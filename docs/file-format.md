@@ -76,9 +76,9 @@ secretVariables:
 ```
 
 - `variables` are plain values committed to git.
-- `secretVariables` lists names only. Values are stored in the macOS Keychain
-  under `awake/<workspace id>/<environment name>/<variable name>` and are never
-  written to disk.
+- `secretVariables` lists names only. Values are stored in the operating system
+  keychain under `awake/<workspace id>/<environment name>/<variable name>` and
+  are never written to disk.
 - A missing secret is reported when a request needs it, and the interface
   prompts for the value.
 

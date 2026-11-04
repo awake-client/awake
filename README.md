@@ -1,8 +1,9 @@
 # Awake
 
-Awake is a git-native API client for macOS. Collections, requests and
-environments are plain YAML files stored in a workspace directory, so
-collaboration happens through git instead of a proprietary cloud.
+Awake is a git-native API client for macOS, Linux and Windows. Collections,
+requests and environments are plain YAML files stored in a workspace
+directory, so collaboration happens through git instead of a proprietary
+cloud.
 
 > Status: early development. The repository currently contains the project
 > scaffolding and the foundations described below.
@@ -66,7 +67,8 @@ local/                      private requests, git ignored
 ```
 
 Secret values never appear in these files. Only their names are stored, with
-the values kept in the macOS Keychain.
+the values kept in the operating system keychain: macOS Keychain, Windows
+Credential Manager or the Secret Service implementation on Linux.
 
 ## Development
 
@@ -77,11 +79,21 @@ Requirements:
 - Wails v3 CLI: `go install github.com/wailsapp/wails/v3/cmd/wails3@latest`
 - Git
 
+Platform dependencies:
+
+- macOS: Xcode command line tools.
+- Windows: WebView2 runtime (preinstalled on Windows 11) and NSIS if you
+  package an installer.
+- Linux: GTK 3 and WebKitGTK 4.1 development packages, for example
+  `libgtk-3-dev` and `libwebkit2gtk-4.1-dev` on Debian and Ubuntu.
+
 ```sh
 wails3 task dev       # run the application with hot reload
 wails3 task test      # run the Go test suite
 wails3 task lint      # run the Go linter
-wails3 task build     # build the macOS application
+wails3 task build     # build the application for the host platform
+wails3 task build GOOS=windows   # cross-compile for Windows
+wails3 task package   # create the platform package
 ```
 
 ## Documentation
