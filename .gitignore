@@ -1,0 +1,27 @@
+# macOS
+.DS_Store
+
+# Editors
+.idea/
+.vscode/
+
+# Go
+/bin/
+*.test
+*.out
+coverage.out
+coverage.html
+
+# Wails build output
+/build/bin/
+
+# Node and Angular
+node_modules/
+frontend/node_modules/
+frontend/dist/
+frontend/.angular/
+frontend/coverage/
+
+# Logs and temporary files
+*.log
+/tmp/
