@@ -25,3 +25,6 @@ frontend/coverage/
 # Logs and temporary files
 *.log
 /tmp/
+
+# Task runner state
+.task/
