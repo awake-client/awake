@@ -64,6 +64,23 @@ func (document *Document) Encode() ([]byte, error) {
 	return buffer.Bytes(), nil
 }
 
+// EncodeValue serializes a Go value with the canonical formatting rules. The
+// value is marshaled first, then normalized through the document encoder so
+// that indentation and line endings match files written by Awake.
+func EncodeValue(value any) ([]byte, error) {
+	raw, err := yaml.Marshal(value)
+	if err != nil {
+		return nil, fmt.Errorf("marshal yaml value: %w", err)
+	}
+
+	document, err := Parse(raw)
+	if err != nil {
+		return nil, fmt.Errorf("normalize yaml value: %w", err)
+	}
+
+	return document.Encode()
+}
+
 // Decode maps the document onto a Go value.
 func (document *Document) Decode(target any) error {
 	if err := document.root.Decode(target); err != nil {
