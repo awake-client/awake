@@ -11,6 +11,7 @@ import (
 
 	"go.yaml.in/yaml/v3"
 
+	"github.com/clementherve/awake/src/shared/files"
 	"github.com/clementherve/awake/src/shared/yamlcodec"
 )
 
@@ -95,7 +96,7 @@ func (repository *Repository) Save(configuration Configuration) error {
 		return fmt.Errorf("encode workspace configuration: %w", err)
 	}
 
-	return writeFileAtomically(repository.ConfigurationPath(), content)
+	return files.WriteAtomically(repository.ConfigurationPath(), content)
 }
 
 // CreateOptions describes a new workspace.
@@ -202,39 +203,5 @@ func ensureIgnoreFile(rootPath string) error {
 	content += "# Added by Awake: local overrides and disposable data.\n"
 	content += strings.Join(missing, "\n") + "\n"
 
-	return writeFileAtomically(path, []byte(content))
-}
-
-func writeFileAtomically(path string, content []byte) error {
-	directory := filepath.Dir(path)
-
-	temporaryFile, err := os.CreateTemp(directory, ".awake-*")
-	if err != nil {
-		return fmt.Errorf("create temporary file for %s: %w", path, err)
-	}
-	temporaryPath := temporaryFile.Name()
-
-	defer func() {
-		_ = os.Remove(temporaryPath)
-	}()
-
-	if _, err := temporaryFile.Write(content); err != nil {
-		temporaryFile.Close()
-		return fmt.Errorf("write temporary file for %s: %w", path, err)
-	}
-	if err := temporaryFile.Sync(); err != nil {
-		temporaryFile.Close()
-		return fmt.Errorf("sync temporary file for %s: %w", path, err)
-	}
-	if err := temporaryFile.Close(); err != nil {
-		return fmt.Errorf("close temporary file for %s: %w", path, err)
-	}
-	if err := os.Chmod(temporaryPath, 0o644); err != nil {
-		return fmt.Errorf("set permissions on %s: %w", path, err)
-	}
-	if err := os.Rename(temporaryPath, path); err != nil {
-		return fmt.Errorf("replace %s: %w", path, err)
-	}
-
-	return nil
+	return files.WriteAtomically(path, []byte(content))
 }
