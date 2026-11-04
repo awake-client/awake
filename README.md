@@ -72,16 +72,16 @@ the values kept in the macOS Keychain.
 
 Requirements:
 
-- Go 1.25 or newer
+- Go 1.26 or newer
 - Node.js 22 or newer
 - Wails v3 CLI: `go install github.com/wailsapp/wails/v3/cmd/wails3@latest`
 - Git
 
 ```sh
-task dev          # run the application with hot reload
-task test         # run the Go test suite
-task lint         # run the Go and TypeScript linters
-task build        # build the macOS application bundle
+wails3 task dev       # run the application with hot reload
+wails3 task test      # run the Go test suite
+wails3 task lint      # run the Go linter
+wails3 task build     # build the macOS application
 ```
 
 ## Documentation
