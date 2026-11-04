@@ -47,6 +47,9 @@ func (client *Client) IsRepository(ctx context.Context) (bool, error) {
 	if err != nil {
 		var commandError *CommandError
 		if errors.As(err, &commandError) {
+			if errors.Is(commandError.Err, exec.ErrNotFound) {
+				return false, fmt.Errorf("git: executable not found: %w", err)
+			}
 			return false, nil
 		}
 		return false, err
