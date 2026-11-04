@@ -26,6 +26,7 @@ func Run(frontendAssets embed.FS) error {
 		Name:        applicationName,
 		Description: applicationDescription,
 		Services: []application.Service{
+			application.NewService(featureServices.Platform),
 			application.NewService(featureServices.Workspace),
 		},
 		Assets: application.AssetOptions{
