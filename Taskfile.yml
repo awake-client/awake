@@ -1,0 +1,47 @@
+version: '3'
+
+vars:
+  APP_NAME: awake
+  BIN_DIR: bin
+  PACKAGE_MANAGER: npm
+  VITE_PORT: '{{.WAILS_VITE_PORT | default 9245}}'
+
+includes:
+  common: ./build/Taskfile.yml
+  darwin: ./build/darwin/Taskfile.yml
+
+tasks:
+  build:
+    summary: Builds the macOS application
+    cmds:
+      - task: darwin:build
+
+  package:
+    summary: Packages the macOS application as a disk image
+    cmds:
+      - task: darwin:package
+
+  run:
+    summary: Runs the application
+    cmds:
+      - task: darwin:run
+
+  dev:
+    summary: Runs the application with frontend hot reload
+    cmds:
+      - wails3 dev -config ./build/config.yml -port {{.VITE_PORT}}
+
+  test:
+    summary: Runs the Go test suite
+    cmds:
+      - go test ./...
+
+  lint:
+    summary: Runs the Go linters
+    cmds:
+      - golangci-lint run ./...
+
+  format:
+    summary: Formats the Go sources
+    cmds:
+      - gofmt -w .
