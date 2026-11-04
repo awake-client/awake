@@ -1,0 +1,13 @@
+[Desktop Entry]
+Version=1.0
+Name=Awake
+Comment=Git-native API client
+# The Exec line includes %u to pass the URL to the application
+Exec=/usr/local/bin/awake %u
+Terminal=false
+Type=Application
+Icon=awake
+Categories=Utility;
+StartupWMClass=awake
+
+ 

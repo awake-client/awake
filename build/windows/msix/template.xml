@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<MsixPackagingToolTemplate
+    xmlns="http://schemas.microsoft.com/msix/packaging/msixpackagingtool/template/2022">
+    <Settings
+        AllowTelemetry="false"
+        ApplyACLsToPackageFiles="true"
+        GenerateCommandLineFile="true"
+        AllowPromptForPassword="false">
+    </Settings>
+    <Installer
+        Path="awake"
+        Arguments=""
+        InstallLocation="C:\Program Files\Clement Herve\Awake">
+    </Installer>
+    <PackageInformation
+        PackageName="Awake"
+        PackageDisplayName="Awake"
+        PublisherName="CN=Clement Herve"
+        PublisherDisplayName="Clement Herve"
+        Version="0.1.0.0"
+        PackageDescription="Git-native API client">
+        <Capabilities>
+            <Capability Name="runFullTrust" />
+            
+        </Capabilities>
+        <Applications>
+            <Application
+                Id="com.clementherve.awake"
+                Description="Git-native API client"
+                DisplayName="Awake"
+                ExecutableName="awake"
+                EntryPoint="Windows.FullTrustApplication">
+                
+            </Application>
+        </Applications>
+        <Resources>
+            <Resource Language="en-us" />
+        </Resources>
+        <Dependencies>
+            <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.17763.0" MaxVersionTested="10.0.19041.0" />
+        </Dependencies>
+        <Properties>
+            <Framework>false</Framework>
+            <DisplayName>Awake</DisplayName>
+            <PublisherDisplayName>Clement Herve</PublisherDisplayName>
+            <Description>Git-native API client</Description>
+            <Logo>Assets\AppIcon.png</Logo>
+        </Properties>
+    </PackageInformation>
+    <SaveLocation PackagePath="awake.msix" />
+    <PackageIntegrity>
+        <CertificatePath></CertificatePath>
+    </PackageIntegrity>
+</MsixPackagingToolTemplate>

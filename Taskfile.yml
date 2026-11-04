@@ -5,26 +5,31 @@ vars:
   BIN_DIR: bin
   PACKAGE_MANAGER: npm
   VITE_PORT: '{{.WAILS_VITE_PORT | default 9245}}'
+  # Target operating system for build and package tasks. Defaults to the host
+  # and can be overridden with `wails3 task build GOOS=windows`.
+  GOOS: '{{.GOOS | default OS}}'
 
 includes:
   common: ./build/Taskfile.yml
   darwin: ./build/darwin/Taskfile.yml
+  windows: ./build/windows/Taskfile.yml
+  linux: ./build/linux/Taskfile.yml
 
 tasks:
   build:
-    summary: Builds the macOS application
+    summary: Builds the application for the target operating system
     cmds:
-      - task: darwin:build
+      - task: "{{.GOOS}}:build"
 
   package:
-    summary: Packages the macOS application as a disk image
+    summary: Packages the application for the target operating system
     cmds:
-      - task: darwin:package
+      - task: "{{.GOOS}}:package"
 
   run:
     summary: Runs the application
     cmds:
-      - task: darwin:run
+      - task: "{{.GOOS}}:run"
 
   dev:
     summary: Runs the application with frontend hot reload
@@ -32,9 +37,16 @@ tasks:
       - wails3 dev -config ./build/config.yml -port {{.VITE_PORT}}
 
   test:
-    summary: Runs the Go test suite
+    summary: Runs the Go and frontend test suites
     cmds:
-      - go test ./...
+      - go test ./src/...
+      - task: frontend:test
+
+  frontend:test:
+    summary: Runs the Angular unit tests
+    dir: frontend
+    cmds:
+      - npm test -- --watch=false
 
   lint:
     summary: Runs the Go linters
