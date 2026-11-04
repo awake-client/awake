@@ -20,9 +20,14 @@ const (
 // Run creates the Wails application and blocks until the last window is
 // closed.
 func Run(frontendAssets embed.FS) error {
+	featureServices := newServices()
+
 	instance := application.New(application.Options{
 		Name:        applicationName,
 		Description: applicationDescription,
+		Services: []application.Service{
+			application.NewService(featureServices.Workspace),
+		},
 		Assets: application.AssetOptions{
 			Handler: application.AssetFileServerFS(frontendAssets),
 		},
