@@ -1,0 +1,63 @@
+<section class="workspace-picker">
+  <header>
+    <h1>Open a workspace</h1>
+    <p class="hint">
+      Point to a directory containing a workspace, or create a new one.
+    </p>
+  </header>
+
+  <label class="field">
+    <span class="field-label">Directory</span>
+    <input
+      type="text"
+      [ngModel]="workspacePath()"
+      (ngModelChange)="workspacePath.set($event)"
+      placeholder="/Users/me/api-workspace"
+      spellcheck="false"
+      autocomplete="off"
+    />
+  </label>
+
+  <div class="actions">
+    <button type="button" (click)="openWorkspace()" [disabled]="isBusy()">
+      Open workspace
+    </button>
+  </div>
+
+  <hr />
+
+  <h2>Create a workspace</h2>
+
+  <label class="field">
+    <span class="field-label">Name</span>
+    <input
+      type="text"
+      [ngModel]="workspaceName()"
+      (ngModelChange)="workspaceName.set($event)"
+      placeholder="Platform API"
+      autocomplete="off"
+    />
+  </label>
+
+  <label class="field">
+    <span class="field-label">Mode</span>
+    <select [value]="mode()" (change)="selectMode($event)">
+      <option value="team">Team</option>
+      <option value="personal">Personal</option>
+    </select>
+  </label>
+
+  <div class="actions">
+    <button type="button" (click)="createWorkspace()" [disabled]="isBusy()">
+      Create workspace
+    </button>
+  </div>
+
+  @if (openedWorkspace(); as workspace) {
+    <p class="success">Opened {{ workspace.Name }} ({{ workspace.Mode }}).</p>
+  }
+
+  @if (errorMessage(); as message) {
+    <p class="error">{{ message }}</p>
+  }
+</section>
