@@ -1,0 +1,14 @@
+# Workspace configuration
+version: 1
+id: workspace_01JABCDEF
+name: Platform API
+mode: team
+defaultEnvironment: development
+variables:
+  apiVersion: v1
+git:
+  remote: origin
+  branch: main
+  automaticPull: true
+  automaticPush: true
+  synchronizationInterval: 5m

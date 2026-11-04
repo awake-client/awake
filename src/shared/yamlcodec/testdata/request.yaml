@@ -1,0 +1,14 @@
+name: List users
+method: GET
+url: "{{baseUrl}}/{{apiVersion}}/users"
+parameters:
+  - {name: page, value: "1", enabled: true}
+  - {name: query, value: "", enabled: false}
+headers:
+  - {name: Accept, value: application/json, enabled: true}
+authentication:
+  type: inherit
+body:
+  type: none
+documentation: |
+  Returns a paginated list of users.
