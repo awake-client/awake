@@ -8,5 +8,8 @@ export {
 
 export type {
     Chunk,
-    Response
+    Response,
+    Stream,
+    StreamEvent,
+    StreamEventPage
 } from "./models.js";

@@ -3,7 +3,8 @@
 
 export {
     AuthenticationType,
-    BodyType
+    BodyType,
+    Protocol
 } from "./models.js";
 
 export type {

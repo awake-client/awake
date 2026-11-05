@@ -103,12 +103,38 @@ export interface Parameter {
 }
 
 /**
+ * Protocol describes how a request exchanges data with its server.
+ */
+export enum Protocol {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    /**
+     * ProtocolHTTP is a single request and response exchange.
+     */
+    ProtocolHTTP = "http",
+
+    /**
+     * ProtocolSSE keeps an HTTP connection open and reads server-sent events.
+     */
+    ProtocolSSE = "sse",
+
+    /**
+     * ProtocolWebSocket keeps a bidirectional WebSocket connection open.
+     */
+    ProtocolWebSocket = "websocket",
+};
+
+/**
  * Request mirrors a request YAML file.
  */
 export interface Request {
     "Name": string;
     "Method": string;
     "URL": string;
+    "Protocol": Protocol;
     "Parameters": Parameter[] | null;
     "Headers": Header[] | null;
     "Authentication": Authentication | null;

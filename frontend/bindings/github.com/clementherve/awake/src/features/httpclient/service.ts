@@ -22,6 +22,22 @@ export function Close(identifier: string): $CancellablePromise<void> {
 }
 
 /**
+ * CloseStream stops a live stream but keeps its events readable until they are
+ * released.
+ */
+export function CloseStream(identifier: string): $CancellablePromise<void> {
+    return $Call.ByID(2611765148, identifier);
+}
+
+/**
+ * OpenStream starts a server-sent events or WebSocket session. The connection
+ * stays open until CloseStream or ReleaseStream is called.
+ */
+export function OpenStream(workspaceRoot: string, requestPath: string, environmentFileName: string): $CancellablePromise<$models.Stream> {
+    return $Call.ByID(175550392, workspaceRoot, requestPath, environmentFileName);
+}
+
+/**
  * ReadChunk returns a slice of a stored response body.
  */
 export function ReadChunk(identifier: string, offset: number, length: number): $CancellablePromise<$models.Chunk> {
@@ -29,8 +45,31 @@ export function ReadChunk(identifier: string, offset: number, length: number): $
 }
 
 /**
+ * ReadStreamEvents returns the events starting at fromIndex. Callers pass the
+ * NextIndex of the previous page, and zero for the first read.
+ */
+export function ReadStreamEvents(identifier: string, fromIndex: number): $CancellablePromise<$models.StreamEventPage> {
+    return $Call.ByID(1083302581, identifier, fromIndex);
+}
+
+/**
+ * ReleaseStream stops a stream and forgets its events.
+ */
+export function ReleaseStream(identifier: string): $CancellablePromise<void> {
+    return $Call.ByID(3546862221, identifier);
+}
+
+/**
  * Send executes a request and streams its body to the response store.
  */
 export function Send(workspaceRoot: string, requestPath: string, environmentFileName: string): $CancellablePromise<$models.Response> {
     return $Call.ByID(3813540462, workspaceRoot, requestPath, environmentFileName);
+}
+
+/**
+ * SendStreamMessage writes a WebSocket message. encoding is utf-8 for text or
+ * base64 for binary payloads.
+ */
+export function SendStreamMessage(identifier: string, message: string, encoding: string): $CancellablePromise<void> {
+    return $Call.ByID(931444429, identifier, message, encoding);
 }
