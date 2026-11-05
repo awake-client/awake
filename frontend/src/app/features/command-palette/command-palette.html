@@ -1,0 +1,59 @@
+@if (isOpen()) {
+  <div class="palette-backdrop" (click)="close()">
+    <section
+      class="palette"
+      role="dialog"
+      aria-label="Search requests"
+      aria-modal="true"
+      (click)="$event.stopPropagation()"
+    >
+      <input
+        #searchInput
+        class="palette-input"
+        type="text"
+        name="paletteQuery"
+        [ngModel]="query()"
+        (ngModelChange)="updateQuery($event)"
+        placeholder="Search requests by name, path or method…"
+        autocomplete="off"
+        spellcheck="false"
+        aria-label="Search requests"
+      />
+
+      @if (errorMessage(); as message) {
+        <p class="palette-message error">{{ message }}</p>
+      }
+
+      @if (isLoading()) {
+        <p class="palette-message">Loading requests…</p>
+      } @else if (results().length === 0) {
+        <p class="palette-message">No request matches this search.</p>
+      } @else {
+        <ul class="palette-results" role="listbox">
+          @for (entry of results(); track entry.Path; let index = $index) {
+            <li
+              class="palette-result"
+              role="option"
+              [class.active]="index === selectedIndex()"
+              [attr.aria-selected]="index === selectedIndex()"
+              (mouseenter)="activeIndex.set(index)"
+              (click)="choose(entry)"
+            >
+              <span class="method" [attr.data-method]="entry.Method || 'GET'">
+                {{ entry.Method || 'GET' }}
+              </span>
+              <span class="result-name">{{ entry.Name }}</span>
+              <span class="result-path">{{ displayPath(entry) }}</span>
+            </li>
+          }
+        </ul>
+      }
+
+      <footer class="palette-footer">
+        <span><kbd>↑</kbd><kbd>↓</kbd> navigate</span>
+        <span><kbd>↵</kbd> open</span>
+        <span><kbd>esc</kbd> close</span>
+      </footer>
+    </section>
+  </div>
+}

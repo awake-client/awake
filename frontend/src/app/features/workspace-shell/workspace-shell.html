@@ -9,6 +9,14 @@
   </div>
 
   <div class="workspace-actions">
+    <button
+      type="button"
+      class="ghost-button"
+      title="Search requests (Ctrl/Cmd + P)"
+      (click)="openCommandPalette()"
+    >
+      Search
+    </button>
     <a class="ghost-button" routerLink="/workspace/history">History</a>
     <a class="ghost-button" routerLink="/workspace/git">Git</a>
 
@@ -45,3 +53,5 @@
     <router-outlet />
   </section>
 </div>
+
+<app-command-palette />

@@ -1,10 +1,11 @@
-import { Component, computed, effect, inject, signal } from '@angular/core';
+import { Component, computed, effect, inject, signal, viewChild } from '@angular/core';
 import { Router, RouterLink, RouterOutlet } from '@angular/router';
 import * as EnvironmentsService from '@bindings/github.com/clementherve/awake/src/features/environments/service';
 import { Summary } from '@bindings/github.com/clementherve/awake/src/features/environments/models';
 import { EnvironmentStore } from '@core/environment-store';
 import { WorkspaceStore } from '@core/workspace-store';
 import { CollectionTree } from '@features/collections/collection-tree';
+import { CommandPalette } from '@features/command-palette/command-palette';
 
 /**
  * Application frame for an open workspace: collection tree on the left, the
@@ -12,7 +13,7 @@ import { CollectionTree } from '@features/collections/collection-tree';
  */
 @Component({
   selector: 'app-workspace-shell',
-  imports: [RouterOutlet, RouterLink, CollectionTree],
+  imports: [RouterOutlet, RouterLink, CollectionTree, CommandPalette],
   templateUrl: './workspace-shell.html',
   styleUrl: './workspace-shell.css',
 })
@@ -20,6 +21,7 @@ export class WorkspaceShell {
   private readonly environmentStore = inject(EnvironmentStore);
   private readonly workspaceStore = inject(WorkspaceStore);
   private readonly router = inject(Router);
+  private readonly commandPalette = viewChild(CommandPalette);
 
   protected readonly workspace = this.workspaceStore.workspace;
   protected readonly rootPath = computed(
@@ -46,6 +48,10 @@ export class WorkspaceShell {
 
   protected openRequest(path: string): void {
     void this.router.navigate(['/workspace/request', ...path.split('/')]);
+  }
+
+  protected openCommandPalette(): void {
+    void this.commandPalette()?.open();
   }
 
   protected selectEnvironment(event: Event): void {
