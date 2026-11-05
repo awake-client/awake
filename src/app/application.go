@@ -35,6 +35,7 @@ func Run(frontendAssets embed.FS) error {
 			application.NewService(featureServices.History),
 			application.NewService(featureServices.HTTPClient),
 			application.NewService(featureServices.Interop),
+			application.NewService(featureServices.OAuth2),
 			application.NewService(featureServices.Platform),
 			application.NewService(featureServices.Secrets),
 			application.NewService(featureServices.Workspace),

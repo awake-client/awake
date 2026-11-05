@@ -7,6 +7,7 @@ import (
 	"github.com/clementherve/awake/src/features/history"
 	"github.com/clementherve/awake/src/features/httpclient"
 	"github.com/clementherve/awake/src/features/interop"
+	"github.com/clementherve/awake/src/features/oauth2"
 	"github.com/clementherve/awake/src/features/platform"
 	"github.com/clementherve/awake/src/features/secrets"
 	"github.com/clementherve/awake/src/features/workspace"
@@ -21,6 +22,7 @@ type services struct {
 	History      *history.Service
 	HTTPClient   *httpclient.Service
 	Interop      *interop.Service
+	OAuth2       *oauth2.Service
 	Platform     *platform.Service
 	Secrets      *secrets.Service
 	Workspace    *workspace.Service
@@ -31,11 +33,15 @@ func newServices() (*services, error) {
 
 	keychain := secrets.NewKeyringKeychain()
 	secretRepository := secrets.NewRepository(keychain)
+	source := requestSource{secrets: secretRepository}
 
-	httpClient, err := httpclient.NewService(requestSource{secrets: secretRepository}, historyService)
+	httpClient, err := httpclient.NewService(source, historyService)
 	if err != nil {
 		return nil, err
 	}
+
+	oauth2Service := oauth2.NewService(source)
+	httpclient.SetOAuth2Provider(httpClient, oauth2.NewProvider(oauth2Service))
 
 	return &services{
 		Collections:  collections.NewService(),
@@ -44,6 +50,7 @@ func newServices() (*services, error) {
 		History:      historyService,
 		HTTPClient:   httpClient,
 		Interop:      interop.NewService(interopAdapter{}, interopAdapter{}),
+		OAuth2:       oauth2Service,
 		Platform:     platform.NewService(),
 		Secrets:      secrets.NewServiceWithKeychain(keychain),
 		Workspace:    workspace.NewService(),
