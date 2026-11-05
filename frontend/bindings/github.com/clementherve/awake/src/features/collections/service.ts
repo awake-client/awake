@@ -48,6 +48,13 @@ export function LoadRequest(workspaceRoot: string, relativePath: string): $Cance
 }
 
 /**
+ * SearchRequests returns requests matching every word of the query.
+ */
+export function SearchRequests(workspaceRoot: string, query: string, limit: number): $CancellablePromise<$models.Entry[] | null> {
+    return $Call.ByID(2739524308, workspaceRoot, query, limit);
+}
+
+/**
  * UpdateRequest replaces the content of an existing request file.
  */
 export function UpdateRequest(workspaceRoot: string, relativePath: string, request: domain$0.Request): $CancellablePromise<void> {

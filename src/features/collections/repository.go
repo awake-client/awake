@@ -142,6 +142,72 @@ func (repository *Repository) List(relativePath string) ([]Entry, error) {
 	return result, nil
 }
 
+// SearchRequests returns the requests whose name, path or method match every
+// word of the query. An empty query returns the first requests of the
+// workspace, which lets the command palette fill itself when it opens.
+func (repository *Repository) SearchRequests(query string, limit int) ([]Entry, error) {
+	if limit <= 0 {
+		limit = 50
+	}
+
+	terms := strings.Fields(strings.ToLower(query))
+	result := make([]Entry, 0, limit)
+
+	err := filepath.WalkDir(repository.CollectionsPath(), func(filePath string, entry os.DirEntry, walkError error) error {
+		if walkError != nil {
+			if errors.Is(walkError, os.ErrNotExist) {
+				return nil
+			}
+			return walkError
+		}
+		if entry.IsDir() {
+			return nil
+		}
+		if !strings.HasSuffix(entry.Name(), fileExtension) || entry.Name() == collectionFileName {
+			return nil
+		}
+
+		relativePath, err := filepath.Rel(repository.workspaceRoot, filePath)
+		if err != nil {
+			return err
+		}
+
+		name, method, err := readRequestSummary(filePath, entry.Name())
+		if err != nil {
+			return fmt.Errorf("read request %s: %w", relativePath, err)
+		}
+
+		requestPath := filepath.ToSlash(relativePath)
+		candidate := Entry{
+			Path:   requestPath,
+			Name:   name,
+			Kind:   KindRequest,
+			Method: method,
+		}
+		if matchesQuery(candidate, terms) {
+			result = append(result, candidate)
+		}
+
+		return nil
+	})
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return []Entry{}, nil
+		}
+		return nil, fmt.Errorf("search requests: %w", err)
+	}
+
+	sort.Slice(result, func(first int, second int) bool {
+		return entryLess(result[first], result[second])
+	})
+
+	if len(result) > limit {
+		result = result[:limit]
+	}
+
+	return result, nil
+}
+
 // LoadRequest reads and validates a request file.
 func (repository *Repository) LoadRequest(relativePath string) (domain.Request, error) {
 	if !isRequestPath(relativePath) {
@@ -385,4 +451,19 @@ func hasChildren(directory string) (bool, error) {
 func isRequestPath(relativePath string) bool {
 	return strings.HasSuffix(relativePath, fileExtension) &&
 		path.Base(relativePath) != collectionFileName
+}
+
+func matchesQuery(entry Entry, terms []string) bool {
+	if len(terms) == 0 {
+		return true
+	}
+
+	haystack := strings.ToLower(entry.Name + " " + entry.Path + " " + entry.Method)
+	for _, term := range terms {
+		if !strings.Contains(haystack, term) {
+			return false
+		}
+	}
+
+	return true
 }

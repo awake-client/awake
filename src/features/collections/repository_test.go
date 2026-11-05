@@ -238,3 +238,65 @@ func TestUpdateRequestRejectsMissingFile(t *testing.T) {
 		t.Fatalf("expected ErrEntryNotFound, got %v", err)
 	}
 }
+
+func TestSearchRequestsMatchesNamePathAndMethod(t *testing.T) {
+	workspaceRoot := t.TempDir()
+	writeTestFile(t, workspaceRoot, "collections/platform/users/list.yaml", "name: List users\nmethod: GET\nurl: https://example.com/users\n")
+	writeTestFile(t, workspaceRoot, "collections/platform/users/create.yaml", "name: Create user\nmethod: POST\nurl: https://example.com/users\n")
+	writeTestFile(t, workspaceRoot, "collections/billing/invoices.yaml", "name: List invoices\nmethod: GET\nurl: https://example.com/invoices\n")
+	writeTestFile(t, workspaceRoot, "collections/platform/collection.yaml", "name: Platform\n")
+
+	repository := NewRepository(workspaceRoot)
+
+	testCases := []struct {
+		query    string
+		expected []string
+	}{
+		{query: "", expected: []string{"Create user", "List invoices", "List users"}},
+		{query: "users", expected: []string{"Create user", "List users"}},
+		{query: "list users", expected: []string{"List users"}},
+		{query: "post", expected: []string{"Create user"}},
+		{query: "billing", expected: []string{"List invoices"}},
+		{query: "missing", expected: []string{}},
+	}
+
+	for _, testCase := range testCases {
+		entries, err := repository.SearchRequests(testCase.query, 100)
+		if err != nil {
+			t.Fatalf("search %q: %v", testCase.query, err)
+		}
+
+		names := make([]string, 0, len(entries))
+		for _, entry := range entries {
+			names = append(names, entry.Name)
+		}
+
+		if strings.Join(names, ",") != strings.Join(testCase.expected, ",") {
+			t.Errorf("search %q: expected %v, got %v", testCase.query, testCase.expected, names)
+		}
+	}
+}
+
+func TestSearchRequestsHonoursLimit(t *testing.T) {
+	workspaceRoot := t.TempDir()
+	writeTestFile(t, workspaceRoot, "collections/platform/first.yaml", "name: First\nmethod: GET\nurl: https://example.com/first\n")
+	writeTestFile(t, workspaceRoot, "collections/platform/second.yaml", "name: Second\nmethod: GET\nurl: https://example.com/second\n")
+
+	entries, err := NewRepository(workspaceRoot).SearchRequests("", 1)
+	if err != nil {
+		t.Fatalf("search requests: %v", err)
+	}
+	if len(entries) != 1 {
+		t.Fatalf("expected 1 entry, got %d", len(entries))
+	}
+}
+
+func TestSearchRequestsReturnsNothingWithoutCollections(t *testing.T) {
+	entries, err := NewRepository(t.TempDir()).SearchRequests("", 10)
+	if err != nil {
+		t.Fatalf("search requests: %v", err)
+	}
+	if len(entries) != 0 {
+		t.Fatalf("expected no entries, got %+v", entries)
+	}
+}

@@ -35,3 +35,8 @@ func (service *Service) UpdateRequest(workspaceRoot string, relativePath string,
 func (service *Service) CreateCollection(workspaceRoot string, relativePath string, collection domain.Collection) error {
 	return NewRepository(workspaceRoot).CreateCollection(relativePath, collection)
 }
+
+// SearchRequests returns requests matching every word of the query.
+func (service *Service) SearchRequests(workspaceRoot string, query string, limit int) ([]Entry, error) {
+	return NewRepository(workspaceRoot).SearchRequests(query, limit)
+}
