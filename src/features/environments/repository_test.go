@@ -5,6 +5,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/clementherve/awake/src/shared/variables"
 )
 
 func TestListReturnsSharedEnvironmentsSorted(t *testing.T) {
@@ -63,7 +65,7 @@ variables:
 		t.Errorf("expected Development, got %q", resolved.Name)
 	}
 
-	interpolated, err := Interpolate(
+	interpolated, err := variables.Interpolate(
 		"{{baseUrl}}?pageSize={{pageSize}}",
 		resolved.Layers()...,
 	)
