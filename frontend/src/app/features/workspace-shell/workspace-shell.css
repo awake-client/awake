@@ -3,128 +3,235 @@
   flex-direction: column;
   height: 100vh;
   overflow: hidden;
+  background: var(--color-background);
 }
 
 .workspace-header {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
-  justify-content: space-between;
-  height: 44px;
-  padding: 0 12px 0 16px;
+  height: 38px;
+  padding: 0 10px;
   border-bottom: 1px solid var(--color-border);
-  background: var(--color-surface);
+  background: var(--color-background);
   flex: 0 0 auto;
+  gap: 12px;
 }
 
 /* On macOS the inset title bar leaves a transparent strip above the content,
    so the header reserves the room used by the traffic lights. */
 :host-context(html[data-platform='darwin']) .workspace-header {
-  height: 82px;
+  height: 72px;
   align-items: flex-end;
-  padding-bottom: 8px;
+  padding-bottom: 4px;
 }
 
 .workspace-identity {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 6px;
   min-width: 0;
+  color: var(--color-text);
+  font-size: 0.75rem;
+}
+
+.home-icon {
+  flex: 0 0 auto;
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
 }
 
 .workspace-name {
-  font-weight: 600;
+  font-weight: 500;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .mode-badge {
-  font-size: 0.625rem;
-  font-weight: 600;
-  letter-spacing: 0.06em;
+  font-size: 0.5625rem;
+  font-weight: 500;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
   color: var(--color-text-muted);
   border: 1px solid var(--color-border);
   border-radius: 999px;
-  padding: 2px 8px;
+  padding: 1px 6px;
+}
+
+.workspace-brand {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.brand-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+  font-size: 0.5625rem;
+  font-weight: 700;
 }
 
 .ghost-button {
-  border: 1px solid var(--color-border);
+  border: 1px solid transparent;
   background: transparent;
   color: var(--color-text-muted);
-  border-radius: 6px;
-  padding: 5px 10px;
-  font-size: 0.75rem;
+  border-radius: var(--radius-sm);
+  padding: 3px 8px;
+  font-size: 0.6875rem;
   cursor: pointer;
   text-decoration: none;
   display: inline-flex;
   align-items: center;
+  gap: 5px;
+  white-space: nowrap;
 }
 
 .ghost-button:hover {
-  color: var(--color-text);
+  color: var(--color-text-strong);
   background: var(--color-hover);
 }
 
+.ghost-button.icon-only {
+  padding: 4px 7px;
+  font-size: 0.8125rem;
+}
+
 .update-error {
-  max-width: 160px;
+  max-width: 120px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 0.6875rem;
+  font-size: 0.625rem;
   color: var(--color-danger);
 }
 
 .workspace-body {
   display: grid;
-  grid-template-columns: 288px 1fr;
+  grid-template-columns: 300px minmax(0, 1fr);
   flex: 1;
   min-height: 0;
 }
 
 .tree-panel {
   border-right: 1px solid var(--color-border);
-  background: var(--color-surface);
-  padding-top: 12px;
+  background: var(--color-background);
   min-height: 0;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 .editor-panel {
   min-width: 0;
   min-height: 0;
   overflow: hidden;
+  background: var(--color-background);
 }
 
 .workspace-actions {
   display: flex;
   align-items: center;
-  gap: 12px;
+  justify-content: flex-end;
+  gap: 4px;
+  min-width: 0;
 }
 
 .environment-picker {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
+  margin-left: 4px;
 }
 
 .environment-label {
-  font-size: 0.6875rem;
-  color: var(--color-text-muted);
+  display: none;
 }
 
 .environment-picker select {
-  border: 1px solid var(--color-border);
-  background: var(--color-surface);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--color-text-muted);
+  border-radius: var(--radius-sm);
+  padding: 3px 4px;
+  font-size: 0.6875rem;
+  max-width: 140px;
+}
+
+.environment-picker select:hover {
+  background: var(--color-hover);
   color: var(--color-text);
-  border-radius: 6px;
-  padding: 4px 8px;
-  font-size: 0.75rem;
-  max-width: 220px;
 }
 
 .environment-picker select:focus {
   outline: none;
-  border-color: var(--color-accent);
+  border-color: var(--color-border-strong);
+}
+
+.status-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 26px;
+  padding: 0 10px;
+  border-top: 1px solid var(--color-border);
+  background: var(--color-background);
+  color: var(--color-text-muted);
+  font-size: 0.625rem;
+  flex: 0 0 auto;
+}
+
+.status-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+
+.status-spacer {
+  flex: 1;
+}
+
+.status-button {
+  border: none;
+  background: transparent;
+  color: var(--color-text-muted);
+  font: inherit;
+  font-size: 0.625rem;
+  padding: 0;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.status-button:hover {
+  color: var(--color-text);
+}
+
+.status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-success);
+}
+
+@media (max-width: 900px) {
+  .workspace-body {
+    grid-template-columns: 240px minmax(0, 1fr);
+  }
+
+  .workspace-brand {
+    display: none;
+  }
 }

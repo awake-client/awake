@@ -1,11 +1,17 @@
 <header class="workspace-header">
   <div class="workspace-identity">
+    <span class="home-icon" aria-hidden="true">⌂</span>
     <span class="workspace-name">
       {{ workspace()?.configuration?.Name }}
     </span>
     @if (modeLabel(); as mode) {
       <span class="mode-badge">{{ mode }}</span>
     }
+  </div>
+
+  <div class="workspace-brand">
+    <span class="brand-mark">A</span>
+    <span>Awake</span>
   </div>
 
   <div class="workspace-actions">
@@ -20,13 +26,13 @@
     <a class="ghost-button" routerLink="/workspace/history">History</a>
     <a class="ghost-button" routerLink="/workspace/environments">Environments</a>
     <a class="ghost-button" routerLink="/workspace/git">Git</a>
-    <a class="ghost-button" routerLink="/workspace/interop">Import/Export</a>
+    <a class="ghost-button" routerLink="/workspace/interop">Import</a>
 
     <label class="environment-picker">
-      <span class="environment-label">Environment</span>
       <select
         [value]="selectedEnvironment()"
         (change)="selectEnvironment($event)"
+        title="Environment"
       >
         <option value="">No environment</option>
         @for (environment of environments(); track environment.FileName) {
@@ -67,5 +73,20 @@
     <router-outlet />
   </section>
 </div>
+
+<footer class="status-bar">
+  <span class="status-item">
+    <span class="status-dot"></span>
+    {{ selectedEnvironmentLabel() }}
+  </span>
+  @if (modeLabel(); as mode) {
+    <span class="status-item">{{ mode }} workspace</span>
+  }
+  <span class="status-spacer"></span>
+  <button type="button" class="status-button" (click)="openCommandPalette()">
+    Search ⌘P
+  </button>
+  <span class="status-item">v{{ version() || '0.1.0' }}</span>
+</footer>
 
 <app-command-palette />

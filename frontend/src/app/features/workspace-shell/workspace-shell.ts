@@ -48,6 +48,16 @@ export class WorkspaceShell {
     }
     return mode.charAt(0).toUpperCase() + mode.slice(1);
   });
+  protected readonly selectedEnvironmentLabel = computed(() => {
+    const selected = this.selectedEnvironment();
+    if (!selected) {
+      return 'No environment';
+    }
+    const environment = this.environments().find(
+      (summary) => summary.FileName === selected,
+    );
+    return environment?.Name ?? selected;
+  });
 
   constructor() {
     effect(() => {
