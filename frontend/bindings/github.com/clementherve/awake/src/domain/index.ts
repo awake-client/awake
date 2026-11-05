@@ -15,5 +15,8 @@ export type {
     Header,
     HistoryEntry,
     Parameter,
-    Request
+    Request,
+    ScriptOutcome,
+    ScriptTest,
+    Scripts
 } from "./models.js";

@@ -173,5 +173,34 @@ export interface Request {
     "Headers": Header[] | null;
     "Authentication": Authentication | null;
     "Body": Body | null;
+    "Scripts": Scripts | null;
     "Documentation": string;
+}
+
+/**
+ * ScriptOutcome is the result of a pre-request or post-response script.
+ */
+export interface ScriptOutcome {
+    "Logs": string[] | null;
+    "Tests": ScriptTest[] | null;
+    "Error": string;
+}
+
+/**
+ * ScriptTest is one assertion reported by a request script.
+ */
+export interface ScriptTest {
+    "Name": string;
+    "Passed": boolean;
+    "Error": string;
+}
+
+/**
+ * Scripts holds the JavaScript hooks of a request. They run inside the
+ * application with access to the request, the response and the resolved
+ * variables.
+ */
+export interface Scripts {
+    "PreRequest": string;
+    "PostResponse": string;
 }

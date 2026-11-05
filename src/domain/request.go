@@ -80,6 +80,7 @@ type Request struct {
 	Headers        []Header        `yaml:"headers,omitempty"`
 	Authentication *Authentication `yaml:"authentication,omitempty"`
 	Body           *Body           `yaml:"body,omitempty"`
+	Scripts        *Scripts        `yaml:"scripts,omitempty"`
 	Documentation  string          `yaml:"documentation,omitempty"`
 }
 
@@ -124,6 +125,39 @@ type Authentication struct {
 type Body struct {
 	Type    BodyType `yaml:"type"`
 	Content string   `yaml:"content,omitempty"`
+}
+
+// Scripts holds the JavaScript hooks of a request. They run inside the
+// application with access to the request, the response and the resolved
+// variables.
+type Scripts struct {
+	PreRequest   string `yaml:"preRequest,omitempty"`
+	PostResponse string `yaml:"postResponse,omitempty"`
+}
+
+// ScriptTest is one assertion reported by a request script.
+type ScriptTest struct {
+	Name   string
+	Passed bool
+	Error  string
+}
+
+// ScriptOutcome is the result of a pre-request or post-response script.
+type ScriptOutcome struct {
+	Logs  []string
+	Tests []ScriptTest
+	Error string
+}
+
+// ScriptResponse is the response view exposed to post-response scripts. Body
+// contains the preview (or the base64 preview for binary responses).
+type ScriptResponse struct {
+	StatusCode           int
+	Status               string
+	Headers              map[string][]string
+	Body                 string
+	Encoding             string
+	DurationMilliseconds int64
 }
 
 // ApplyDefaults fills optional sections and normalizes the method.
