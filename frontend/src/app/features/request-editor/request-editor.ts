@@ -3,6 +3,11 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
 import * as CollectionsService from '@bindings/github.com/clementherve/awake/src/features/collections/service';
+import * as HTTPClientService from '@bindings/github.com/clementherve/awake/src/features/httpclient/service';
+import {
+  Chunk,
+  Response as HTTPResponse,
+} from '@bindings/github.com/clementherve/awake/src/features/httpclient/models';
 import {
   Authentication,
   AuthenticationType,
@@ -12,6 +17,7 @@ import {
   Parameter,
   Request,
 } from '@bindings/github.com/clementherve/awake/src/domain/models';
+import { EnvironmentStore } from '@core/environment-store';
 import { WorkspaceStore } from '@core/workspace-store';
 
 /** Sections of the request editor. */
@@ -55,6 +61,7 @@ const TAB_LABELS: Record<EditorTab, string> = {
 })
 export class RequestEditor {
   private readonly route = inject(ActivatedRoute);
+  private readonly environmentStore = inject(EnvironmentStore);
   private readonly workspaceStore = inject(WorkspaceStore);
 
   protected readonly AuthenticationType = AuthenticationType;
@@ -81,7 +88,16 @@ export class RequestEditor {
   protected readonly body = signal<Body>({ Type: BodyType.BodyNone, Content: '' });
   protected readonly activeTab = signal<EditorTab>('parameters');
 
+  protected readonly response = signal<HTTPResponse | null>(null);
+  protected readonly responseBody = signal('');
+  protected readonly responseHasMore = signal(false);
+  protected readonly responseTab = signal<'body' | 'headers'>('body');
+  protected readonly responseError = signal<string | null>(null);
+  protected readonly isSending = signal(false);
+  protected readonly isLoadingChunk = signal(false);
+
   private readonly snapshot = signal('');
+  private responseNextOffset = 0;
 
   private readonly draft = computed<Request>(() => ({
     Name: this.name(),
@@ -109,15 +125,19 @@ export class RequestEditor {
     });
   }
 
+  ngOnDestroy(): void {
+    void this.closeResponse();
+  }
+
   protected selectTab(tab: EditorTab): void {
     this.activeTab.set(tab);
   }
 
-  protected async save(): Promise<void> {
+  protected async save(): Promise<boolean> {
     const draft = this.draft();
     if (draft.Name.trim() === '' || draft.URL.trim() === '') {
       this.errorMessage.set('A request needs a name and a URL.');
-      return;
+      return false;
     }
 
     const request: Request = {
@@ -141,19 +161,134 @@ export class RequestEditor {
       this.url.set(request.URL);
       this.snapshot.set(JSON.stringify(this.draft()));
       this.statusMessage.set('Saved');
+      return true;
     } catch (error) {
       this.errorMessage.set(describeError(error));
+      return false;
     } finally {
       this.isSaving.set(false);
     }
   }
 
+  protected async send(): Promise<void> {
+    if (this.isLoading() || this.isSending()) {
+      return;
+    }
+
+    if (this.isDirty() && !(await this.save())) {
+      return;
+    }
+
+    this.isSending.set(true);
+    this.responseError.set(null);
+    await this.closeResponse();
+
+    try {
+      const response = await HTTPClientService.Send(
+        this.workspaceStore.rootPath() ?? '',
+        this.requestPath(),
+        this.environmentStore.selected(),
+      );
+
+      this.response.set(response);
+      this.responseTab.set('body');
+      this.responseHasMore.set(false);
+
+      if (response.Encoding === 'utf-8') {
+        this.responseBody.set(response.Preview);
+        this.responseNextOffset = new TextEncoder().encode(
+          response.Preview,
+        ).length;
+        this.responseHasMore.set(this.responseNextOffset < response.Size);
+      } else {
+        this.responseBody.set('');
+        this.responseNextOffset = 0;
+      }
+    } catch (error) {
+      this.responseError.set(describeError(error));
+    } finally {
+      this.isSending.set(false);
+    }
+  }
+
+  protected async loadMore(): Promise<void> {
+    const response = this.response();
+    if (!response || this.isLoadingChunk() || !this.responseHasMore()) {
+      return;
+    }
+
+    this.isLoadingChunk.set(true);
+
+    try {
+      const chunk = await HTTPClientService.ReadChunk(
+        response.ID,
+        this.responseNextOffset,
+        256 << 10,
+      );
+      this.responseBody.update((body) => body + decodeChunk(chunk));
+      this.responseNextOffset = chunk.NextOffset;
+      this.responseHasMore.set(chunk.HasMore);
+    } catch (error) {
+      this.responseError.set(describeError(error));
+    } finally {
+      this.isLoadingChunk.set(false);
+    }
+  }
+
+  protected async closeResponsePanel(): Promise<void> {
+    await this.closeResponse();
+    this.responseError.set(null);
+  }
+
+  protected selectResponseTab(tab: 'body' | 'headers'): void {
+    this.responseTab.set(tab);
+  }
+
+  protected statusClass(response: HTTPResponse): string {
+    if (response.StatusCode >= 500) {
+      return 'server-error';
+    }
+    if (response.StatusCode >= 400) {
+      return 'client-error';
+    }
+    return 'success';
+  }
+
+  protected headerEntries(
+    response: HTTPResponse,
+  ): { name: string; value: string }[] {
+    return Object.entries(response.Headers ?? {}).map(([name, values]) => ({
+      name,
+      value: (values ?? []).join(', '),
+    }));
+  }
+
+  protected formatSize(bytes: number): string {
+    if (bytes < 1024) {
+      return `${bytes} B`;
+    }
+    if (bytes < 1024 * 1024) {
+      return `${(bytes / 1024).toFixed(1)} kB`;
+    }
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  }
+
   protected handleShortcut(event: KeyboardEvent): void {
-    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 's') {
+    if (!(event.metaKey || event.ctrlKey)) {
+      return;
+    }
+
+    if (event.key.toLowerCase() === 's') {
       event.preventDefault();
       if (this.isDirty() && !this.isSaving()) {
         void this.save();
       }
+      return;
+    }
+
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      void this.send();
     }
   }
 
@@ -237,6 +372,7 @@ export class RequestEditor {
   }
 
   private async load(path: string): Promise<void> {
+    await this.closeResponse();
     this.requestPath.set(path);
     this.isLoading.set(true);
     this.errorMessage.set(null);
@@ -273,6 +409,33 @@ export class RequestEditor {
     this.activeTab.set('parameters');
     this.snapshot.set(JSON.stringify(this.draft()));
   }
+  private async closeResponse(): Promise<void> {
+    const response = this.response();
+    this.response.set(null);
+    this.responseBody.set('');
+    this.responseHasMore.set(false);
+    this.responseNextOffset = 0;
+
+    if (!response) {
+      return;
+    }
+
+    try {
+      await HTTPClientService.Close(response.ID);
+    } catch {
+      // The response may already have expired; nothing else to release.
+    }
+  }
+}
+
+function decodeChunk(chunk: Chunk): string {
+  if (chunk.Encoding === 'utf-8') {
+    return chunk.Content;
+  }
+
+  const binary = atob(chunk.Content);
+  const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
+  return new TextDecoder().decode(bytes);
 }
 
 function defaultAuthentication(): Authentication {

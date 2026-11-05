@@ -1,4 +1,5 @@
 <section class="request-editor">
+  <div class="request-section">
   <header class="editor-toolbar">
     <select
       class="method-select"
@@ -22,6 +23,16 @@
       autocomplete="off"
       aria-label="Request URL"
     />
+
+    <button
+      type="button"
+      class="send-button"
+      [disabled]="isLoading() || isSending()"
+      (click)="send()"
+      title="Send request (⌘/Ctrl + Enter)"
+    >
+      {{ isSending() ? 'Sending…' : 'Send' }}
+    </button>
 
     <button
       type="button"
@@ -337,5 +348,97 @@
         }
       }
     </div>
+  }
+  </div>
+
+  @if (isSending() || response() || responseError()) {
+    <section class="response-section">
+      <header class="response-toolbar">
+        @if (isSending()) {
+          <span class="response-meta">Sending request…</span>
+        } @else if (response(); as current) {
+          <span class="status-pill" [attr.data-status]="statusClass(current)">
+            {{ current.Status }}
+          </span>
+          <span class="response-meta">{{ current.DurationMilliseconds }} ms</span>
+          <span class="response-meta">{{ formatSize(current.Size) }}</span>
+          @if (current.Truncated) {
+            <span class="response-warning">truncated</span>
+          }
+        }
+
+        <span class="response-spacer"></span>
+
+        @if (response()) {
+          <div class="response-tabs">
+            <button
+              type="button"
+              class="tab"
+              [class.active]="responseTab() === 'body'"
+              (click)="selectResponseTab('body')"
+            >
+              Body
+            </button>
+            <button
+              type="button"
+              class="tab"
+              [class.active]="responseTab() === 'headers'"
+              (click)="selectResponseTab('headers')"
+            >
+              Headers
+            </button>
+          </div>
+
+          <button
+            type="button"
+            class="response-close"
+            aria-label="Close response"
+            (click)="closeResponsePanel()"
+          >
+            ×
+          </button>
+        }
+      </header>
+
+      @if (responseError(); as message) {
+        <p class="editor-message error">{{ message }}</p>
+      }
+
+      @if (response(); as current) {
+        @if (responseTab() === 'body') {
+          <div class="response-body-container">
+            @if (current.Encoding === 'base64') {
+              <p class="empty-panel">
+                Binary response ({{ formatSize(current.Size) }}).
+              </p>
+            } @else {
+              <pre class="response-body">{{ responseBody() }}</pre>
+            }
+
+            @if (responseHasMore()) {
+              <button
+                type="button"
+                class="add-button"
+                [disabled]="isLoadingChunk()"
+                (click)="loadMore()"
+              >
+                {{ isLoadingChunk() ? 'Loading…' : 'Load more' }}
+              </button>
+            }
+          </div>
+        } @else {
+          <div class="response-headers">
+            @for (header of headerEntries(current); track header.name) {
+              <div class="response-header-row">
+                <span class="response-header-name">{{ header.name }}</span>
+                <span class="response-header-value">{{ header.value }}</span>
+              </div>
+            } @empty {
+              <p class="empty-panel">No response headers.</p>
+            }
+          </div>
+        }
+      }
+    </section>
   }
 </section>
