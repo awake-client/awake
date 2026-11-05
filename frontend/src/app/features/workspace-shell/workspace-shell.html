@@ -8,9 +8,26 @@
     }
   </div>
 
-  <button type="button" class="ghost-button" (click)="switchWorkspace()">
-    Switch workspace
-  </button>
+  <div class="workspace-actions">
+    <label class="environment-picker">
+      <span class="environment-label">Environment</span>
+      <select
+        [value]="selectedEnvironment()"
+        (change)="selectEnvironment($event)"
+      >
+        <option value="">No environment</option>
+        @for (environment of environments(); track environment.FileName) {
+          <option [value]="environment.FileName">
+            {{ environment.Name }}{{ environment.HasLocalOverrides ? ' (local)' : '' }}
+          </option>
+        }
+      </select>
+    </label>
+
+    <button type="button" class="ghost-button" (click)="switchWorkspace()">
+      Switch workspace
+    </button>
+  </div>
 </header>
 
 <div class="workspace-body">

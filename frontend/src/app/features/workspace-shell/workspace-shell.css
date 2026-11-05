@@ -84,3 +84,35 @@
   min-height: 0;
   overflow: hidden;
 }
+
+.workspace-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.environment-picker {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.environment-label {
+  font-size: 0.6875rem;
+  color: var(--color-text-muted);
+}
+
+.environment-picker select {
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 0.75rem;
+  max-width: 220px;
+}
+
+.environment-picker select:focus {
+  outline: none;
+  border-color: var(--color-accent);
+}
