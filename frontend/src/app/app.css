@@ -1,32 +1,12 @@
-.application-shell {
-  display: grid;
-  grid-template-columns: 260px 1fr;
+:host {
+  display: block;
   height: 100vh;
   overflow: hidden;
 }
 
-.sidebar {
-  border-right: 1px solid var(--color-border);
-  padding: 16px;
-  background: var(--color-surface);
-}
-
-.application-name {
-  font-size: 0.8125rem;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--color-text-muted);
-}
-
-.content {
-  overflow: auto;
-  padding: 32px;
-}
-
 /* On macOS the window uses an inset title bar, so a transparent strip above
-   the shell acts as the drag region and the sidebar reserves space for the
-   traffic lights. Other platforms keep their native title bar. */
+   the content acts as the drag region. Other platforms keep their native title
+   bar and need no extra space. */
 .drag-region {
   display: none;
 }
@@ -38,12 +18,4 @@ html[data-platform='darwin'] .drag-region {
   height: 38px;
   z-index: 10;
   -webkit-app-region: drag;
-}
-
-html[data-platform='darwin'] .sidebar {
-  padding-top: 48px;
-}
-
-html[data-platform='darwin'] .content {
-  padding-top: 48px;
 }

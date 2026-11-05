@@ -1,0 +1,27 @@
+<header class="workspace-header">
+  <div class="workspace-identity">
+    <span class="workspace-name">
+      {{ workspace()?.configuration?.Name }}
+    </span>
+    @if (modeLabel(); as mode) {
+      <span class="mode-badge">{{ mode }}</span>
+    }
+  </div>
+
+  <button type="button" class="ghost-button" (click)="switchWorkspace()">
+    Switch workspace
+  </button>
+</header>
+
+<div class="workspace-body">
+  <aside class="tree-panel">
+    <app-collection-tree
+      [workspaceRoot]="rootPath()"
+      (requestSelected)="openRequest($event)"
+    />
+  </aside>
+
+  <section class="editor-panel">
+    <router-outlet />
+  </section>
+</div>

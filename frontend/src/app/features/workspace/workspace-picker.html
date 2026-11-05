@@ -53,10 +53,6 @@
     </button>
   </div>
 
-  @if (openedWorkspace(); as workspace) {
-    <p class="success">Opened {{ workspace.Name }} ({{ workspace.Mode }}).</p>
-  }
-
   @if (errorMessage(); as message) {
     <p class="error">{{ message }}</p>
   }
