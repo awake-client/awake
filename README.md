@@ -96,6 +96,21 @@ wails3 task build GOOS=windows   # cross-compile for Windows
 wails3 task package   # create the platform package
 ```
 
+## Updates
+
+Awake checks the GitHub releases of
+[`awake-client/awake`](https://github.com/awake-client/awake/releases) when
+the user selects **Check for updates** on the workspace picker or **Updates**
+in the workspace header. The Wails updater downloads the artifact for the
+running platform, replaces the application and restarts it. Release builds
+should inject the version:
+
+```sh
+go build -ldflags \
+  "-X github.com/clementherve/awake/src/features/updates.Version=1.2.3" \
+  -o bin/awake
+```
+
 ## Documentation
 
 - [Architecture and conventions](docs/conventions.md)
