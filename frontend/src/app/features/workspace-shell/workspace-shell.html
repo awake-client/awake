@@ -37,6 +37,18 @@
       </select>
     </label>
 
+    <button
+      type="button"
+      class="ghost-button"
+      [title]="'Check for updates' + (version() ? ' (v' + version() + ')' : '')"
+      (click)="checkForUpdates()"
+    >
+      Updates
+    </button>
+    @if (updateError(); as message) {
+      <span class="update-error" [title]="message">Update unavailable</span>
+    }
+
     <button type="button" class="ghost-button" (click)="switchWorkspace()">
       Switch workspace
     </button>

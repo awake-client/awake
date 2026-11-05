@@ -10,6 +10,7 @@ import {
 import { Router, RouterLink, RouterOutlet } from '@angular/router';
 import * as EnvironmentsService from '@bindings/github.com/clementherve/awake/src/features/environments/service';
 import { Summary } from '@bindings/github.com/clementherve/awake/src/features/environments/models';
+import * as UpdatesService from '@bindings/github.com/clementherve/awake/src/features/updates/service';
 import { EnvironmentStore } from '@core/environment-store';
 import { WorkspaceStore } from '@core/workspace-store';
 import { CollectionTree } from '@features/collections/collection-tree';
@@ -38,6 +39,8 @@ export class WorkspaceShell {
   );
   protected readonly environments = signal<Summary[]>([]);
   protected readonly selectedEnvironment = this.environmentStore.selected;
+  protected readonly version = signal('');
+  protected readonly updateError = signal<string | null>(null);
   protected readonly modeLabel = computed(() => {
     const mode = this.workspace()?.configuration.Mode;
     if (!mode) {
@@ -68,6 +71,10 @@ export class WorkspaceShell {
         reloadEnvironments,
       ),
     );
+
+    void UpdatesService.CurrentVersion()
+      .then((version) => this.version.set(version))
+      .catch(() => this.version.set(''));
   }
 
   protected openRequest(path: string): void {
@@ -85,6 +92,15 @@ export class WorkspaceShell {
   protected switchWorkspace(): void {
     this.workspaceStore.close();
     void this.router.navigate(['/']);
+  }
+
+  protected async checkForUpdates(): Promise<void> {
+    this.updateError.set(null);
+    try {
+      await UpdatesService.CheckForUpdates();
+    } catch (error) {
+      this.updateError.set(describeError(error));
+    }
   }
 
   private async loadEnvironments(rootPath: string): Promise<void> {
@@ -119,4 +135,11 @@ export class WorkspaceShell {
       this.environmentStore.select(previousSelection);
     }
   }
+}
+
+function describeError(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+  return String(error);
 }

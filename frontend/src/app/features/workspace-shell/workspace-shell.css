@@ -67,6 +67,15 @@
   background: var(--color-hover);
 }
 
+.update-error {
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.6875rem;
+  color: var(--color-danger);
+}
+
 .workspace-body {
   display: grid;
   grid-template-columns: 288px 1fr;

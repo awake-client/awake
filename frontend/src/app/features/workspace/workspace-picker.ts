@@ -2,6 +2,7 @@ import { Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import * as WorkspaceService from '@bindings/github.com/clementherve/awake/src/features/workspace/service';
+import * as UpdatesService from '@bindings/github.com/clementherve/awake/src/features/updates/service';
 import {
   Configuration,
   CreateOptions,
@@ -24,8 +25,14 @@ export class WorkspacePicker {
   protected readonly mode = signal<Mode>(Mode.ModeTeam);
   protected readonly errorMessage = signal<string | null>(null);
   protected readonly isBusy = signal(false);
+  protected readonly version = signal('');
+  protected readonly updateError = signal<string | null>(null);
 
   async ngOnInit(): Promise<void> {
+    void UpdatesService.CurrentVersion()
+      .then((version) => this.version.set(version))
+      .catch(() => this.version.set(''));
+
     const stored = this.workspaceStore.workspace();
     if (!stored) {
       return;
@@ -59,6 +66,15 @@ export class WorkspacePicker {
 
   protected selectMode(event: Event): void {
     this.mode.set((event.target as HTMLSelectElement).value as Mode);
+  }
+
+  protected async checkForUpdates(): Promise<void> {
+    this.updateError.set(null);
+    try {
+      await UpdatesService.CheckForUpdates();
+    } catch (error) {
+      this.updateError.set(describeError(error));
+    }
   }
 
   private async runOperation(
