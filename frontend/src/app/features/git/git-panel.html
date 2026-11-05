@@ -1,0 +1,137 @@
+<section class="git-panel">
+  <header class="git-header">
+    <div>
+      <h1>Git</h1>
+      <p class="git-hint">Synchronize this workspace with its remote.</p>
+    </div>
+
+    @if (isRepository()) {
+      <div class="git-actions">
+        <button type="button" class="ghost-button" [disabled]="isBusy()" (click)="pull()">
+          Pull
+        </button>
+        <button type="button" class="ghost-button" [disabled]="isBusy()" (click)="push()">
+          Push
+        </button>
+        <button type="button" class="ghost-button" [disabled]="isLoading()" (click)="load()">
+          Refresh
+        </button>
+      </div>
+    }
+  </header>
+
+  @if (errorMessage(); as message) {
+    <p class="git-message error">{{ message }}</p>
+  }
+  @if (statusMessage(); as message) {
+    <p class="git-message success">{{ message }}</p>
+  }
+
+  @if (isLoading()) {
+    <p class="git-empty">Reading repository…</p>
+  } @else if (isRepository() === false) {
+    <div class="git-empty-state">
+      <p>This workspace is not a git repository yet.</p>
+      <button type="button" class="primary-button" [disabled]="isBusy()" (click)="initialize()">
+        {{ isBusy() ? 'Initializing…' : 'Initialize repository' }}
+      </button>
+    </div>
+  } @else if (status(); as current) {
+    <div class="git-branch">
+      <span class="branch-name">{{ current.Branch }}</span>
+      @if (current.Upstream) {
+        <span class="branch-upstream">{{ current.Upstream }}</span>
+      }
+      @if (current.Ahead > 0) {
+        <span class="branch-count">↑ {{ current.Ahead }}</span>
+      }
+      @if (current.Behind > 0) {
+        <span class="branch-count">↓ {{ current.Behind }}</span>
+      }
+    </div>
+
+    @if (conflicts.length > 0) {
+      <div class="conflict-banner">
+        <strong>{{ conflicts.length }} conflicted file(s).</strong>
+        Resolve each file to finish the merge.
+      </div>
+    }
+
+    @if (changes.length === 0) {
+      <p class="git-empty">Working tree clean.</p>
+    } @else {
+      <div class="change-list">
+        @for (change of changes; track change.Path) {
+          <div class="change-row" [class.conflicted]="change.Conflicted">
+            <span class="change-status">{{ changeLabel(change) }}</span>
+            <span class="change-path">{{ change.Path }}</span>
+            @if (change.Conflicted) {
+              <button type="button" class="ghost-button small" (click)="openConflict(change.Path)">
+                Resolve
+              </button>
+            }
+          </div>
+        }
+      </div>
+
+      <div class="commit-box">
+        <label class="field">
+          <span class="field-label">Commit message</span>
+          <input
+            type="text"
+            name="commitMessage"
+            [ngModel]="commitMessage()"
+            (ngModelChange)="commitMessage.set($event)"
+            placeholder="feat: describe the change"
+            autocomplete="off"
+          />
+        </label>
+
+        <button
+          type="button"
+          class="primary-button"
+          [disabled]="isBusy() || commitMessage().trim() === ''"
+          (click)="commit()"
+        >
+          {{ isBusy() ? 'Working…' : 'Stage all and commit' }}
+        </button>
+      </div>
+    }
+
+    @if (conflictPath(); as path) {
+      <section class="conflict-view">
+        <header class="conflict-header">
+          <span class="conflict-path">{{ path }}</span>
+          <button type="button" class="ghost-button small" (click)="closeConflict()">
+            Close
+          </button>
+        </header>
+
+        @if (isLoadingConflict()) {
+          <p class="git-empty">Loading versions…</p>
+        } @else if (conflictVersions(); as versions) {
+          <div class="conflict-columns">
+            <article class="conflict-column">
+              <h2>Base</h2>
+              <pre>{{ decode(versions.Base) }}</pre>
+            </article>
+            <article class="conflict-column">
+              <h2>Local</h2>
+              <pre>{{ decode(versions.Local) }}</pre>
+              <button type="button" class="primary-button" [disabled]="isBusy()" (click)="resolve('local')">
+                Keep local
+              </button>
+            </article>
+            <article class="conflict-column">
+              <h2>Incoming</h2>
+              <pre>{{ decode(versions.Incoming) }}</pre>
+              <button type="button" class="primary-button" [disabled]="isBusy()" (click)="resolve('incoming')">
+                Keep incoming
+              </button>
+            </article>
+          </div>
+        }
+      </section>
+    }
+  }
+</section>

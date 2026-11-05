@@ -1,0 +1,286 @@
+:host {
+  display: block;
+  height: 100%;
+  overflow: auto;
+  padding: 24px;
+}
+
+.git-panel {
+  max-width: 1100px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.git-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+h1 {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+.git-hint {
+  margin: 4px 0 0;
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
+.git-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.ghost-button,
+.primary-button {
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.ghost-button {
+  background: transparent;
+  color: var(--color-text-muted);
+}
+
+.ghost-button:hover {
+  color: var(--color-text);
+  background: var(--color-hover);
+}
+
+.primary-button {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.ghost-button:disabled,
+.primary-button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.ghost-button.small {
+  padding: 3px 8px;
+  font-size: 0.6875rem;
+}
+
+.git-message {
+  margin: 0;
+  font-size: 0.75rem;
+}
+
+.git-message.error {
+  color: var(--color-danger);
+}
+
+.git-message.success {
+  color: var(--color-success);
+}
+
+.git-empty {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+}
+
+.git-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 20px;
+  border: 1px dashed var(--color-border);
+  border-radius: 8px;
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+}
+
+.git-empty-state p {
+  margin: 0;
+}
+
+.git-branch {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.75rem;
+}
+
+.branch-name {
+  font-weight: 700;
+}
+
+.branch-upstream,
+.branch-count {
+  color: var(--color-text-muted);
+}
+
+.conflict-banner {
+  padding: 10px 12px;
+  border: 1px solid var(--color-danger);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--color-danger) 10%, transparent);
+  color: var(--color-danger);
+  font-size: 0.75rem;
+}
+
+.change-list {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.change-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 7px 12px;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface);
+  font-size: 0.75rem;
+}
+
+.change-row:last-child {
+  border-bottom: none;
+}
+
+.change-row.conflicted {
+  background: color-mix(in srgb, var(--color-danger) 7%, var(--color-surface));
+}
+
+.change-status {
+  flex: 0 0 28px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-weight: 700;
+  color: var(--color-text-muted);
+}
+
+.change-row.conflicted .change-status {
+  color: var(--color-danger);
+}
+
+.change-path {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.commit-box {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+.commit-box .field {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.field-label {
+  font-size: 0.625rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.commit-box input {
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+  border-radius: 6px;
+  padding: 6px 8px;
+  font-size: 0.8125rem;
+}
+
+.commit-box input:focus {
+  outline: none;
+  border-color: var(--color-accent);
+}
+
+.conflict-view {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-surface);
+}
+
+.conflict-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.conflict-path {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.75rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.conflict-columns {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.conflict-column {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.conflict-column h2 {
+  margin: 0;
+  font-size: 0.625rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.conflict-column pre {
+  flex: 1;
+  min-height: 160px;
+  max-height: 360px;
+  overflow: auto;
+  margin: 0;
+  padding: 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-background);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.7rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 900px) {
+  .conflict-columns {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

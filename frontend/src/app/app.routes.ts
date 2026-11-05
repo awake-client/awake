@@ -44,6 +44,11 @@ export const routes: Routes = [
             (module) => module.HistoryPanel,
           ),
       },
+      {
+        path: 'git',
+        loadComponent: () =>
+          import('@features/git/git-panel').then((module) => module.GitPanel),
+      },
     ],
   },
   { path: '**', redirectTo: '' },
