@@ -1,0 +1,233 @@
+<section class="environments">
+  <header class="environments-header">
+    <h1>Environments</h1>
+    <p class="environments-hint">
+      Shared variables live in <code>environments/&lt;name&gt;.yaml</code>.
+      Secret values are stored in the operating system keychain and never
+      written to the workspace.
+    </p>
+  </header>
+
+  @if (errorMessage(); as message) {
+    <p class="environments-message error">{{ message }}</p>
+  }
+  @if (message(); as text) {
+    <p class="environments-message success">{{ text }}</p>
+  }
+
+  <div class="environments-layout">
+    <aside class="environment-list">
+      <h2>Available</h2>
+
+      @if (environments().length === 0) {
+        <p class="list-empty">No environment yet.</p>
+      } @else {
+        <ul>
+          @for (environment of environments(); track environment.FileName) {
+            <li>
+              <button
+                type="button"
+                class="environment-entry"
+                [class.active]="environment.FileName === selectedFileName()"
+                (click)="selectEnvironment(environment.FileName)"
+              >
+                <span class="environment-name">{{ environment.Name }}</span>
+                <span class="environment-file">{{ environment.FileName }}</span>
+                @if (environment.HasLocalOverrides) {
+                  <span class="local-badge">local</span>
+                }
+              </button>
+            </li>
+          }
+        </ul>
+      }
+
+      <form class="new-environment" (ngSubmit)="createEnvironment()">
+        <h2>New environment</h2>
+        <label class="field">
+          <span class="field-label">File name</span>
+          <input
+            type="text"
+            name="newFileName"
+            [ngModel]="newFileName()"
+            (ngModelChange)="newFileName.set($event)"
+            placeholder="staging"
+            autocomplete="off"
+            spellcheck="false"
+          />
+        </label>
+        <label class="field">
+          <span class="field-label">Display name</span>
+          <input
+            type="text"
+            name="newEnvironmentName"
+            [ngModel]="newEnvironmentName()"
+            (ngModelChange)="newEnvironmentName.set($event)"
+            placeholder="Staging"
+            autocomplete="off"
+          />
+        </label>
+        <button
+          type="submit"
+          class="primary-button"
+          [disabled]="isSaving()"
+        >
+          Create
+        </button>
+      </form>
+    </aside>
+
+    <section class="environment-editor">
+      @if (!selectedFileName()) {
+        <p class="editor-empty">
+          Select an environment to edit its variables and secrets.
+        </p>
+      } @else {
+        <label class="field">
+          <span class="field-label">Display name</span>
+          <input
+            type="text"
+            name="environmentName"
+            [ngModel]="name()"
+            (ngModelChange)="name.set($event)"
+            autocomplete="off"
+          />
+        </label>
+
+        <article class="editor-section">
+          <header class="section-header">
+            <h2>Variables</h2>
+            <button type="button" class="ghost-button" (click)="addVariable()">
+              Add variable
+            </button>
+          </header>
+
+          @if (variables().length === 0) {
+            <p class="section-empty">No variable yet.</p>
+          } @else {
+            <div class="variable-rows">
+              @for (variable of variables(); track $index) {
+                <div class="variable-row">
+                  <input
+                    type="text"
+                    [name]="'variableName' + $index"
+                    [ngModel]="variable.name"
+                    (ngModelChange)="updateVariable($index, 'name', $event)"
+                    placeholder="baseUrl"
+                    autocomplete="off"
+                    spellcheck="false"
+                  />
+                  <input
+                    type="text"
+                    [name]="'variableValue' + $index"
+                    [ngModel]="variable.value"
+                    (ngModelChange)="updateVariable($index, 'value', $event)"
+                    placeholder="https://example.com"
+                    autocomplete="off"
+                    spellcheck="false"
+                  />
+                  <button
+                    type="button"
+                    class="icon-button"
+                    title="Remove variable"
+                    (click)="removeVariable($index)"
+                  >
+                    Remove
+                  </button>
+                </div>
+              }
+            </div>
+          }
+        </article>
+
+        <article class="editor-section">
+          <header class="section-header">
+            <h2>Secrets</h2>
+          </header>
+
+          <div class="secret-add">
+            <input
+              type="text"
+              name="newSecretName"
+              [ngModel]="newSecretName()"
+              (ngModelChange)="newSecretName.set($event)"
+              placeholder="apiToken"
+              autocomplete="off"
+              spellcheck="false"
+            />
+            <button
+              type="button"
+              class="ghost-button"
+              (click)="addSecretName()"
+            >
+              Declare secret
+            </button>
+          </div>
+
+          @if (secretNames().length === 0) {
+            <p class="section-empty">No secret declared yet.</p>
+          } @else {
+            <div class="secret-rows">
+              @for (secretName of secretNames(); track secretName) {
+                <div class="secret-row">
+                  <div class="secret-identity">
+                    <span class="secret-name">{{ secretName }}</span>
+                    <span
+                      class="secret-state"
+                      [class.set]="secretIsSet(secretName)"
+                    >
+                      {{ secretIsSet(secretName) ? 'Stored' : 'Not stored' }}
+                    </span>
+                  </div>
+
+                  <input
+                    type="password"
+                    [name]="'secretValue' + secretName"
+                    [ngModel]="secretValues()[secretName] ?? ''"
+                    (ngModelChange)="updateSecretValue(secretName, $event)"
+                    placeholder="New value"
+                    autocomplete="new-password"
+                  />
+                  <button
+                    type="button"
+                    class="ghost-button"
+                    (click)="storeSecret(secretName)"
+                  >
+                    Store
+                  </button>
+                  <button
+                    type="button"
+                    class="icon-button"
+                    [disabled]="!secretIsSet(secretName)"
+                    (click)="clearSecret(secretName)"
+                  >
+                    Clear
+                  </button>
+                  <button
+                    type="button"
+                    class="icon-button"
+                    title="Stop declaring this secret"
+                    (click)="removeSecretName(secretName)"
+                  >
+                    Remove
+                  </button>
+                </div>
+              }
+            </div>
+          }
+        </article>
+
+        <footer class="editor-actions">
+          <button
+            type="button"
+            class="primary-button"
+            [disabled]="isSaving() || isLoading()"
+            (click)="saveEnvironment()"
+          >
+            {{ isSaving() ? 'Saving…' : 'Save environment' }}
+          </button>
+        </footer>
+      }
+    </section>
+  </div>
+</section>

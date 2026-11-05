@@ -1,4 +1,12 @@
-import { Component, computed, effect, inject, signal, viewChild } from '@angular/core';
+import {
+  Component,
+  DestroyRef,
+  computed,
+  effect,
+  inject,
+  signal,
+  viewChild,
+} from '@angular/core';
 import { Router, RouterLink, RouterOutlet } from '@angular/router';
 import * as EnvironmentsService from '@bindings/github.com/clementherve/awake/src/features/environments/service';
 import { Summary } from '@bindings/github.com/clementherve/awake/src/features/environments/models';
@@ -21,6 +29,7 @@ export class WorkspaceShell {
   private readonly environmentStore = inject(EnvironmentStore);
   private readonly workspaceStore = inject(WorkspaceStore);
   private readonly router = inject(Router);
+  private readonly destroyRef = inject(DestroyRef);
   private readonly commandPalette = viewChild(CommandPalette);
 
   protected readonly workspace = this.workspaceStore.workspace;
@@ -44,6 +53,21 @@ export class WorkspaceShell {
         void this.loadEnvironments(rootPath);
       }
     });
+
+    const reloadEnvironments = () => {
+      const rootPath = this.rootPath();
+      if (rootPath) {
+        void this.loadEnvironments(rootPath);
+      }
+    };
+
+    window.addEventListener('awake:environments-changed', reloadEnvironments);
+    this.destroyRef.onDestroy(() =>
+      window.removeEventListener(
+        'awake:environments-changed',
+        reloadEnvironments,
+      ),
+    );
   }
 
   protected openRequest(path: string): void {
@@ -64,11 +88,19 @@ export class WorkspaceShell {
   }
 
   private async loadEnvironments(rootPath: string): Promise<void> {
-    this.environmentStore.select('');
+    const previousSelection = this.environmentStore.selected();
 
     try {
       const summaries = (await EnvironmentsService.List(rootPath)) ?? [];
       this.environments.set(summaries);
+
+      if (
+        previousSelection &&
+        summaries.some((summary) => summary.FileName === previousSelection)
+      ) {
+        this.environmentStore.select(previousSelection);
+        return;
+      }
 
       const defaultEnvironment =
         this.workspaceStore.workspace()?.configuration.DefaultEnvironment ??
@@ -78,9 +110,13 @@ export class WorkspaceShell {
         summaries.some((summary) => summary.FileName === defaultEnvironment)
       ) {
         this.environmentStore.select(defaultEnvironment);
+        return;
       }
+
+      this.environmentStore.select('');
     } catch {
       this.environments.set([]);
+      this.environmentStore.select(previousSelection);
     }
   }
 }

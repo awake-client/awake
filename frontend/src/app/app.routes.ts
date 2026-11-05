@@ -56,6 +56,13 @@ export const routes: Routes = [
             (module) => module.InteropPanel,
           ),
       },
+      {
+        path: 'environments',
+        loadComponent: () =>
+          import('@features/environments/environments-panel').then(
+            (module) => module.EnvironmentsPanel,
+          ),
+      },
     ],
   },
   { path: '**', redirectTo: '' },
