@@ -297,6 +297,59 @@ func TestCloseRemovesStoredResponse(t *testing.T) {
 	}
 }
 
+type fakeRecorder struct {
+	entries []domain.HistoryEntry
+	err     error
+}
+
+func (recorder *fakeRecorder) Record(_ string, entry domain.HistoryEntry) error {
+	recorder.entries = append(recorder.entries, entry)
+	return recorder.err
+}
+
+func TestSendRecordsHistory(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		writer.Header().Set("Content-Type", "text/plain")
+		_, _ = writer.Write([]byte("hello"))
+	}))
+	defer server.Close()
+
+	responseStore, err := newStoreAt(t.TempDir())
+	if err != nil {
+		t.Fatalf("create response store: %v", err)
+	}
+
+	recorder := &fakeRecorder{}
+	service := newServiceWithStore(fakeSource{
+		request: domain.Request{
+			Name:   "List users",
+			Method: domain.MethodGet,
+			URL:    server.URL + "/users",
+		},
+	}, responseStore, recorder)
+
+	response, err := service.Send(t.TempDir(), "collections/users/list.yaml", "development")
+	if err != nil {
+		t.Fatalf("send request: %v", err)
+	}
+	defer service.Close(response.ID)
+
+	if len(recorder.entries) != 1 {
+		t.Fatalf("expected one history entry, got %d", len(recorder.entries))
+	}
+
+	entry := recorder.entries[0]
+	if entry.RequestPath != "collections/users/list.yaml" || entry.RequestName != "List users" {
+		t.Errorf("unexpected history entry: %+v", entry)
+	}
+	if entry.StatusCode != http.StatusOK || entry.Environment != "development" {
+		t.Errorf("unexpected history metadata: %+v", entry)
+	}
+	if entry.SizeBytes != int64(len("hello")) {
+		t.Errorf("unexpected size %d", entry.SizeBytes)
+	}
+}
+
 func newTestService(t *testing.T, source Source) *Service {
 	t.Helper()
 
@@ -305,5 +358,5 @@ func newTestService(t *testing.T, source Source) *Service {
 		t.Fatalf("create response store: %v", err)
 	}
 
-	return newServiceWithStore(source, responseStore)
+	return newServiceWithStore(source, responseStore, nil)
 }

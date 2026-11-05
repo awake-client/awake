@@ -39,6 +39,7 @@ type Response struct {
 	Preview              string
 	Encoding             string
 	Truncated            bool
+	HistoryWarning       string
 }
 
 // Chunk is one slice of a stored response body.

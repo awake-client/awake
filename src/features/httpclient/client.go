@@ -26,28 +26,36 @@ type Source interface {
 	LoadVariableLayers(workspaceRoot string, environmentFileName string) ([]map[string]string, error)
 }
 
+// HistoryRecorder records executed requests. The application layer supplies
+// the implementation so this feature does not depend on the history feature.
+type HistoryRecorder interface {
+	Record(workspaceRoot string, entry domain.HistoryEntry) error
+}
+
 // Service exposes request execution to the application layer.
 type Service struct {
-	source Source
-	client *http.Client
-	store  *store
+	source   Source
+	client   *http.Client
+	store    *store
+	recorder HistoryRecorder
 }
 
 // NewService returns an HTTP client service backed by source.
-func NewService(source Source) (*Service, error) {
+func NewService(source Source, recorder HistoryRecorder) (*Service, error) {
 	responseStore, err := newStore()
 	if err != nil {
 		return nil, err
 	}
 
-	return newServiceWithStore(source, responseStore), nil
+	return newServiceWithStore(source, responseStore, recorder), nil
 }
 
-func newServiceWithStore(source Source, responseStore *store) *Service {
+func newServiceWithStore(source Source, responseStore *store, recorder HistoryRecorder) *Service {
 	return &Service{
-		source: source,
-		client: &http.Client{Timeout: DefaultTimeout},
-		store:  responseStore,
+		source:   source,
+		client:   &http.Client{Timeout: DefaultTimeout},
+		store:    responseStore,
+		recorder: recorder,
 	}
 }
 
@@ -75,7 +83,36 @@ func (service *Service) Send(workspaceRoot string, requestPath string, environme
 	}
 	defer httpResponse.Body.Close()
 
-	return service.captureResponse(httpResponse, time.Since(startedAt))
+	response, err := service.captureResponse(httpResponse, time.Since(startedAt))
+	if err != nil {
+		return Response{}, err
+	}
+
+	response.HistoryWarning = service.recordHistory(workspaceRoot, requestPath, environmentFileName, request, response)
+
+	return response, nil
+}
+
+func (service *Service) recordHistory(workspaceRoot string, requestPath string, environmentFileName string, request domain.Request, response Response) string {
+	if service.recorder == nil {
+		return ""
+	}
+
+	err := service.recorder.Record(workspaceRoot, domain.HistoryEntry{
+		RequestPath:          requestPath,
+		RequestName:          request.Name,
+		Method:               request.Method,
+		URL:                  request.URL,
+		StatusCode:           response.StatusCode,
+		DurationMilliseconds: response.DurationMilliseconds,
+		SizeBytes:            response.Size,
+		Environment:          environmentFileName,
+	})
+	if err != nil {
+		return err.Error()
+	}
+
+	return ""
 }
 
 // ReadChunk returns a slice of a stored response body.
