@@ -9,6 +9,7 @@ import (
 	"github.com/clementherve/awake/src/features/interop"
 	"github.com/clementherve/awake/src/features/oauth2"
 	"github.com/clementherve/awake/src/features/platform"
+	"github.com/clementherve/awake/src/features/scripts"
 	"github.com/clementherve/awake/src/features/secrets"
 	"github.com/clementherve/awake/src/features/updates"
 	"github.com/clementherve/awake/src/features/workspace"
@@ -44,6 +45,7 @@ func newServices() (*services, error) {
 
 	oauth2Service := oauth2.NewService(source)
 	httpclient.SetOAuth2Provider(httpClient, oauth2.NewProvider(oauth2Service))
+	httpclient.SetScriptRunner(httpClient, scripts.NewRunner())
 
 	return &services{
 		Collections:  collections.NewService(),
