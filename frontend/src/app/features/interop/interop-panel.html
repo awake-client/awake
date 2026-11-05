@@ -1,0 +1,124 @@
+<section class="interop">
+  <header class="interop-header">
+    <h1>Import and export</h1>
+    <p class="interop-hint">
+      Move collections between Awake, OpenAPI, Postman and Bruno.
+    </p>
+  </header>
+
+  <div class="interop-grid">
+    <article class="interop-card">
+      <h2>Import</h2>
+      <p class="card-hint">
+        Requests are written into <code>collections/</code>. Refresh the
+        collection tree afterwards.
+      </p>
+
+      <label class="field">
+        <span class="field-label">Format</span>
+        <select
+          name="importFormat"
+          [ngModel]="importFormat()"
+          (ngModelChange)="selectImportFormat($event)"
+        >
+          @for (format of formats; track format) {
+            <option [value]="format">{{ formatLabels[format] }}</option>
+          }
+        </select>
+      </label>
+
+      <label class="field">
+        <span class="field-label">Source path</span>
+        <input
+          type="text"
+          name="importPath"
+          [ngModel]="importPath()"
+          (ngModelChange)="importPath.set($event)"
+          [placeholder]="importHint()"
+          autocomplete="off"
+          spellcheck="false"
+        />
+      </label>
+
+      @if (importError(); as message) {
+        <p class="interop-message error">{{ message }}</p>
+      }
+      @if (importMessage(); as message) {
+        <p class="interop-message success">{{ message }}</p>
+      }
+      @if (importWarnings().length > 0) {
+        <ul class="interop-warnings">
+          @for (warning of importWarnings(); track warning) {
+            <li>{{ warning }}</li>
+          }
+        </ul>
+      }
+
+      <button
+        type="button"
+        class="primary-button"
+        [disabled]="isImporting()"
+        (click)="importDocument()"
+      >
+        {{ isImporting() ? 'Importing…' : 'Import' }}
+      </button>
+    </article>
+
+    <article class="interop-card">
+      <h2>Export</h2>
+      <p class="card-hint">
+        The export snapshots every request in the workspace. Existing files at
+        the destination are replaced.
+      </p>
+
+      <label class="field">
+        <span class="field-label">Format</span>
+        <select
+          name="exportFormat"
+          [ngModel]="exportFormat()"
+          (ngModelChange)="selectExportFormat($event)"
+        >
+          @for (format of formats; track format) {
+            <option [value]="format">{{ formatLabels[format] }}</option>
+          }
+        </select>
+      </label>
+
+      <label class="field">
+        <span class="field-label">Destination path</span>
+        <input
+          type="text"
+          name="exportPath"
+          [ngModel]="exportPath()"
+          (ngModelChange)="exportPath.set($event)"
+          [placeholder]="exportHint()"
+          autocomplete="off"
+          spellcheck="false"
+        />
+      </label>
+
+      @if (exportError(); as message) {
+        <p class="interop-message error">{{ message }}</p>
+      }
+      @if (exportMessage(); as message) {
+        <p class="interop-message success">{{ message }}</p>
+      }
+      @if (exportPaths().length > 0) {
+        <ul class="interop-paths">
+          @for (path of exportPaths(); track path) {
+            <li>{{ path }}</li>
+          }
+        </ul>
+      }
+
+      <button
+        type="button"
+        class="primary-button"
+        [disabled]="isExporting()"
+        (click)="exportDocument()"
+      >
+        {{ isExporting() ? 'Exporting…' : 'Export' }}
+      </button>
+    </article>
+  </div>
+</section>
