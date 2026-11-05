@@ -22,6 +22,18 @@ const (
 	MethodOptions = "OPTIONS"
 )
 
+// Protocol describes how a request exchanges data with its server.
+type Protocol string
+
+const (
+	// ProtocolHTTP is a single request and response exchange.
+	ProtocolHTTP Protocol = "http"
+	// ProtocolSSE keeps an HTTP connection open and reads server-sent events.
+	ProtocolSSE Protocol = "sse"
+	// ProtocolWebSocket keeps a bidirectional WebSocket connection open.
+	ProtocolWebSocket Protocol = "websocket"
+)
+
 // Body types supported by the request editor.
 type BodyType string
 
@@ -52,6 +64,7 @@ type Request struct {
 	Name           string          `yaml:"name"`
 	Method         string          `yaml:"method"`
 	URL            string          `yaml:"url"`
+	Protocol       Protocol        `yaml:"protocol,omitempty"`
 	Parameters     []Parameter     `yaml:"parameters,omitempty"`
 	Headers        []Header        `yaml:"headers,omitempty"`
 	Authentication *Authentication `yaml:"authentication,omitempty"`
@@ -95,6 +108,9 @@ type Body struct {
 func (request *Request) ApplyDefaults() {
 	request.Method = strings.ToUpper(strings.TrimSpace(request.Method))
 
+	if request.Protocol == "" {
+		request.Protocol = ProtocolHTTP
+	}
 	if request.Authentication == nil {
 		request.Authentication = &Authentication{Type: AuthenticationInherit}
 	}
@@ -112,6 +128,9 @@ func (request Request) Validate() error {
 		return ErrInvalidRequest
 	}
 	if !isSupportedMethod(request.Method) {
+		return ErrInvalidRequest
+	}
+	if !isSupportedProtocol(request.Protocol) {
 		return ErrInvalidRequest
 	}
 
@@ -139,6 +158,15 @@ func (request Request) Validate() error {
 func isSupportedMethod(method string) bool {
 	switch method {
 	case MethodGet, MethodPost, MethodPut, MethodPatch, MethodDelete, MethodHead, MethodOptions:
+		return true
+	default:
+		return false
+	}
+}
+
+func isSupportedProtocol(protocol Protocol) bool {
+	switch protocol {
+	case "", ProtocolHTTP, ProtocolSSE, ProtocolWebSocket:
 		return true
 	default:
 		return false

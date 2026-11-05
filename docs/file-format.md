@@ -144,11 +144,32 @@ documentation: |
 | `name` | string | Display name |
 | `method` | string | HTTP method |
 | `url` | string | URL template with variables |
+| `protocol` | string | `http` (default), `sse` or `websocket` |
 | `parameters` | list | Query parameters |
 | `headers` | list | Request headers |
 | `authentication` | object | Authentication settings or `inherit` |
 | `body` | object | Request body |
 | `documentation` | string | Free-form notes |
+
+### Streaming requests
+
+`protocol` selects how Awake talks to the server. It is omitted for ordinary
+HTTP requests.
+
+```yaml
+name: Deployment events
+method: GET
+url: "{{baseUrl}}/events"
+protocol: sse
+```
+
+- `sse` keeps a GET connection open and consumes the `text/event-stream`
+  response. Each dispatched event becomes one entry in the event log.
+- `websocket` opens a bidirectional connection. The request URL may use
+  `ws://` or `wss://`; an `http://` or `https://` URL is converted. A non-empty
+  `body.content` is sent as the first text message.
+- Streams are live sessions. Their events are kept in memory only and are
+  never written to the workspace or the history database.
 
 ### Body types
 
