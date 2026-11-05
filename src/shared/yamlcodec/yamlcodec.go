@@ -78,7 +78,40 @@ func EncodeValue(value any) ([]byte, error) {
 		return nil, fmt.Errorf("normalize yaml value: %w", err)
 	}
 
+	applyCompactSequenceEntries(document.root)
+
 	return document.Encode()
+}
+
+func applyCompactSequenceEntries(node *yaml.Node) {
+	if node.Kind == yaml.SequenceNode && sequenceHoldsFlatMappings(node) {
+		for _, item := range node.Content {
+			item.Style = yaml.FlowStyle
+		}
+	}
+
+	for _, child := range node.Content {
+		applyCompactSequenceEntries(child)
+	}
+}
+
+func sequenceHoldsFlatMappings(node *yaml.Node) bool {
+	if len(node.Content) == 0 {
+		return false
+	}
+
+	for _, item := range node.Content {
+		if item.Kind != yaml.MappingNode {
+			return false
+		}
+		for index := 1; index < len(item.Content); index += 2 {
+			if item.Content[index].Kind != yaml.ScalarNode {
+				return false
+			}
+		}
+	}
+
+	return true
 }
 
 // Decode maps the document onto a Go value.
