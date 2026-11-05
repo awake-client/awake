@@ -111,3 +111,8 @@ func validateFileName(name string) error {
 	}
 	return nil
 }
+
+// IsVariableName reports whether name is a valid variable identifier.
+func IsVariableName(name string) bool {
+	return variableNameRegex.MatchString(name)
+}

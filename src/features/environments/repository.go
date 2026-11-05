@@ -9,6 +9,9 @@ import (
 	"strings"
 
 	"go.yaml.in/yaml/v3"
+
+	"github.com/clementherve/awake/src/shared/files"
+	"github.com/clementherve/awake/src/shared/yamlcodec"
 )
 
 // Repository reads environment files from a workspace.
@@ -148,6 +151,138 @@ func readEnvironment(path string, missingError error) (Environment, error) {
 	}
 
 	return environment, nil
+}
+
+// Save writes the shared environment file with canonical formatting. Existing
+// top-level comments are preserved when the file can be parsed.
+func (repository *Repository) Save(fileName string, environment Environment) error {
+	if err := validateFileName(fileName); err != nil {
+		return err
+	}
+	if err := environment.validate(); err != nil {
+		return err
+	}
+
+	path := repository.SharedPath(fileName)
+	existing, err := os.ReadFile(path)
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("read environment %s: %w", fileName, err)
+	}
+
+	var content []byte
+	if len(existing) > 0 {
+		content, err = encodeEnvironment(existing, environment)
+	} else {
+		content, err = yamlcodec.EncodeValue(environment)
+	}
+	if err != nil {
+		return fmt.Errorf("encode environment %s: %w", fileName, err)
+	}
+
+	if err := os.MkdirAll(repository.DirectoryPath(), 0o755); err != nil {
+		return fmt.Errorf("create environments directory: %w", err)
+	}
+
+	return files.WriteAtomically(path, content)
+}
+
+func encodeEnvironment(existing []byte, environment Environment) ([]byte, error) {
+	document, err := yamlcodec.Parse(existing)
+	if err != nil || len(document.Root().Content) == 0 {
+		return yamlcodec.EncodeValue(environment)
+	}
+
+	mapping := document.Root().Content[0]
+	if mapping.Kind != yaml.MappingNode {
+		return yamlcodec.EncodeValue(environment)
+	}
+
+	setScalar(mapping, "name", environment.Name)
+	setStringMap(mapping, "variables", environment.Variables)
+	setStringSequence(mapping, "secretVariables", environment.SecretVariables)
+
+	return document.Encode()
+}
+
+func setScalar(mapping *yaml.Node, key string, value string) {
+	for index := 0; index+1 < len(mapping.Content); index += 2 {
+		if mapping.Content[index].Value == key {
+			mapping.Content[index+1].Kind = yaml.ScalarNode
+			mapping.Content[index+1].Tag = "!!str"
+			mapping.Content[index+1].Value = value
+			mapping.Content[index+1].Content = nil
+			return
+		}
+	}
+
+	mapping.Content = append(mapping.Content,
+		&yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: key},
+		&yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: value},
+	)
+}
+
+func setStringMap(mapping *yaml.Node, key string, values map[string]string) {
+	if len(values) == 0 {
+		removeMappingValue(mapping, key)
+		return
+	}
+
+	keys := make([]string, 0, len(values))
+	for name := range values {
+		keys = append(keys, name)
+	}
+	sort.Strings(keys)
+
+	node := &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map"}
+	for _, name := range keys {
+		node.Content = append(node.Content,
+			&yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: name},
+			&yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: values[name]},
+		)
+	}
+
+	setMappingValue(mapping, key, node)
+}
+
+func setStringSequence(mapping *yaml.Node, key string, values []string) {
+	if len(values) == 0 {
+		removeMappingValue(mapping, key)
+		return
+	}
+
+	node := &yaml.Node{Kind: yaml.SequenceNode, Tag: "!!seq"}
+	for _, value := range values {
+		node.Content = append(node.Content, &yaml.Node{
+			Kind:  yaml.ScalarNode,
+			Tag:   "!!str",
+			Value: value,
+		})
+	}
+
+	setMappingValue(mapping, key, node)
+}
+
+func setMappingValue(mapping *yaml.Node, key string, value *yaml.Node) {
+	for index := 0; index+1 < len(mapping.Content); index += 2 {
+		if mapping.Content[index].Value == key {
+			mapping.Content[index+1] = value
+			return
+		}
+	}
+
+	mapping.Content = append(mapping.Content,
+		&yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: key},
+		value,
+	)
+}
+
+func removeMappingValue(mapping *yaml.Node, key string) {
+	for index := 0; index+1 < len(mapping.Content); index += 2 {
+		if mapping.Content[index].Value == key {
+			mapping.Content = append(mapping.Content[:index], mapping.Content[index+2:]...)
+			return
+		}
+	}
 }
 
 func fileExists(path string) bool {

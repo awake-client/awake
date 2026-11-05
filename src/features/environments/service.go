@@ -17,3 +17,8 @@ func (service *Service) List(workspaceRoot string) ([]Summary, error) {
 func (service *Service) Load(workspaceRoot string, fileName string) (ResolvedEnvironment, error) {
 	return NewRepository(workspaceRoot).Load(fileName)
 }
+
+// Save writes a shared environment file.
+func (service *Service) Save(workspaceRoot string, fileName string, environment Environment) error {
+	return NewRepository(workspaceRoot).Save(fileName, environment)
+}

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/clementherve/awake/src/shared/variables"
@@ -144,5 +145,63 @@ func writeEnvironmentFile(t *testing.T, workspaceRoot string, fileName string, c
 	}
 	if err := os.WriteFile(filepath.Join(directory, fileName), []byte(content), 0o644); err != nil {
 		t.Fatalf("write %s: %v", fileName, err)
+	}
+}
+
+func TestSaveWritesEnvironmentAndKeepsTopLevelComments(t *testing.T) {
+	workspaceRoot := t.TempDir()
+	writeEnvironmentFile(t, workspaceRoot, "development.yaml", "# Shared configuration\nname: Development\nvariables:\n  baseUrl: https://old.example.com\nsecretVariables:\n  - apiToken\n")
+
+	repository := NewRepository(workspaceRoot)
+	err := repository.Save("development", Environment{
+		Name:      "Development",
+		Variables: map[string]string{"baseUrl": "https://new.example.com", "pageSize": "50"},
+		SecretVariables: []string{
+			"apiToken",
+			"webhookSecret",
+		},
+	})
+	if err != nil {
+		t.Fatalf("save environment: %v", err)
+	}
+
+	content, err := os.ReadFile(filepath.Join(workspaceRoot, directoryName, "development.yaml"))
+	if err != nil {
+		t.Fatalf("read environment: %v", err)
+	}
+	if !strings.Contains(string(content), "# Shared configuration") {
+		t.Errorf("expected the comment to be preserved, got:\n%s", content)
+	}
+
+	loaded, err := repository.Load("development")
+	if err != nil {
+		t.Fatalf("load saved environment: %v", err)
+	}
+	if loaded.Shared.Variables["baseUrl"] != "https://new.example.com" {
+		t.Errorf("unexpected variables: %+v", loaded.Shared.Variables)
+	}
+	if loaded.Shared.Variables["pageSize"] != "50" {
+		t.Errorf("unexpected variables: %+v", loaded.Shared.Variables)
+	}
+	if len(loaded.Shared.SecretVariables) != 2 || loaded.Shared.SecretVariables[1] != "webhookSecret" {
+		t.Errorf("unexpected secret variables: %+v", loaded.Shared.SecretVariables)
+	}
+}
+
+func TestSaveRemovesEmptySections(t *testing.T) {
+	workspaceRoot := t.TempDir()
+	writeEnvironmentFile(t, workspaceRoot, "development.yaml", "name: Development\nvariables:\n  baseUrl: https://example.com\n")
+
+	repository := NewRepository(workspaceRoot)
+	if err := repository.Save("development", Environment{Name: "Development"}); err != nil {
+		t.Fatalf("save environment: %v", err)
+	}
+
+	content, err := os.ReadFile(repository.SharedPath("development"))
+	if err != nil {
+		t.Fatalf("read environment: %v", err)
+	}
+	if strings.Contains(string(content), "variables") {
+		t.Errorf("expected the empty variables section to be removed, got:\n%s", content)
 	}
 }
