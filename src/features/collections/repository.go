@@ -240,6 +240,38 @@ func (repository *Repository) LoadRequest(relativePath string) (domain.Request, 
 	return request, nil
 }
 
+// LoadCollection reads and validates a collection metadata file. A collection
+// directory without metadata is valid and returns ErrEntryNotFound so callers
+// can fall back to the directory name.
+func (repository *Repository) LoadCollection(relativePath string) (domain.Collection, error) {
+	if strings.HasSuffix(relativePath, fileExtension) {
+		return domain.Collection{}, ErrInvalidPath
+	}
+
+	directory, err := repository.resolve(relativePath)
+	if err != nil {
+		return domain.Collection{}, err
+	}
+
+	content, err := os.ReadFile(filepath.Join(directory, collectionFileName))
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return domain.Collection{}, ErrEntryNotFound
+		}
+		return domain.Collection{}, fmt.Errorf("read collection %s: %w", relativePath, err)
+	}
+
+	var collection domain.Collection
+	if err := yaml.Unmarshal(content, &collection); err != nil {
+		return domain.Collection{}, fmt.Errorf("%w: %v", domain.ErrInvalidCollection, err)
+	}
+	if err := collection.Validate(); err != nil {
+		return domain.Collection{}, err
+	}
+
+	return collection, nil
+}
+
 // CreateRequest writes a new request file and creates missing parent
 // directories.
 func (repository *Repository) CreateRequest(relativePath string, request domain.Request) error {

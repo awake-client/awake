@@ -21,6 +21,12 @@ func (service *Service) LoadRequest(workspaceRoot string, relativePath string) (
 	return NewRepository(workspaceRoot).LoadRequest(relativePath)
 }
 
+// LoadCollection returns collection metadata, or ErrEntryNotFound when the
+// directory has no collection file.
+func (service *Service) LoadCollection(workspaceRoot string, relativePath string) (domain.Collection, error) {
+	return NewRepository(workspaceRoot).LoadCollection(relativePath)
+}
+
 // CreateRequest writes a new request file.
 func (service *Service) CreateRequest(workspaceRoot string, relativePath string, request domain.Request) error {
 	return NewRepository(workspaceRoot).CreateRequest(relativePath, request)

@@ -41,6 +41,14 @@ export function List(workspaceRoot: string, relativePath: string): $CancellableP
 }
 
 /**
+ * LoadCollection returns collection metadata, or ErrEntryNotFound when the
+ * directory has no collection file.
+ */
+export function LoadCollection(workspaceRoot: string, relativePath: string): $CancellablePromise<domain$0.Collection> {
+    return $Call.ByID(503560914, workspaceRoot, relativePath);
+}
+
+/**
  * LoadRequest returns a request with defaults applied.
  */
 export function LoadRequest(workspaceRoot: string, relativePath: string): $CancellablePromise<domain$0.Request> {
