@@ -34,10 +34,12 @@ type HistoryRecorder interface {
 
 // Service exposes request execution to the application layer.
 type Service struct {
-	source   Source
-	client   *http.Client
-	store    *store
-	recorder HistoryRecorder
+	source       Source
+	client       *http.Client
+	streamClient *http.Client
+	streams      *streamRegistry
+	store        *store
+	recorder     HistoryRecorder
 }
 
 // NewService returns an HTTP client service backed by source.
@@ -52,10 +54,12 @@ func NewService(source Source, recorder HistoryRecorder) (*Service, error) {
 
 func newServiceWithStore(source Source, responseStore *store, recorder HistoryRecorder) *Service {
 	return &Service{
-		source:   source,
-		client:   &http.Client{Timeout: DefaultTimeout},
-		store:    responseStore,
-		recorder: recorder,
+		source:       source,
+		client:       &http.Client{Timeout: DefaultTimeout},
+		streamClient: newStreamClient(),
+		streams:      newStreamRegistry(),
+		store:        responseStore,
+		recorder:     recorder,
 	}
 }
 
@@ -215,6 +219,10 @@ func readPreview(path string, size int64) ([]byte, error) {
 }
 
 func buildHTTPRequest(request domain.Request, layers []map[string]string) (*http.Request, error) {
+	return buildHTTPRequestWithContext(context.Background(), request, layers)
+}
+
+func buildHTTPRequestWithContext(parent context.Context, request domain.Request, layers []map[string]string) (*http.Request, error) {
 	rawURL, err := interpolate(request.URL, layers)
 	if err != nil {
 		return nil, err
@@ -266,7 +274,7 @@ func buildHTTPRequest(request domain.Request, layers []map[string]string) (*http
 
 	parsedURL.RawQuery = query.Encode()
 
-	httpRequest, err := http.NewRequestWithContext(context.Background(), request.Method, parsedURL.String(), bodyReader)
+	httpRequest, err := http.NewRequestWithContext(parent, request.Method, parsedURL.String(), bodyReader)
 	if err != nil {
 		return nil, fmt.Errorf("build request: %w", err)
 	}
