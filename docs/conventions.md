@@ -11,6 +11,7 @@ that owns its model, its persistence and the service exposed to the frontend.
 ```
 src/
   app/                  bootstrap, dependency wiring, menus, typed events
+  domain/               pure entities shared by several features
   features/
     workspace/
       model.go
@@ -45,10 +46,18 @@ Forbidden:
 
 Allowed:
 
-- a feature importing `src/shared`;
+- a feature importing `src/domain` and `src/shared`;
 - a feature consuming another feature through an interface it declares itself
   (ports and adapters), with the implementation wired in `src/app`;
 - cross-feature notifications through `shared/eventbus`.
+
+### Domain
+
+`src/domain` holds the entities several features must agree on, such as
+`Request`, `Collection`, `Parameter` and `Header`. It contains no input or
+output: reading and writing files stays in features, and low-level helpers stay
+in `src/shared`. A domain type carries its defaults and validation so every
+feature applies the same rules.
 
 ### Frontend layout
 
