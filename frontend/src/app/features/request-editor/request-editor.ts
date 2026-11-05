@@ -8,12 +8,15 @@ import {
   Chunk,
   Response as HTTPResponse,
 } from '@bindings/github.com/clementherve/awake/src/features/httpclient/models';
+import * as OAuth2Service from '@bindings/github.com/clementherve/awake/src/features/oauth2/service';
+import { Status as OAuth2Status } from '@bindings/github.com/clementherve/awake/src/features/oauth2/models';
 import {
   Authentication,
   AuthenticationType,
   Body,
   BodyType,
   Header,
+  OAuth2GrantType,
   Parameter,
   Protocol,
   Request,
@@ -74,6 +77,7 @@ export class RequestEditor {
   private readonly streamPanel = viewChild<StreamPanel>(StreamPanel);
 
   protected readonly AuthenticationType = AuthenticationType;
+  protected readonly OAuth2GrantType = OAuth2GrantType;
   protected readonly BodyType = BodyType;
   protected readonly Protocol = Protocol;
   protected readonly httpMethods = HTTP_METHODS;
@@ -105,6 +109,9 @@ export class RequestEditor {
   );
   protected readonly body = signal<Body>({ Type: BodyType.BodyNone, Content: '' });
   protected readonly activeTab = signal<EditorTab>('parameters');
+  protected readonly oauth2Status = signal<OAuth2Status | null>(null);
+  protected readonly oauth2Busy = signal(false);
+  protected readonly oauth2Error = signal<string | null>(null);
 
   protected readonly response = signal<HTTPResponse | null>(null);
   protected readonly responseBody = signal('');
@@ -196,6 +203,7 @@ export class RequestEditor {
       this.url.set(request.URL);
       this.snapshot.set(JSON.stringify(this.draft()));
       this.statusMessage.set('Saved');
+      void this.refreshOAuth2Status();
       return true;
     } catch (error) {
       this.errorMessage.set(describeError(error));
@@ -389,17 +397,138 @@ export class RequestEditor {
   protected selectAuthenticationType(event: Event): void {
     const type = (event.target as HTMLSelectElement)
       .value as AuthenticationType;
-    this.authentication.update((authentication) => ({ ...authentication, Type: type }));
+    this.authentication.update((authentication) => {
+      if (type !== AuthenticationType.AuthenticationOAuth2) {
+        return { ...authentication, Type: type };
+      }
+      return {
+        ...authentication,
+        Type: type,
+        GrantType:
+          authentication.GrantType ||
+          OAuth2GrantType.OAuth2GrantAuthorizationCode,
+      };
+    });
+
+    if (type === AuthenticationType.AuthenticationOAuth2) {
+      void this.refreshOAuth2Status();
+    } else {
+      this.oauth2Status.set(null);
+      this.oauth2Error.set(null);
+    }
   }
 
   protected updateAuthentication(
-    field: 'Username' | 'Password' | 'Token' | 'Key' | 'Value' | 'Location',
+    field:
+      | 'Username'
+      | 'Password'
+      | 'Token'
+      | 'Key'
+      | 'Value'
+      | 'Location'
+      | 'AuthorizationURL'
+      | 'TokenURL'
+      | 'ClientID'
+      | 'ClientSecret'
+      | 'RedirectURL'
+      | 'Audience',
     value: string,
   ): void {
     this.authentication.update((authentication) => ({
       ...authentication,
       [field]: value,
     }));
+  }
+
+  protected selectGrantType(event: Event): void {
+    const grantType = (event.target as HTMLSelectElement)
+      .value as OAuth2GrantType;
+    this.authentication.update((authentication) => ({
+      ...authentication,
+      GrantType: grantType,
+    }));
+    void this.refreshOAuth2Status();
+  }
+
+  protected updateScopes(value: string): void {
+    const scopes = value
+      .split(/[\s,]+/)
+      .map((scope) => scope.trim())
+      .filter((scope) => scope !== '');
+    this.authentication.update((authentication) => ({
+      ...authentication,
+      Scopes: scopes,
+    }));
+  }
+
+  protected scopesText(): string {
+    return (this.authentication().Scopes ?? []).join(' ');
+  }
+
+  protected async authorizeOAuth2(): Promise<void> {
+    const rootPath = this.workspaceStore.rootPath();
+    const requestPath = this.requestPath();
+    if (!rootPath || !requestPath || this.oauth2Busy()) {
+      return;
+    }
+    if (this.isDirty() && !(await this.save())) {
+      return;
+    }
+
+    this.oauth2Busy.set(true);
+    this.oauth2Error.set(null);
+
+    try {
+      const status = await OAuth2Service.Authorize(
+        rootPath,
+        requestPath,
+        this.environmentStore.selected(),
+      );
+      this.oauth2Status.set(status);
+      this.statusMessage.set('OAuth 2 token obtained.');
+    } catch (error) {
+      this.oauth2Error.set(describeError(error));
+    } finally {
+      this.oauth2Busy.set(false);
+    }
+  }
+
+  protected async clearOAuth2(): Promise<void> {
+    const rootPath = this.workspaceStore.rootPath();
+    const requestPath = this.requestPath();
+    if (!rootPath || !requestPath) {
+      return;
+    }
+
+    this.oauth2Busy.set(true);
+    this.oauth2Error.set(null);
+
+    try {
+      await OAuth2Service.Clear(
+        rootPath,
+        requestPath,
+        this.environmentStore.selected(),
+      );
+      this.oauth2Status.set(null);
+      this.statusMessage.set('OAuth 2 token cleared.');
+    } catch (error) {
+      this.oauth2Error.set(describeError(error));
+    } finally {
+      this.oauth2Busy.set(false);
+    }
+  }
+
+  protected oauth2Expiry(): string {
+    const status = this.oauth2Status();
+    if (!status?.HasToken) {
+      return 'No token stored.';
+    }
+    if (!status.ExpiresAtMilliseconds) {
+      return 'Token stored without an expiry.';
+    }
+    return `Token stored until ${new Date(
+      status.ExpiresAtMilliseconds,
+    ).toLocaleString()}.`;
   }
 
   protected selectBodyType(event: Event): void {
@@ -461,6 +590,34 @@ export class RequestEditor {
     });
     this.activeTab.set('parameters');
     this.snapshot.set(JSON.stringify(this.draft()));
+    void this.refreshOAuth2Status();
+  }
+
+  private async refreshOAuth2Status(): Promise<void> {
+    const rootPath = this.workspaceStore.rootPath();
+    const requestPath = this.requestPath();
+    const authentication = this.authentication();
+    if (
+      !rootPath ||
+      !requestPath ||
+      authentication.Type !== AuthenticationType.AuthenticationOAuth2 ||
+      !authentication.GrantType
+    ) {
+      this.oauth2Status.set(null);
+      return;
+    }
+
+    try {
+      this.oauth2Status.set(
+        await OAuth2Service.Status(
+          rootPath,
+          requestPath,
+          this.environmentStore.selected(),
+        ),
+      );
+    } catch {
+      this.oauth2Status.set(null);
+    }
   }
   private async closeResponse(): Promise<void> {
     const response = this.response();
@@ -491,7 +648,8 @@ function decodeChunk(chunk: Chunk): string {
   return new TextDecoder().decode(bytes);
 }
 
-function defaultAuthentication(): Authentication {  return {
+function defaultAuthentication(): Authentication {
+  return {
     Type: AuthenticationType.AuthenticationInherit,
     Username: '',
     Password: '',
@@ -499,6 +657,14 @@ function defaultAuthentication(): Authentication {  return {
     Key: '',
     Value: '',
     Location: 'header',
+    GrantType: OAuth2GrantType.OAuth2GrantAuthorizationCode,
+    AuthorizationURL: '',
+    TokenURL: '',
+    ClientID: '',
+    ClientSecret: '',
+    Scopes: [],
+    RedirectURL: '',
+    Audience: '',
   };
 }
 

@@ -308,6 +308,25 @@
   max-width: 60ch;
 }
 
+.field-hint {
+  font-size: 0.6875rem;
+  line-height: 1.4;
+  color: var(--color-text-muted);
+}
+
+.oauth2-actions {
+  display: flex;
+  gap: 8px;
+  padding-top: 4px;
+}
+
+.oauth2-error {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--color-danger);
+  max-width: 60ch;
+}
+
 input[type='text'],
 input[type='password'],
 select,

@@ -285,19 +285,140 @@
 
               @case (AuthenticationType.AuthenticationOAuth2) {
                 <label class="field">
-                  <span class="field-label">Access token</span>
+                  <span class="field-label">Grant type</span>
+                  <select
+                    [ngModel]="authentication().GrantType"
+                    (ngModelChange)="selectGrantType($event)"
+                  >
+                    <option
+                      [value]="OAuth2GrantType.OAuth2GrantAuthorizationCode"
+                    >
+                      Authorization code (PKCE)
+                    </option>
+                    <option
+                      [value]="OAuth2GrantType.OAuth2GrantClientCredentials"
+                    >
+                      Client credentials
+                    </option>
+                  </select>
+                </label>
+
+                @if (
+                  authentication().GrantType ===
+                  OAuth2GrantType.OAuth2GrantAuthorizationCode
+                ) {
+                  <label class="field">
+                    <span class="field-label">Authorization URL</span>
+                    <input
+                      type="text"
+                      [ngModel]="authentication().AuthorizationURL"
+                      (ngModelChange)="updateAuthentication('AuthorizationURL', $event)"
+                      placeholder="https://identity.example.com/authorize"
+                      spellcheck="false"
+                    />
+                  </label>
+                  <label class="field">
+                    <span class="field-label">Redirect URL</span>
+                    <input
+                      type="text"
+                      [ngModel]="authentication().RedirectURL"
+                      (ngModelChange)="updateAuthentication('RedirectURL', $event)"
+                      placeholder="http://127.0.0.1:53682/callback"
+                      spellcheck="false"
+                    />
+                    <span class="field-hint">
+                      Leave empty to listen on a random loopback port. The
+                      redirect must point to this computer.
+                    </span>
+                  </label>
+                }
+
+                <label class="field">
+                  <span class="field-label">Token URL</span>
                   <input
                     type="text"
-                    [ngModel]="authentication().Token"
-                    (ngModelChange)="updateAuthentication('Token', $event)"
-                    placeholder="{{ '{{accessToken}}' }}"
+                    [ngModel]="authentication().TokenURL"
+                    (ngModelChange)="updateAuthentication('TokenURL', $event)"
+                    placeholder="https://identity.example.com/token"
                     spellcheck="false"
                   />
                 </label>
-                <p class="panel-note">
-                  The authorization code flow arrives with the authentication
-                  feature. Until then, provide an access token.
-                </p>
+                <label class="field">
+                  <span class="field-label">Client ID</span>
+                  <input
+                    type="text"
+                    [ngModel]="authentication().ClientID"
+                    (ngModelChange)="updateAuthentication('ClientID', $event)"
+                    placeholder="{{ '{{clientId}}' }}"
+                    spellcheck="false"
+                  />
+                </label>
+                <label class="field">
+                  <span class="field-label">Client secret</span>
+                  <input
+                    type="password"
+                    [ngModel]="authentication().ClientSecret"
+                    (ngModelChange)="updateAuthentication('ClientSecret', $event)"
+                    placeholder="{{ '{{clientSecret}}' }}"
+                    autocomplete="new-password"
+                  />
+                  <span class="field-hint">
+                    Reference a secret variable declared in the environment;
+                    the value stays in the keychain.
+                  </span>
+                </label>
+                <label class="field">
+                  <span class="field-label">Scopes</span>
+                  <input
+                    type="text"
+                    [ngModel]="scopesText()"
+                    (ngModelChange)="updateScopes($event)"
+                    placeholder="read write"
+                    spellcheck="false"
+                  />
+                  <span class="field-hint">Separate scopes with spaces.</span>
+                </label>
+                <label class="field">
+                  <span class="field-label">Audience</span>
+                  <input
+                    type="text"
+                    [ngModel]="authentication().Audience"
+                    (ngModelChange)="updateAuthentication('Audience', $event)"
+                    placeholder="https://api.example.com"
+                    spellcheck="false"
+                  />
+                </label>
+
+                <div class="oauth2-actions">
+                  <button
+                    type="button"
+                    class="add-button"
+                    [disabled]="oauth2Busy()"
+                    (click)="authorizeOAuth2()"
+                  >
+                    {{
+                      oauth2Busy()
+                        ? 'Authorizing…'
+                        : authentication().GrantType ===
+                            OAuth2GrantType.OAuth2GrantClientCredentials
+                          ? 'Get token'
+                          : 'Authorize in browser'
+                    }}
+                  </button>
+                  <button
+                    type="button"
+                    class="remove-button"
+                    [disabled]="oauth2Busy()"
+                    (click)="clearOAuth2()"
+                  >
+                    Clear token
+                  </button>
+                </div>
+
+                <p class="panel-note">{{ oauth2Expiry() }}</p>
+                @if (oauth2Error(); as message) {
+                  <p class="oauth2-error">{{ message }}</p>
+                }
               }
 
               @default {
