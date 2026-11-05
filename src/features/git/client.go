@@ -69,6 +69,12 @@ func (client *Client) Stage(ctx context.Context, paths ...string) error {
 	return err
 }
 
+// StageAll stages every change in the work tree, including deletions.
+func (client *Client) StageAll(ctx context.Context) error {
+	_, err := client.run(ctx, "add", "--all")
+	return err
+}
+
 // Commit creates a commit from the staged changes and returns its hash.
 func (client *Client) Commit(ctx context.Context, message string) (string, error) {
 	if _, err := client.run(ctx, "commit", "--message", message); err != nil {
