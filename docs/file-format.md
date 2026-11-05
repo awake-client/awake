@@ -149,7 +149,47 @@ documentation: |
 | `headers` | list | Request headers |
 | `authentication` | object | Authentication settings or `inherit` |
 | `body` | object | Request body |
+| `scripts` | object | JavaScript hooks |
 | `documentation` | string | Free-form notes |
+
+### Scripts
+
+A request may attach two JavaScript hooks. They run inside the application
+with goja, synchronously, and are interrupted after five seconds.
+
+```yaml
+scripts:
+  preRequest: |
+    request.headers["X-Request-Id"] = "abc-123";
+    awake.log("sending", request.method, request.url);
+  postResponse: |
+    awake.test("successful", response.status === 200);
+    awake.setVariable("lastUserId", JSON.parse(response.body).id);
+```
+
+| Field | Description |
+| --- | --- |
+| `preRequest` | Runs before the request is built. May mutate `request`. |
+| `postResponse` | Runs after the response preview is captured. |
+
+The `request` object exposes `method`, `url`, `headers`, `query` and `body`.
+Mutating it changes the outgoing request: setting a header or a query
+parameter adds it, deleting one removes it. The `response` object exposes
+`status`, `statusText`, `headers`, `body`, `encoding` and `duration`.
+
+The `awake` helper provides:
+
+| Function | Description |
+| --- | --- |
+| `awake.log(...values)` | Appends a line to the script logs |
+| `awake.test(name, value)` | Records an assertion; `value` may be a boolean or a function |
+| `awake.getVariable(name)` | Reads a resolved variable |
+| `awake.setVariable(name, value)` | Sets a variable for the current request only |
+
+Variables set by a script apply to that execution and are never written to
+the environment. A failing script does not abort the request; its error is
+reported with the response. Post-response scripts see the response preview
+(first 256 KiB), so assertions on a large body only cover that preview.
 
 ### Streaming requests
 
