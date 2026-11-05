@@ -68,6 +68,7 @@ type Stream struct {
 	StartedAtMilliseconds int64
 	Closed                bool
 	Error                 string
+	PreRequestOutcome     domain.ScriptOutcome
 }
 
 // StreamEventPage is an incremental slice of a stream event log.
@@ -93,6 +94,7 @@ type streamSession struct {
 	statusCode int
 	status     string
 	headers    map[string][]string
+	preRequest domain.ScriptOutcome
 
 	cancel     context.CancelFunc
 	context    context.Context
@@ -130,6 +132,8 @@ func (service *Service) OpenStream(workspaceRoot string, requestPath string, env
 		return Stream{}, err
 	}
 
+	layers, preRequestOutcome := service.runPreRequest(&request, layers)
+
 	oauth2Token, err := service.oauth2Token(workspaceRoot, requestPath, environmentFileName, request, layers)
 	if err != nil {
 		return Stream{}, err
@@ -137,9 +141,9 @@ func (service *Service) OpenStream(workspaceRoot string, requestPath string, env
 
 	switch request.Protocol {
 	case domain.ProtocolSSE:
-		return service.openServerSentEvents(request, layers, oauth2Token)
+		return service.openServerSentEvents(request, layers, oauth2Token, preRequestOutcome)
 	case domain.ProtocolWebSocket:
-		return service.openWebSocket(request, layers, oauth2Token)
+		return service.openWebSocket(request, layers, oauth2Token, preRequestOutcome)
 	default:
 		return Stream{}, ErrNotStreaming
 	}
@@ -238,7 +242,7 @@ func (service *Service) ReleaseStream(identifier string) error {
 	return nil
 }
 
-func (service *Service) openServerSentEvents(request domain.Request, layers []map[string]string, oauth2Token string) (Stream, error) {
+func (service *Service) openServerSentEvents(request domain.Request, layers []map[string]string, oauth2Token string, preRequestOutcome domain.ScriptOutcome) (Stream, error) {
 	streamContext, cancel := context.WithCancel(context.Background())
 
 	httpRequest, err := buildHTTPRequestWithContext(streamContext, request, layers, oauth2Token)
@@ -272,13 +276,14 @@ func (service *Service) openServerSentEvents(request domain.Request, layers []ma
 	session.context = streamContext
 	session.cancel = cancel
 	session.closer = httpResponse.Body
+	session.preRequest = preRequestOutcome
 
 	go service.readServerSentEvents(session, httpResponse.Body)
 
 	return session.snapshot(), nil
 }
 
-func (service *Service) openWebSocket(request domain.Request, layers []map[string]string, oauth2Token string) (Stream, error) {
+func (service *Service) openWebSocket(request domain.Request, layers []map[string]string, oauth2Token string, preRequestOutcome domain.ScriptOutcome) (Stream, error) {
 	streamContext, cancel := context.WithCancel(context.Background())
 
 	httpRequest, err := buildHTTPRequestWithContext(streamContext, request, layers, oauth2Token)
@@ -315,6 +320,7 @@ func (service *Service) openWebSocket(request domain.Request, layers []map[strin
 	session.context = streamContext
 	session.cancel = cancel
 	session.connection = connection
+	session.preRequest = preRequestOutcome
 	session.append("open", "system", "", "Connected", "utf-8")
 
 	if request.Body != nil && request.Body.Type != domain.BodyNone {
@@ -458,6 +464,7 @@ func (session *streamSession) snapshot() Stream {
 		StartedAtMilliseconds: session.startedAt.UnixMilli(),
 		Closed:                session.closed,
 		Error:                 session.lastError,
+		PreRequestOutcome:     session.preRequest,
 	}
 }
 

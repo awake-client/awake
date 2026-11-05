@@ -31,6 +31,8 @@ export interface Response {
     "Encoding": string;
     "Truncated": boolean;
     "HistoryWarning": string;
+    "PreRequestOutcome": domain$0.ScriptOutcome;
+    "PostResponseOutcome": domain$0.ScriptOutcome;
 }
 
 /**
@@ -45,6 +47,7 @@ export interface Stream {
     "StartedAtMilliseconds": number;
     "Closed": boolean;
     "Error": string;
+    "PreRequestOutcome": domain$0.ScriptOutcome;
 }
 
 /**

@@ -45,6 +45,23 @@ type OAuth2TokenProvider interface {
 	) (string, error)
 }
 
+// ScriptRunner runs the JavaScript hooks attached to a request. The
+// application layer supplies the implementation so this feature does not
+// depend on the scripts feature.
+type ScriptRunner interface {
+	BeforeRequest(
+		script string,
+		request *domain.Request,
+		variables map[string]string,
+	) domain.ScriptOutcome
+	AfterResponse(
+		script string,
+		request domain.Request,
+		response domain.ScriptResponse,
+		variables map[string]string,
+	) domain.ScriptOutcome
+}
+
 // Service exposes request execution to the application layer.
 type Service struct {
 	source       Source
@@ -54,6 +71,7 @@ type Service struct {
 	store        *store
 	recorder     HistoryRecorder
 	oauth2       OAuth2TokenProvider
+	scripts      ScriptRunner
 }
 
 // NewService returns an HTTP client service backed by source.
@@ -84,6 +102,13 @@ func SetOAuth2Provider(service *Service, provider OAuth2TokenProvider) {
 	service.oauth2 = provider
 }
 
+// SetScriptRunner connects the JavaScript hooks to request execution. It is a
+// package function rather than a service method, so the runner never crosses
+// the Wails bridge.
+func SetScriptRunner(service *Service, runner ScriptRunner) {
+	service.scripts = runner
+}
+
 // Send executes a request and streams its body to the response store.
 func (service *Service) Send(workspaceRoot string, requestPath string, environmentFileName string) (Response, error) {
 	request, err := service.source.LoadRequest(workspaceRoot, requestPath)
@@ -95,6 +120,8 @@ func (service *Service) Send(workspaceRoot string, requestPath string, environme
 	if err != nil {
 		return Response{}, err
 	}
+
+	layers, preRequestOutcome := service.runPreRequest(&request, layers)
 
 	oauth2Token, err := service.oauth2Token(workspaceRoot, requestPath, environmentFileName, request, layers)
 	if err != nil {
@@ -118,9 +145,61 @@ func (service *Service) Send(workspaceRoot string, requestPath string, environme
 		return Response{}, err
 	}
 
+	response.PreRequestOutcome = preRequestOutcome
+	response.PostResponseOutcome = service.runPostResponse(request, response, layers)
 	response.HistoryWarning = service.recordHistory(workspaceRoot, requestPath, environmentFileName, request, response)
 
 	return response, nil
+}
+
+func (service *Service) runPreRequest(request *domain.Request, layers []map[string]string) ([]map[string]string, domain.ScriptOutcome) {
+	if request.Scripts == nil || strings.TrimSpace(request.Scripts.PreRequest) == "" {
+		return layers, domain.ScriptOutcome{}
+	}
+	if service.scripts == nil {
+		return layers, domain.ScriptOutcome{Error: "script runner is not configured"}
+	}
+
+	// The script works on the merged values and the result is appended as the
+	// highest precedence layer, so a variable it sets wins over the
+	// environment for this request only.
+	variables := mergeLayers(layers)
+	outcome := service.scripts.BeforeRequest(request.Scripts.PreRequest, request, variables)
+
+	return append(layers, variables), outcome
+}
+
+func (service *Service) runPostResponse(request domain.Request, response Response, layers []map[string]string) domain.ScriptOutcome {
+	if request.Scripts == nil || strings.TrimSpace(request.Scripts.PostResponse) == "" {
+		return domain.ScriptOutcome{}
+	}
+	if service.scripts == nil {
+		return domain.ScriptOutcome{Error: "script runner is not configured"}
+	}
+
+	return service.scripts.AfterResponse(
+		request.Scripts.PostResponse,
+		request,
+		domain.ScriptResponse{
+			StatusCode:           response.StatusCode,
+			Status:               response.Status,
+			Headers:              response.Headers,
+			Body:                 response.Preview,
+			Encoding:             response.Encoding,
+			DurationMilliseconds: response.DurationMilliseconds,
+		},
+		mergeLayers(layers),
+	)
+}
+
+func mergeLayers(layers []map[string]string) map[string]string {
+	merged := make(map[string]string)
+	for _, layer := range layers {
+		for name, value := range layer {
+			merged[name] = value
+		}
+	}
+	return merged
 }
 
 func (service *Service) oauth2Token(

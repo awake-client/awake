@@ -433,6 +433,132 @@ func TestSendRequiresOAuth2ProviderForGrant(t *testing.T) {
 	}
 }
 
+type fakeScriptRunner struct {
+	preRequestCalls   int
+	postResponseCalls int
+	preVariables      map[string]string
+	postResponse      domain.ScriptResponse
+}
+
+func (runner *fakeScriptRunner) BeforeRequest(
+	_ string,
+	request *domain.Request,
+	variables map[string]string,
+) domain.ScriptOutcome {
+	runner.preRequestCalls++
+	variables["scriptValue"] = "from-script"
+	runner.preVariables = variables
+	request.Headers = append(request.Headers, domain.Header{
+		Name:    "X-Script",
+		Value:   "yes",
+		Enabled: true,
+	})
+
+	return domain.ScriptOutcome{
+		Logs:  []string{"preparing request"},
+		Tests: []domain.ScriptTest{{Name: "pre test", Passed: true}},
+	}
+}
+
+func (runner *fakeScriptRunner) AfterResponse(
+	_ string,
+	_ domain.Request,
+	response domain.ScriptResponse,
+	_ map[string]string,
+) domain.ScriptOutcome {
+	runner.postResponseCalls++
+	runner.postResponse = response
+
+	return domain.ScriptOutcome{
+		Logs:  []string{"received response"},
+		Tests: []domain.ScriptTest{{Name: "post test", Passed: true}},
+	}
+}
+
+func TestSendRunsRequestScripts(t *testing.T) {
+	var receivedPath string
+	var receivedHeader string
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		receivedPath = request.URL.Path
+		receivedHeader = request.Header.Get("X-Script")
+		_, _ = writer.Write([]byte("hello from the server"))
+	}))
+	defer server.Close()
+
+	runner := &fakeScriptRunner{}
+	service := newTestService(t, fakeSource{
+		request: domain.Request{
+			Name:   "List users",
+			Method: domain.MethodGet,
+			URL:    server.URL + "/{{scriptValue}}",
+			Scripts: &domain.Scripts{
+				PreRequest:   "request.headers['X-Script'] = 'yes'",
+				PostResponse: "awake.log(response.body)",
+			},
+		},
+	})
+	SetScriptRunner(service, runner)
+
+	response, err := service.Send(t.TempDir(), "collections/users/list.yaml", "")
+	if err != nil {
+		t.Fatalf("send request: %v", err)
+	}
+	defer service.Close(response.ID)
+
+	if runner.preRequestCalls != 1 {
+		t.Errorf("expected one pre-request script, got %d", runner.preRequestCalls)
+	}
+	if runner.postResponseCalls != 1 {
+		t.Errorf("expected one post-response script, got %d", runner.postResponseCalls)
+	}
+	if receivedPath != "/from-script" {
+		t.Errorf("unexpected path: %q", receivedPath)
+	}
+	if receivedHeader != "yes" {
+		t.Errorf("unexpected script header: %q", receivedHeader)
+	}
+	if response.PreRequestOutcome.Logs[0] != "preparing request" {
+		t.Errorf("unexpected pre-request outcome: %+v", response.PreRequestOutcome)
+	}
+	if response.PostResponseOutcome.Tests[0].Name != "post test" {
+		t.Errorf("unexpected post-response outcome: %+v", response.PostResponseOutcome)
+	}
+	if runner.postResponse.Body != "hello from the server" {
+		t.Errorf("unexpected response preview: %q", runner.postResponse.Body)
+	}
+}
+
+func TestSendSkipsScriptsWhenTheyAreEmpty(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		_, _ = writer.Write([]byte("ok"))
+	}))
+	defer server.Close()
+
+	runner := &fakeScriptRunner{}
+	service := newTestService(t, fakeSource{
+		request: domain.Request{
+			Name:   "List users",
+			Method: domain.MethodGet,
+			URL:    server.URL,
+			Scripts: &domain.Scripts{
+				PreRequest:   "  ",
+				PostResponse: "",
+			},
+		},
+	})
+	SetScriptRunner(service, runner)
+
+	response, err := service.Send(t.TempDir(), "collections/users/list.yaml", "")
+	if err != nil {
+		t.Fatalf("send request: %v", err)
+	}
+	defer service.Close(response.ID)
+
+	if runner.preRequestCalls != 0 || runner.postResponseCalls != 0 {
+		t.Errorf("expected no script calls, got %d and %d", runner.preRequestCalls, runner.postResponseCalls)
+	}
+}
+
 func newTestService(t *testing.T, source Source) *Service {
 	t.Helper()
 

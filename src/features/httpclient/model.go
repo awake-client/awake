@@ -4,6 +4,8 @@ package httpclient
 import (
 	"errors"
 	"time"
+
+	"github.com/clementherve/awake/src/domain"
 )
 
 const (
@@ -43,6 +45,8 @@ type Response struct {
 	Encoding             string
 	Truncated            bool
 	HistoryWarning       string
+	PreRequestOutcome    domain.ScriptOutcome
+	PostResponseOutcome  domain.ScriptOutcome
 }
 
 // Chunk is one slice of a stored response body.

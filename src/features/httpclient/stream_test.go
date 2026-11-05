@@ -136,6 +136,43 @@ func TestOpenStreamRejectsHTTPRequests(t *testing.T) {
 	}
 }
 
+func TestOpenStreamRunsPreRequestScripts(t *testing.T) {
+	var receivedHeader string
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		receivedHeader = request.Header.Get("X-Script")
+		writer.Header().Set("Content-Type", "text/event-stream")
+		_, _ = writer.Write([]byte("data: ready\n\n"))
+	}))
+	defer server.Close()
+
+	runner := &fakeScriptRunner{}
+	service := newTestService(t, fakeSource{
+		request: domain.Request{
+			Name:     "Events",
+			Method:   domain.MethodGet,
+			URL:      server.URL,
+			Protocol: domain.ProtocolSSE,
+			Scripts: &domain.Scripts{
+				PreRequest: "request.headers['X-Script'] = 'yes'",
+			},
+		},
+	})
+	SetScriptRunner(service, runner)
+
+	stream, err := service.OpenStream(t.TempDir(), "collections/events.yaml", "")
+	if err != nil {
+		t.Fatalf("open stream: %v", err)
+	}
+	defer service.ReleaseStream(stream.ID)
+
+	if receivedHeader != "yes" {
+		t.Errorf("unexpected script header: %q", receivedHeader)
+	}
+	if stream.PreRequestOutcome.Logs[0] != "preparing request" {
+		t.Errorf("unexpected pre-request outcome: %+v", stream.PreRequestOutcome)
+	}
+}
+
 func TestReadStreamEventsRejectsUnknownStream(t *testing.T) {
 	service := newTestService(t, fakeSource{})
 
