@@ -24,6 +24,9 @@ var (
 	ErrResponseNotFound = errors.New("httpclient: response not found")
 	// ErrInvalidChunk is returned for an out-of-range chunk request.
 	ErrInvalidChunk = errors.New("httpclient: invalid chunk")
+	// ErrOAuth2AuthorizationRequired is returned when an OAuth 2 request needs
+	// the user to authorize it before it can be sent.
+	ErrOAuth2AuthorizationRequired = errors.New("httpclient: oauth2 authorization required")
 )
 
 // Response describes an exchange. The body itself stays on disk and is read

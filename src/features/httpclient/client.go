@@ -32,6 +32,19 @@ type HistoryRecorder interface {
 	Record(workspaceRoot string, entry domain.HistoryEntry) error
 }
 
+// OAuth2TokenProvider supplies a bearer token for an OAuth 2 request. The
+// application layer supplies the implementation so this feature does not
+// depend on the OAuth 2 feature.
+type OAuth2TokenProvider interface {
+	AccessToken(
+		workspaceRoot string,
+		requestPath string,
+		environmentFileName string,
+		authentication domain.Authentication,
+		layers []map[string]string,
+	) (string, error)
+}
+
 // Service exposes request execution to the application layer.
 type Service struct {
 	source       Source
@@ -40,6 +53,7 @@ type Service struct {
 	streams      *streamRegistry
 	store        *store
 	recorder     HistoryRecorder
+	oauth2       OAuth2TokenProvider
 }
 
 // NewService returns an HTTP client service backed by source.
@@ -63,6 +77,13 @@ func newServiceWithStore(source Source, responseStore *store, recorder HistoryRe
 	}
 }
 
+// SetOAuth2Provider connects the OAuth 2 flows to request execution. It is a
+// package function rather than a service method, so the provider never crosses
+// the Wails bridge.
+func SetOAuth2Provider(service *Service, provider OAuth2TokenProvider) {
+	service.oauth2 = provider
+}
+
 // Send executes a request and streams its body to the response store.
 func (service *Service) Send(workspaceRoot string, requestPath string, environmentFileName string) (Response, error) {
 	request, err := service.source.LoadRequest(workspaceRoot, requestPath)
@@ -75,7 +96,12 @@ func (service *Service) Send(workspaceRoot string, requestPath string, environme
 		return Response{}, err
 	}
 
-	httpRequest, err := buildHTTPRequest(request, layers)
+	oauth2Token, err := service.oauth2Token(workspaceRoot, requestPath, environmentFileName, request, layers)
+	if err != nil {
+		return Response{}, err
+	}
+
+	httpRequest, err := buildHTTPRequest(request, layers, oauth2Token)
 	if err != nil {
 		return Response{}, err
 	}
@@ -95,6 +121,32 @@ func (service *Service) Send(workspaceRoot string, requestPath string, environme
 	response.HistoryWarning = service.recordHistory(workspaceRoot, requestPath, environmentFileName, request, response)
 
 	return response, nil
+}
+
+func (service *Service) oauth2Token(
+	workspaceRoot string,
+	requestPath string,
+	environmentFileName string,
+	request domain.Request,
+	layers []map[string]string,
+) (string, error) {
+	authentication := resolvedAuthentication(request.Authentication)
+	if authentication.Type != domain.AuthenticationOAuth2 || authentication.GrantType == "" {
+		// A static OAuth 2 token or another authentication type needs no
+		// exchange.
+		return "", nil
+	}
+	if service.oauth2 == nil {
+		return "", ErrOAuth2AuthorizationRequired
+	}
+
+	return service.oauth2.AccessToken(
+		workspaceRoot,
+		requestPath,
+		environmentFileName,
+		authentication,
+		layers,
+	)
 }
 
 func (service *Service) recordHistory(workspaceRoot string, requestPath string, environmentFileName string, request domain.Request, response Response) string {
@@ -218,11 +270,11 @@ func readPreview(path string, size int64) ([]byte, error) {
 	return buffer[:read], nil
 }
 
-func buildHTTPRequest(request domain.Request, layers []map[string]string) (*http.Request, error) {
-	return buildHTTPRequestWithContext(context.Background(), request, layers)
+func buildHTTPRequest(request domain.Request, layers []map[string]string, oauth2Token string) (*http.Request, error) {
+	return buildHTTPRequestWithContext(context.Background(), request, layers, oauth2Token)
 }
 
-func buildHTTPRequestWithContext(parent context.Context, request domain.Request, layers []map[string]string) (*http.Request, error) {
+func buildHTTPRequestWithContext(parent context.Context, request domain.Request, layers []map[string]string, oauth2Token string) (*http.Request, error) {
 	rawURL, err := interpolate(request.URL, layers)
 	if err != nil {
 		return nil, err
@@ -303,7 +355,7 @@ func buildHTTPRequestWithContext(parent context.Context, request domain.Request,
 		httpRequest.Header.Set("Content-Type", contentType)
 	}
 
-	if err := applyAuthentication(httpRequest, authentication, layers); err != nil {
+	if err := applyAuthentication(httpRequest, authentication, layers, oauth2Token); err != nil {
 		return nil, err
 	}
 
@@ -322,7 +374,7 @@ func resolvedAuthentication(authentication *domain.Authentication) domain.Authen
 	return *authentication
 }
 
-func applyAuthentication(httpRequest *http.Request, authentication domain.Authentication, layers []map[string]string) error {
+func applyAuthentication(httpRequest *http.Request, authentication domain.Authentication, layers []map[string]string, oauth2Token string) error {
 	switch authentication.Type {
 	case domain.AuthenticationBasic:
 		username, err := interpolate(authentication.Username, layers)
@@ -335,12 +387,27 @@ func applyAuthentication(httpRequest *http.Request, authentication domain.Authen
 		}
 		httpRequest.SetBasicAuth(username, password)
 
-	case domain.AuthenticationBearer, domain.AuthenticationOAuth2:
+	case domain.AuthenticationBearer:
 		token, err := interpolate(authentication.Token, layers)
 		if err != nil {
 			return err
 		}
 		httpRequest.Header.Set("Authorization", "Bearer "+token)
+
+	case domain.AuthenticationOAuth2:
+		// Requests written before the flows existed carry a static token.
+		if authentication.GrantType == "" {
+			token, err := interpolate(authentication.Token, layers)
+			if err != nil {
+				return err
+			}
+			httpRequest.Header.Set("Authorization", "Bearer "+token)
+			return nil
+		}
+		if oauth2Token == "" {
+			return ErrOAuth2AuthorizationRequired
+		}
+		httpRequest.Header.Set("Authorization", "Bearer "+oauth2Token)
 
 	case domain.AuthenticationAPIKey:
 		if authentication.Location == "query" {

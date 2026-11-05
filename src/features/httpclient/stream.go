@@ -130,11 +130,16 @@ func (service *Service) OpenStream(workspaceRoot string, requestPath string, env
 		return Stream{}, err
 	}
 
+	oauth2Token, err := service.oauth2Token(workspaceRoot, requestPath, environmentFileName, request, layers)
+	if err != nil {
+		return Stream{}, err
+	}
+
 	switch request.Protocol {
 	case domain.ProtocolSSE:
-		return service.openServerSentEvents(request, layers)
+		return service.openServerSentEvents(request, layers, oauth2Token)
 	case domain.ProtocolWebSocket:
-		return service.openWebSocket(request, layers)
+		return service.openWebSocket(request, layers, oauth2Token)
 	default:
 		return Stream{}, ErrNotStreaming
 	}
@@ -233,10 +238,10 @@ func (service *Service) ReleaseStream(identifier string) error {
 	return nil
 }
 
-func (service *Service) openServerSentEvents(request domain.Request, layers []map[string]string) (Stream, error) {
+func (service *Service) openServerSentEvents(request domain.Request, layers []map[string]string, oauth2Token string) (Stream, error) {
 	streamContext, cancel := context.WithCancel(context.Background())
 
-	httpRequest, err := buildHTTPRequestWithContext(streamContext, request, layers)
+	httpRequest, err := buildHTTPRequestWithContext(streamContext, request, layers, oauth2Token)
 	if err != nil {
 		cancel()
 		return Stream{}, err
@@ -273,10 +278,10 @@ func (service *Service) openServerSentEvents(request domain.Request, layers []ma
 	return session.snapshot(), nil
 }
 
-func (service *Service) openWebSocket(request domain.Request, layers []map[string]string) (Stream, error) {
+func (service *Service) openWebSocket(request domain.Request, layers []map[string]string, oauth2Token string) (Stream, error) {
 	streamContext, cancel := context.WithCancel(context.Background())
 
-	httpRequest, err := buildHTTPRequestWithContext(streamContext, request, layers)
+	httpRequest, err := buildHTTPRequestWithContext(streamContext, request, layers, oauth2Token)
 	if err != nil {
 		cancel()
 		return Stream{}, err

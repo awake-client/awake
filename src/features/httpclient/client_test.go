@@ -350,6 +350,89 @@ func TestSendRecordsHistory(t *testing.T) {
 	}
 }
 
+type fakeOAuth2Provider struct {
+	token          string
+	err            error
+	calls          int
+	authentication domain.Authentication
+	layers         []map[string]string
+}
+
+func (provider *fakeOAuth2Provider) AccessToken(
+	_ string,
+	_ string,
+	_ string,
+	authentication domain.Authentication,
+	layers []map[string]string,
+) (string, error) {
+	provider.calls++
+	provider.authentication = authentication
+	provider.layers = layers
+	return provider.token, provider.err
+}
+
+func TestSendUsesOAuth2Provider(t *testing.T) {
+	var authorization string
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		authorization = request.Header.Get("Authorization")
+		_, _ = writer.Write([]byte("ok"))
+	}))
+	defer server.Close()
+
+	provider := &fakeOAuth2Provider{token: "provider-token"}
+	service := newTestService(t, fakeSource{
+		request: domain.Request{
+			Name:   "List users",
+			Method: domain.MethodGet,
+			URL:    server.URL,
+			Authentication: &domain.Authentication{
+				Type:      domain.AuthenticationOAuth2,
+				GrantType: domain.OAuth2GrantClientCredentials,
+				ClientID:  "client-id",
+				TokenURL:  "https://example.com/token",
+			},
+		},
+	})
+	SetOAuth2Provider(service, provider)
+
+	response, err := service.Send(t.TempDir(), "collections/users/list.yaml", "development")
+	if err != nil {
+		t.Fatalf("send request: %v", err)
+	}
+	defer service.Close(response.ID)
+
+	if authorization != "Bearer provider-token" {
+		t.Errorf("unexpected authorization %q", authorization)
+	}
+	if provider.calls != 1 {
+		t.Errorf("expected one provider call, got %d", provider.calls)
+	}
+	if provider.authentication.GrantType != domain.OAuth2GrantClientCredentials {
+		t.Errorf("unexpected authentication: %+v", provider.authentication)
+	}
+}
+
+func TestSendRequiresOAuth2ProviderForGrant(t *testing.T) {
+	service := newTestService(t, fakeSource{
+		request: domain.Request{
+			Name:   "List users",
+			Method: domain.MethodGet,
+			URL:    "https://example.com",
+			Authentication: &domain.Authentication{
+				Type:      domain.AuthenticationOAuth2,
+				GrantType: domain.OAuth2GrantClientCredentials,
+				ClientID:  "client-id",
+				TokenURL:  "https://example.com/token",
+			},
+		},
+	})
+
+	_, err := service.Send(t.TempDir(), "collections/users/list.yaml", "")
+	if !errors.Is(err, ErrOAuth2AuthorizationRequired) {
+		t.Fatalf("expected ErrOAuth2AuthorizationRequired, got %v", err)
+	}
+}
+
 func newTestService(t *testing.T, source Source) *Service {
 	t.Helper()
 
