@@ -10,6 +10,7 @@ import (
 	"github.com/clementherve/awake/src/features/oauth2"
 	"github.com/clementherve/awake/src/features/platform"
 	"github.com/clementherve/awake/src/features/secrets"
+	"github.com/clementherve/awake/src/features/updates"
 	"github.com/clementherve/awake/src/features/workspace"
 )
 
@@ -25,6 +26,7 @@ type services struct {
 	OAuth2       *oauth2.Service
 	Platform     *platform.Service
 	Secrets      *secrets.Service
+	Updates      *updates.Service
 	Workspace    *workspace.Service
 }
 
@@ -53,6 +55,7 @@ func newServices() (*services, error) {
 		OAuth2:       oauth2Service,
 		Platform:     platform.NewService(),
 		Secrets:      secrets.NewServiceWithKeychain(keychain),
+		Updates:      updates.NewService(),
 		Workspace:    workspace.NewService(),
 	}, nil
 }

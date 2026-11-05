@@ -38,6 +38,7 @@ func Run(frontendAssets embed.FS) error {
 			application.NewService(featureServices.OAuth2),
 			application.NewService(featureServices.Platform),
 			application.NewService(featureServices.Secrets),
+			application.NewService(featureServices.Updates),
 			application.NewService(featureServices.Workspace),
 		},
 		Assets: application.AssetOptions{
@@ -47,6 +48,10 @@ func Run(frontendAssets embed.FS) error {
 			ApplicationShouldTerminateAfterLastWindowClosed: true,
 		},
 	})
+
+	if err := configureUpdates(instance, featureServices.Updates); err != nil {
+		return err
+	}
 
 	instance.Window.NewWithOptions(application.WebviewWindowOptions{
 		Title:            mainWindowTitle,
