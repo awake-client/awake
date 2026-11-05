@@ -46,3 +46,10 @@ export function List(workspaceRoot: string, relativePath: string): $CancellableP
 export function LoadRequest(workspaceRoot: string, relativePath: string): $CancellablePromise<domain$0.Request> {
     return $Call.ByID(3399377391, workspaceRoot, relativePath);
 }
+
+/**
+ * UpdateRequest replaces the content of an existing request file.
+ */
+export function UpdateRequest(workspaceRoot: string, relativePath: string, request: domain$0.Request): $CancellablePromise<void> {
+    return $Call.ByID(3449007932, workspaceRoot, relativePath, request);
+}

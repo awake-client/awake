@@ -203,3 +203,38 @@ func writeTestFile(t *testing.T, workspaceRoot string, relativePath string, cont
 		t.Fatalf("write %s: %v", relativePath, err)
 	}
 }
+
+func TestUpdateRequestRewritesExistingFile(t *testing.T) {
+	workspaceRoot := t.TempDir()
+	relativePath := "collections/platform/users/list.yaml"
+	writeTestFile(t, workspaceRoot, relativePath, "name: List users\nmethod: GET\nurl: https://example.com/users\n")
+
+	repository := NewRepository(workspaceRoot)
+	request := domain.Request{
+		Name:   "List active users",
+		Method: domain.MethodGet,
+		URL:    "{{baseUrl}}/users?active=true",
+	}
+	if err := repository.UpdateRequest(relativePath, request); err != nil {
+		t.Fatalf("update request: %v", err)
+	}
+
+	loaded, err := repository.LoadRequest(relativePath)
+	if err != nil {
+		t.Fatalf("load updated request: %v", err)
+	}
+	if loaded.Name != "List active users" || loaded.URL != "{{baseUrl}}/users?active=true" {
+		t.Errorf("unexpected loaded request: %+v", loaded)
+	}
+}
+
+func TestUpdateRequestRejectsMissingFile(t *testing.T) {
+	err := NewRepository(t.TempDir()).UpdateRequest("collections/platform/missing.yaml", domain.Request{
+		Name:   "Missing",
+		Method: domain.MethodGet,
+		URL:    "https://example.com",
+	})
+	if !errors.Is(err, ErrEntryNotFound) {
+		t.Fatalf("expected ErrEntryNotFound, got %v", err)
+	}
+}

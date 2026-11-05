@@ -209,6 +209,37 @@ func (repository *Repository) CreateRequest(relativePath string, request domain.
 	return files.WriteAtomically(filePath, content)
 }
 
+// UpdateRequest replaces the content of an existing request file.
+func (repository *Repository) UpdateRequest(relativePath string, request domain.Request) error {
+	if !isRequestPath(relativePath) {
+		return ErrInvalidPath
+	}
+
+	request.ApplyDefaults()
+	if err := request.Validate(); err != nil {
+		return err
+	}
+
+	filePath, err := repository.resolve(relativePath)
+	if err != nil {
+		return err
+	}
+
+	if _, err := os.Stat(filePath); err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return ErrEntryNotFound
+		}
+		return fmt.Errorf("inspect request %s: %w", relativePath, err)
+	}
+
+	content, err := yamlcodec.EncodeValue(request)
+	if err != nil {
+		return fmt.Errorf("encode request %s: %w", relativePath, err)
+	}
+
+	return files.WriteAtomically(filePath, content)
+}
+
 // CreateCollection creates a collection directory with its metadata file.
 func (repository *Repository) CreateCollection(relativePath string, collection domain.Collection) error {
 	if relativePath == "" || relativePath == directoryName {

@@ -26,6 +26,11 @@ func (service *Service) CreateRequest(workspaceRoot string, relativePath string,
 	return NewRepository(workspaceRoot).CreateRequest(relativePath, request)
 }
 
+// UpdateRequest replaces the content of an existing request file.
+func (service *Service) UpdateRequest(workspaceRoot string, relativePath string, request domain.Request) error {
+	return NewRepository(workspaceRoot).UpdateRequest(relativePath, request)
+}
+
 // CreateCollection creates a collection directory with its metadata file.
 func (service *Service) CreateCollection(workspaceRoot string, relativePath string, collection domain.Collection) error {
 	return NewRepository(workspaceRoot).CreateCollection(relativePath, collection)
