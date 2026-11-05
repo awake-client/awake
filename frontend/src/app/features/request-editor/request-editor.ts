@@ -1,4 +1,4 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, computed, inject, signal, viewChild } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
@@ -15,10 +15,12 @@ import {
   BodyType,
   Header,
   Parameter,
+  Protocol,
   Request,
 } from '@bindings/github.com/clementherve/awake/src/domain/models';
 import { EnvironmentStore } from '@core/environment-store';
 import { WorkspaceStore } from '@core/workspace-store';
+import { StreamPanel } from './stream-panel/stream-panel';
 
 /** Sections of the request editor. */
 type EditorTab =
@@ -46,13 +48,19 @@ const TAB_LABELS: Record<EditorTab, string> = {
   documentation: 'Documentation',
 };
 
+const PROTOCOL_LABELS: Record<string, string> = {
+  [Protocol.ProtocolHTTP]: 'HTTP',
+  [Protocol.ProtocolSSE]: 'SSE',
+  [Protocol.ProtocolWebSocket]: 'WebSocket',
+};
+
 /**
  * Edits a single request file. Changes stay local until the user saves, which
  * writes the canonical YAML representation back to disk.
  */
 @Component({
   selector: 'app-request-editor',
-  imports: [FormsModule],
+  imports: [FormsModule, StreamPanel],
   templateUrl: './request-editor.html',
   styleUrl: './request-editor.css',
   host: {
@@ -63,12 +71,21 @@ export class RequestEditor {
   private readonly route = inject(ActivatedRoute);
   private readonly environmentStore = inject(EnvironmentStore);
   private readonly workspaceStore = inject(WorkspaceStore);
+  private readonly streamPanel = viewChild<StreamPanel>(StreamPanel);
 
   protected readonly AuthenticationType = AuthenticationType;
   protected readonly BodyType = BodyType;
+  protected readonly Protocol = Protocol;
   protected readonly httpMethods = HTTP_METHODS;
+  protected readonly protocols = [
+    Protocol.ProtocolHTTP,
+    Protocol.ProtocolSSE,
+    Protocol.ProtocolWebSocket,
+  ];
+  protected readonly protocolLabels = PROTOCOL_LABELS;
   protected readonly tabs = Object.keys(TAB_LABELS) as EditorTab[];
   protected readonly tabLabels = TAB_LABELS;
+  protected readonly selectedEnvironment = this.environmentStore.selected;
 
   protected readonly requestPath = signal('');
   protected readonly isLoading = signal(true);
@@ -78,6 +95,7 @@ export class RequestEditor {
 
   protected readonly name = signal('');
   protected readonly method = signal<string>('GET');
+  protected readonly protocol = signal<Protocol>(Protocol.ProtocolHTTP);
   protected readonly url = signal('');
   protected readonly documentation = signal('');
   protected readonly parameters = signal<Parameter[]>([]);
@@ -103,6 +121,7 @@ export class RequestEditor {
     Name: this.name(),
     Method: this.method(),
     URL: this.url(),
+    Protocol: this.protocol(),
     Parameters: this.parameters().filter(
       (parameter) => parameter.Name.trim() !== '',
     ),
@@ -116,6 +135,21 @@ export class RequestEditor {
     () => JSON.stringify(this.draft()) !== this.snapshot(),
   );
 
+  protected readonly isStreaming = computed(
+    () => this.protocol() !== Protocol.ProtocolHTTP,
+  );
+
+  protected readonly streamLive = computed(
+    () => this.streamPanel()?.isLive() ?? false,
+  );
+
+  protected readonly sendLabel = computed(() => {
+    if (this.isStreaming()) {
+      return this.streamLive() ? 'Disconnect' : 'Connect';
+    }
+    return this.isSending() ? 'Sending…' : 'Send';
+  });
+
   constructor() {
     this.route.url.pipe(takeUntilDestroyed()).subscribe((segments) => {
       const path = segments.map((segment) => segment.path).join('/');
@@ -126,6 +160,7 @@ export class RequestEditor {
   }
 
   ngOnDestroy(): void {
+    void this.streamPanel()?.release();
     void this.closeResponse();
   }
 
@@ -176,6 +211,11 @@ export class RequestEditor {
     }
 
     if (this.isDirty() && !(await this.save())) {
+      return;
+    }
+
+    if (this.isStreaming()) {
+      await this.streamPanel()?.toggle();
       return;
     }
 
@@ -367,11 +407,23 @@ export class RequestEditor {
     this.body.update((body) => ({ ...body, Type: type }));
   }
 
+  protected selectProtocol(value: string): void {
+    const protocol = value as Protocol;
+    if (protocol === this.protocol()) {
+      return;
+    }
+
+    void this.streamPanel()?.release();
+    void this.closeResponse();
+    this.protocol.set(protocol);
+  }
+
   protected updateBodyContent(value: string): void {
     this.body.update((body) => ({ ...body, Content: value }));
   }
 
   private async load(path: string): Promise<void> {
+    await this.streamPanel()?.release();
     await this.closeResponse();
     this.requestPath.set(path);
     this.isLoading.set(true);
@@ -394,6 +446,7 @@ export class RequestEditor {
   private applyRequest(request: Request): void {
     this.name.set(request.Name);
     this.method.set(request.Method || 'GET');
+    this.protocol.set(normalizeProtocol(request.Protocol));
     this.url.set(request.URL);
     this.documentation.set(request.Documentation ?? '');
     this.parameters.set(request.Parameters ?? []);
@@ -438,8 +491,7 @@ function decodeChunk(chunk: Chunk): string {
   return new TextDecoder().decode(bytes);
 }
 
-function defaultAuthentication(): Authentication {
-  return {
+function defaultAuthentication(): Authentication {  return {
     Type: AuthenticationType.AuthenticationInherit,
     Username: '',
     Password: '',
@@ -448,6 +500,17 @@ function defaultAuthentication(): Authentication {
     Value: '',
     Location: 'header',
   };
+}
+
+function normalizeProtocol(protocol: Protocol | undefined): Protocol {
+  switch (protocol) {
+    case Protocol.ProtocolSSE:
+      return Protocol.ProtocolSSE;
+    case Protocol.ProtocolWebSocket:
+      return Protocol.ProtocolWebSocket;
+    default:
+      return Protocol.ProtocolHTTP;
+  }
 }
 
 function describeError(error: unknown): string {

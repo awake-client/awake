@@ -2,10 +2,24 @@
   <div class="request-section">
   <header class="editor-toolbar">
     <select
+      class="protocol-select"
+      [ngModel]="protocol()"
+      (ngModelChange)="selectProtocol($event)"
+      aria-label="Request protocol"
+    >
+      @for (protocolOption of protocols; track protocolOption) {
+        <option [value]="protocolOption">
+          {{ protocolLabels[protocolOption] }}
+        </option>
+      }
+    </select>
+
+    <select
       class="method-select"
       [attr.data-method]="method()"
       [ngModel]="method()"
       (ngModelChange)="method.set($event)"
+      [disabled]="protocol() === Protocol.ProtocolWebSocket"
       aria-label="HTTP method"
     >
       @for (httpMethod of httpMethods; track httpMethod) {
@@ -31,7 +45,7 @@
       (click)="send()"
       title="Send request (⌘/Ctrl + Enter)"
     >
-      {{ isSending() ? 'Sending…' : 'Send' }}
+      {{ sendLabel() }}
     </button>
 
     <button
@@ -351,7 +365,13 @@
   }
   </div>
 
-  @if (isSending() || response() || responseError()) {
+  @if (isStreaming()) {
+    <app-stream-panel
+      [protocol]="protocol()"
+      [requestPath]="requestPath()"
+      [environmentFileName]="selectedEnvironment()"
+    />
+  } @else if (isSending() || response() || responseError()) {
     <section class="response-section">
       <header class="response-toolbar">
         @if (isSending()) {

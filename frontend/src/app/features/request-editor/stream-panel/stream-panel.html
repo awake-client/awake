@@ -1,0 +1,123 @@
+<section class="stream-panel">
+  <header class="stream-toolbar">
+    <span class="protocol-pill">{{ protocolLabel() }}</span>
+
+    @if (isConnecting()) {
+      <span class="stream-meta">Connecting…</span>
+    } @else if (stream(); as current) {
+      <span class="connection-pill" [attr.data-live]="!current.Closed">
+        {{ current.Closed ? 'Disconnected' : 'Connected' }}
+      </span>
+      <span class="stream-meta">{{ current.Status }}</span>
+    } @else {
+      <span class="stream-meta">Not connected</span>
+    }
+
+    <span class="spacer"></span>
+
+    @if (stream()) {
+      <div class="stream-tabs">
+        <button
+          type="button"
+          class="tab"
+          [class.active]="activeTab() === 'events'"
+          (click)="selectTab('events')"
+        >
+          Events <span class="tab-count">{{ eventCount() }}</span>
+        </button>
+        <button
+          type="button"
+          class="tab"
+          [class.active]="activeTab() === 'headers'"
+          (click)="selectTab('headers')"
+        >
+          Headers
+        </button>
+      </div>
+
+      @if (isLive()) {
+        <button type="button" class="stream-button" (click)="disconnect()">
+          Disconnect
+        </button>
+      }
+
+      <button
+        type="button"
+        class="stream-close"
+        aria-label="Close stream"
+        (click)="release()"
+      >
+        ×
+      </button>
+    }
+  </header>
+
+  @if (errorMessage(); as message) {
+    <p class="stream-message error">{{ message }}</p>
+  }
+
+  @if (stream()) {
+    @if (activeTab() === 'events') {
+      <div class="event-log" #eventLog>
+        @for (event of events(); track event.Index) {
+          <div
+            class="event-row"
+            [attr.data-direction]="event.Direction"
+            [attr.data-kind]="event.Kind"
+          >
+            <div class="event-header">
+              <span class="event-direction">{{ directionLabel(event) }}</span>
+              <span class="event-label">{{ eventLabel(event) }}</span>
+              <span class="event-time">{{
+                formatTime(event.TimestampMilliseconds)
+              }}</span>
+            </div>
+            @if (event.Data) {
+              <pre class="event-data">{{ displayData(event) }}</pre>
+            }
+          </div>
+        } @empty {
+          <p class="empty-stream">Waiting for events…</p>
+        }
+      </div>
+    } @else {
+      <div class="stream-headers">
+        @for (header of headerEntries(); track header.name) {
+          <div class="stream-header-row">
+            <span class="stream-header-name">{{ header.name }}</span>
+            <span class="stream-header-value">{{ header.value }}</span>
+          </div>
+        } @empty {
+          <p class="empty-stream">No response headers.</p>
+        }
+      </div>
+    }
+
+    @if (isWebSocket() && isLive()) {
+      <div class="message-composer">
+        <input
+          type="text"
+          name="streamMessage"
+          [ngModel]="message()"
+          (ngModelChange)="message.set($event)"
+          (keydown)="handleComposerKeydown($event)"
+          placeholder="Send a WebSocket message"
+          autocomplete="off"
+          spellcheck="false"
+        />
+        <button
+          type="button"
+          class="stream-button primary"
+          [disabled]="message().trim() === ''"
+          (click)="sendMessage()"
+        >
+          Send
+        </button>
+      </div>
+    }
+  } @else {
+    <p class="empty-stream">
+      Press Connect to open the {{ protocolLabel() }} session.
+    </p>
+  }
+</section>

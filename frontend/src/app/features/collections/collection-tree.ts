@@ -13,6 +13,7 @@ import {
   Entry,
   Kind,
 } from '@bindings/github.com/clementherve/awake/src/features/collections/models';
+import { Protocol } from '@bindings/github.com/clementherve/awake/src/domain/models';
 
 const ROW_HEIGHT = 28;
 const COLLECTIONS_DIRECTORY = 'collections';
@@ -182,6 +183,7 @@ export class CollectionTree {
           Name: name,
           Method: 'GET',
           URL: this.creationUrl().trim() || DEFAULT_REQUEST_URL,
+          Protocol: Protocol.ProtocolHTTP,
           Parameters: null,
           Headers: null,
           Authentication: null,

@@ -37,6 +37,12 @@
   font-size: 0.75rem;
 }
 
+.protocol-select {
+  flex: 0 0 auto;
+  width: 108px;
+  font-size: 0.75rem;
+}
+
 .method-select[data-method='GET'] {
   color: var(--method-get);
 }
