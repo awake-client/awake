@@ -1,0 +1,131 @@
+<div class="tree-header">
+  <span class="tree-title">Collections</span>
+  <div class="tree-actions">
+    <button
+      type="button"
+      class="icon-button"
+      aria-label="Create a collection or request"
+      title="Create a collection or request"
+      (click)="openCreation()"
+    >
+      +
+    </button>
+    <button
+      type="button"
+      class="icon-button"
+      aria-label="Refresh collections"
+      title="Refresh collections"
+      (click)="refresh()"
+    >
+      ↻
+    </button>
+  </div>
+</div>
+
+@if (isCreating()) {
+  <form class="create-form" (submit)="createEntry($event)">
+    <label class="create-field">
+      <span class="field-label">Create</span>
+      <select
+        name="creationKind"
+        [ngModel]="creationKind()"
+        (ngModelChange)="selectCreationKind($event)"
+      >
+        <option value="collection">Collection</option>
+        <option value="request" [disabled]="!canCreateRequest()">
+          Request in selected folder
+        </option>
+      </select>
+    </label>
+
+    <label class="create-field">
+      <span class="field-label">Name</span>
+      <input
+        type="text"
+        name="creationName"
+        [ngModel]="creationName()"
+        (ngModelChange)="creationName.set($event)"
+        placeholder="Platform API"
+        autocomplete="off"
+        spellcheck="false"
+      />
+    </label>
+
+    @if (creationKind() === 'request') {
+      <label class="create-field">
+        <span class="field-label">URL</span>
+        <input
+          type="text"
+          name="creationUrl"
+          [ngModel]="creationUrl()"
+          (ngModelChange)="creationUrl.set($event)"
+          placeholder="https://api.example.com/resources"
+          autocomplete="off"
+          spellcheck="false"
+        />
+      </label>
+    }
+
+    @if (creationError(); as message) {
+      <p class="create-error">{{ message }}</p>
+    }
+
+    <div class="create-actions">
+      <button
+        type="submit"
+        class="primary-button"
+        [disabled]="isSavingEntry()"
+      >
+        {{ isSavingEntry() ? 'Creating…' : 'Create' }}
+      </button>
+      <button type="button" class="ghost-button" (click)="closeCreation()">
+        Cancel
+      </button>
+    </div>
+  </form>
+}
+
+@if (errorMessage(); as message) {
+  <p class="tree-message tree-error">{{ message }}</p>
+}
+
+@if (!isLoading() && rows().length === 0 && !errorMessage()) {
+  <p class="tree-message tree-empty">
+    No collections yet. Use + to create one.
+  </p>
+}
+
+<cdk-virtual-scroll-viewport
+  class="tree-viewport"
+  role="tree"
+  [itemSize]="rowHeight"
+>
+  <div
+    *cdkVirtualFor="let row of rows(); trackBy: trackByPath"
+    class="tree-row"
+    role="treeitem"
+    tabindex="0"
+    [class.selected]="
+      selectedPath() === row.entry.Path ||
+      selectedFolder() === row.entry.Path
+    "
+    [class.folder]="!isRequest(row)"
+    [attr.aria-expanded]="isRequest(row) ? null : row.expanded"
+    [style.padding-left.px]="8 + row.depth * 16"
+    (click)="activate(row)"
+    (keydown.enter)="activate(row)"
+    (keydown.space)="activate(row)"
+  >
+    @if (isRequest(row)) {
+      <span class="chevron-spacer"></span>
+      <span class="method" [attr.data-method]="row.entry.Method || 'GET'">
+        {{ row.entry.Method || 'GET' }}
+      </span>
+    } @else {
+      <span class="chevron" [class.expanded]="row.expanded">▸</span>
+      <span class="folder-icon">▤</span>
+    }
+
+    <span class="entry-name">{{ row.entry.Name }}</span>
+  </div>
+</cdk-virtual-scroll-viewport>
