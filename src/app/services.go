@@ -8,6 +8,7 @@ import (
 	"github.com/clementherve/awake/src/features/httpclient"
 	"github.com/clementherve/awake/src/features/interop"
 	"github.com/clementherve/awake/src/features/platform"
+	"github.com/clementherve/awake/src/features/secrets"
 	"github.com/clementherve/awake/src/features/workspace"
 )
 
@@ -21,13 +22,17 @@ type services struct {
 	HTTPClient   *httpclient.Service
 	Interop      *interop.Service
 	Platform     *platform.Service
+	Secrets      *secrets.Service
 	Workspace    *workspace.Service
 }
 
 func newServices() (*services, error) {
 	historyService := history.NewService()
 
-	httpClient, err := httpclient.NewService(requestSource{}, historyService)
+	keychain := secrets.NewKeyringKeychain()
+	secretRepository := secrets.NewRepository(keychain)
+
+	httpClient, err := httpclient.NewService(requestSource{secrets: secretRepository}, historyService)
 	if err != nil {
 		return nil, err
 	}
@@ -40,6 +45,7 @@ func newServices() (*services, error) {
 		HTTPClient:   httpClient,
 		Interop:      interop.NewService(interopAdapter{}, interopAdapter{}),
 		Platform:     platform.NewService(),
+		Secrets:      secrets.NewServiceWithKeychain(keychain),
 		Workspace:    workspace.NewService(),
 	}, nil
 }

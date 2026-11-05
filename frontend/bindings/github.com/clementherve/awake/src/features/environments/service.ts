@@ -27,3 +27,10 @@ export function List(workspaceRoot: string): $CancellablePromise<$models.Summary
 export function Load(workspaceRoot: string, fileName: string): $CancellablePromise<$models.ResolvedEnvironment> {
     return $Call.ByID(1121922383, workspaceRoot, fileName);
 }
+
+/**
+ * Save writes a shared environment file.
+ */
+export function Save(workspaceRoot: string, fileName: string, environment: $models.Environment): $CancellablePromise<void> {
+    return $Call.ByID(4242816834, workspaceRoot, fileName, environment);
+}
