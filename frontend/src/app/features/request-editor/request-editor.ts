@@ -20,6 +20,7 @@ import {
   Parameter,
   Protocol,
   Request,
+  ScriptOutcome,
 } from '@bindings/github.com/clementherve/awake/src/domain/models';
 import { EnvironmentStore } from '@core/environment-store';
 import { WorkspaceStore } from '@core/workspace-store';
@@ -31,6 +32,7 @@ type EditorTab =
   | 'headers'
   | 'authentication'
   | 'body'
+  | 'scripts'
   | 'documentation';
 
 const HTTP_METHODS = [
@@ -48,6 +50,7 @@ const TAB_LABELS: Record<EditorTab, string> = {
   headers: 'Headers',
   authentication: 'Authentication',
   body: 'Body',
+  scripts: 'Scripts',
   documentation: 'Documentation',
 };
 
@@ -108,6 +111,8 @@ export class RequestEditor {
     defaultAuthentication(),
   );
   protected readonly body = signal<Body>({ Type: BodyType.BodyNone, Content: '' });
+  protected readonly preRequestScript = signal('');
+  protected readonly postResponseScript = signal('');
   protected readonly activeTab = signal<EditorTab>('parameters');
   protected readonly oauth2Status = signal<OAuth2Status | null>(null);
   protected readonly oauth2Busy = signal(false);
@@ -116,7 +121,9 @@ export class RequestEditor {
   protected readonly response = signal<HTTPResponse | null>(null);
   protected readonly responseBody = signal('');
   protected readonly responseHasMore = signal(false);
-  protected readonly responseTab = signal<'body' | 'headers'>('body');
+  protected readonly responseTab = signal<'body' | 'headers' | 'scripts'>(
+    'body',
+  );
   protected readonly responseError = signal<string | null>(null);
   protected readonly isSending = signal(false);
   protected readonly isLoadingChunk = signal(false);
@@ -135,6 +142,14 @@ export class RequestEditor {
     Headers: this.headers().filter((header) => header.Name.trim() !== ''),
     Authentication: this.authentication(),
     Body: this.body(),
+    Scripts:
+      this.preRequestScript().trim() === '' &&
+      this.postResponseScript().trim() === ''
+        ? null
+        : {
+            PreRequest: this.preRequestScript(),
+            PostResponse: this.postResponseScript(),
+          },
     Documentation: this.documentation(),
   }));
 
@@ -145,6 +160,11 @@ export class RequestEditor {
   protected readonly isStreaming = computed(
     () => this.protocol() !== Protocol.ProtocolHTTP,
   );
+
+  protected readonly hasResponseScripts = computed(() => {
+    const response = this.response();
+    return response ? this.hasScriptOutcome(response) : false;
+  });
 
   protected readonly streamLive = computed(
     () => this.streamPanel()?.isLive() ?? false,
@@ -288,8 +308,24 @@ export class RequestEditor {
     this.responseError.set(null);
   }
 
-  protected selectResponseTab(tab: 'body' | 'headers'): void {
+  protected selectResponseTab(tab: 'body' | 'headers' | 'scripts'): void {
     this.responseTab.set(tab);
+  }
+
+  protected hasScriptOutcome(response: HTTPResponse): boolean {
+    return (
+      hasScriptContent(response.PreRequestOutcome) ||
+      hasScriptContent(response.PostResponseOutcome)
+    );
+  }
+
+  protected scriptOutcomes(
+    response: HTTPResponse,
+  ): { label: string; outcome: ScriptOutcome }[] {
+    return [
+      { label: 'Before the request', outcome: response.PreRequestOutcome },
+      { label: 'After the response', outcome: response.PostResponseOutcome },
+    ].filter((entry) => hasScriptContent(entry.outcome));
   }
 
   protected statusClass(response: HTTPResponse): string {
@@ -588,6 +624,8 @@ export class RequestEditor {
       Type: request.Body?.Type ?? BodyType.BodyNone,
       Content: request.Body?.Content ?? '',
     });
+    this.preRequestScript.set(request.Scripts?.PreRequest ?? '');
+    this.postResponseScript.set(request.Scripts?.PostResponse ?? '');
     this.activeTab.set('parameters');
     this.snapshot.set(JSON.stringify(this.draft()));
     void this.refreshOAuth2Status();
@@ -684,4 +722,13 @@ function describeError(error: unknown): string {
     return error.message;
   }
   return String(error);
+}
+
+function hasScriptContent(outcome: ScriptOutcome | null | undefined): boolean {
+  return Boolean(
+    outcome &&
+      (outcome.Error ||
+        (outcome.Logs?.length ?? 0) > 0 ||
+        (outcome.Tests?.length ?? 0) > 0),
+  );
 }

@@ -292,7 +292,8 @@
 }
 
 .body-content,
-.documentation {
+.documentation,
+.script-content {
   flex: 1;
   min-height: 180px;
   resize: none;
@@ -473,6 +474,71 @@ textarea:focus {
   min-height: 0;
   overflow: auto;
   padding: 10px 12px;
+}
+
+.response-scripts {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 10px 12px;
+}
+
+.script-outcome {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.script-outcome h3 {
+  margin: 0;
+  font-size: 0.75rem;
+}
+
+.script-tests {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.script-tests li {
+  display: flex;
+  gap: 8px;
+  font-size: 0.75rem;
+}
+
+.script-test-state {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.625rem;
+  font-weight: 600;
+  color: var(--color-success);
+}
+
+.script-tests li.failed .script-test-state {
+  color: var(--color-danger);
+}
+
+.script-test-error {
+  color: var(--color-danger);
+  font-size: 0.6875rem;
+}
+
+.script-logs {
+  margin: 0;
+  padding: 10px;
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.7rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 .response-header-row {

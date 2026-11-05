@@ -188,6 +188,7 @@ export class CollectionTree {
           Headers: null,
           Authentication: null,
           Body: null,
+          Scripts: null,
           Documentation: '',
         });
 

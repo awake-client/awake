@@ -468,6 +468,38 @@
           </div>
         }
 
+        @case ('scripts') {
+          <div class="form-panel">
+            <p class="panel-note">
+              JavaScript hooks run inside the application. A failing script
+              does not abort the request; its error is reported with the
+              response. The runtime is interrupted after five seconds.
+            </p>
+
+            <label class="field field-grow">
+              <span class="field-label">Pre-request script</span>
+              <textarea
+                class="script-content"
+                [ngModel]="preRequestScript()"
+                (ngModelChange)="preRequestScript.set($event)"
+                spellcheck="false"
+                placeholder="request.headers['X-Request-Id'] = 'abc-123';"
+              ></textarea>
+            </label>
+
+            <label class="field field-grow">
+              <span class="field-label">Post-response script</span>
+              <textarea
+                class="script-content"
+                [ngModel]="postResponseScript()"
+                (ngModelChange)="postResponseScript.set($event)"
+                spellcheck="false"
+                placeholder="awake.test('successful', response.status === 200);"
+              ></textarea>
+            </label>
+          </div>
+        }
+
         @case ('documentation') {
           <div class="form-panel">
             <label class="field field-grow">
@@ -528,6 +560,16 @@
             >
               Headers
             </button>
+            @if (hasResponseScripts()) {
+              <button
+                type="button"
+                class="tab"
+                [class.active]="responseTab() === 'scripts'"
+                (click)="selectResponseTab('scripts')"
+              >
+                Scripts
+              </button>
+            }
           </div>
 
           <button
@@ -570,7 +612,7 @@
               </button>
             }
           </div>
-        } @else {
+        } @else if (responseTab() === 'headers') {
           <div class="response-headers">
             @for (header of headerEntries(current); track header.name) {
               <div class="response-header-row">
@@ -579,6 +621,37 @@
               </div>
             } @empty {
               <p class="empty-panel">No response headers.</p>
+            }
+          </div>
+        } @else {
+          <div class="response-scripts">
+            @for (entry of scriptOutcomes(current); track entry.label) {
+              <article class="script-outcome">
+                <h3>{{ entry.label }}</h3>
+                @if (entry.outcome.Error) {
+                  <p class="editor-message error">{{ entry.outcome.Error }}</p>
+                }
+                @if (entry.outcome.Tests?.length) {
+                  <ul class="script-tests">
+                    @for (test of entry.outcome.Tests; track $index) {
+                      <li [class.failed]="!test.Passed">
+                        <span class="script-test-state">
+                          {{ test.Passed ? 'PASS' : 'FAIL' }}
+                        </span>
+                        <span>{{ test.Name }}</span>
+                        @if (test.Error) {
+                          <span class="script-test-error">{{ test.Error }}</span>
+                        }
+                      </li>
+                    }
+                  </ul>
+                }
+                @if (entry.outcome.Logs?.length) {
+                  <pre class="script-logs">{{
+                    entry.outcome.Logs.join('\n')
+                  }}</pre>
+                }
+              </article>
             }
           </div>
         }
