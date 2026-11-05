@@ -6,6 +6,7 @@ import (
 	"github.com/clementherve/awake/src/features/git"
 	"github.com/clementherve/awake/src/features/history"
 	"github.com/clementherve/awake/src/features/httpclient"
+	"github.com/clementherve/awake/src/features/interop"
 	"github.com/clementherve/awake/src/features/platform"
 	"github.com/clementherve/awake/src/features/workspace"
 )
@@ -18,6 +19,7 @@ type services struct {
 	Git          *git.Service
 	History      *history.Service
 	HTTPClient   *httpclient.Service
+	Interop      *interop.Service
 	Platform     *platform.Service
 	Workspace    *workspace.Service
 }
@@ -36,6 +38,7 @@ func newServices() (*services, error) {
 		Git:          git.NewService(),
 		History:      historyService,
 		HTTPClient:   httpClient,
+		Interop:      interop.NewService(interopAdapter{}, interopAdapter{}),
 		Platform:     platform.NewService(),
 		Workspace:    workspace.NewService(),
 	}, nil
