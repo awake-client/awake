@@ -1,0 +1,159 @@
+<section class="overview">
+  <header class="overview-header">
+    <div class="overview-title">
+      <span class="title-icon" aria-hidden="true">▦</span>
+      <h1>{{ workspaceName() }}</h1>
+      <span class="title-chevron" aria-hidden="true">⌄</span>
+    </div>
+
+    <nav class="overview-tabs">
+      <span class="tab active">Overview</span>
+      <a class="tab" routerLink="/workspace/environments">Environments</a>
+      <button
+        type="button"
+        class="tab add-tab"
+        title="Create a collection"
+        (click)="toggleCreate()"
+      >
+        +
+      </button>
+    </nav>
+  </header>
+
+  <div class="overview-layout">
+    <div class="overview-main">
+      @if (errorMessage(); as message) {
+        <p class="overview-message error">{{ message }}</p>
+      }
+
+      <div class="stats">
+        <div class="stat">
+          <span class="stat-value">{{ collections().length }}</span>
+          <span class="stat-label">Collections</span>
+        </div>
+        <div class="stat">
+          <span class="stat-value">{{ environments().length }}</span>
+          <span class="stat-label">Environments</span>
+        </div>
+      </div>
+
+      <section class="overview-section">
+        <h2>Quick Actions</h2>
+        <div class="quick-actions">
+          <button type="button" class="action-button" (click)="toggleCreate()">
+            <span aria-hidden="true">+</span> Create Collection
+          </button>
+          <a class="action-button" routerLink="/workspace/environments">
+            <span aria-hidden="true">▤</span> Manage Environments
+          </a>
+          <a class="action-button" routerLink="/workspace/interop">
+            <span aria-hidden="true">↓</span> Import Collection
+          </a>
+        </div>
+      </section>
+
+      @if (isCreating()) {
+        <form class="create-collection" (ngSubmit)="createCollection()">
+          <label class="field">
+            <span class="field-label">Collection name</span>
+            <input
+              type="text"
+              name="collectionName"
+              [ngModel]="creationName()"
+              (ngModelChange)="creationName.set($event)"
+              placeholder="Platform API"
+              autocomplete="off"
+              spellcheck="false"
+            />
+          </label>
+          @if (creationError(); as message) {
+            <p class="overview-message error">{{ message }}</p>
+          }
+          <div class="create-actions">
+            <button type="submit" class="action-button" [disabled]="isSaving()">
+              {{ isSaving() ? 'Creating…' : 'Create' }}
+            </button>
+            <button
+              type="button"
+              class="action-button muted"
+              (click)="toggleCreate()"
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
+      }
+
+      <section class="overview-section">
+        <h2>Collections</h2>
+
+        @if (isLoading()) {
+          <p class="overview-message">Loading collections…</p>
+        } @else if (collections().length === 0) {
+          <p class="overview-message">
+            No collection yet. Create one to start describing your API.
+          </p>
+        } @else {
+          <div class="collection-list">
+            @for (collection of collections(); track collection.Path) {
+              <button
+                type="button"
+                class="collection-row"
+                [class.selected]="
+                  selectedCollection()?.Path === collection.Path
+                "
+                (click)="openCollection(collection)"
+              >
+                <span class="collection-icon" aria-hidden="true">❏</span>
+                <span class="collection-text">
+                  <span class="collection-name">{{ collection.Name }}</span>
+                  <span class="collection-path">{{
+                    collectionPath(collection)
+                  }}</span>
+                </span>
+                <span class="row-menu" aria-hidden="true">⋯</span>
+              </button>
+            }
+          </div>
+        }
+      </section>
+    </div>
+
+    <aside class="documentation">
+      <header class="documentation-header">
+        <span class="documentation-icon" aria-hidden="true">▤</span>
+        <h2>Documentation</h2>
+      </header>
+
+      @if (selectedCollection()) {
+        <p class="documentation-path">
+          {{ selectedCollection()?.Name }}
+        </p>
+        @if (selectedDocumentation()) {
+          <p class="documentation-text">{{ selectedDocumentation() }}</p>
+        } @else {
+          <p class="documentation-empty">
+            This collection has no documentation yet.
+          </p>
+        }
+        <button
+          type="button"
+          class="action-button"
+          (click)="openCollection(selectedCollection()!)"
+        >
+          Open in collections
+        </button>
+      } @else {
+        <p class="documentation-empty">
+          Add documentation to help your team work smoothly. Select a collection
+          to read its notes.
+        </p>
+        <ul class="documentation-links">
+          <li>Requests live as YAML files under collections/.</li>
+          <li>Environments keep shared variables out of requests.</li>
+          <li>Git keeps the whole team in sync.</li>
+        </ul>
+      }
+    </aside>
+  </div>
+</section>

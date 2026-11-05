@@ -1,8 +1,10 @@
 import { ScrollingModule } from '@angular/cdk/scrolling';
 import {
   Component,
+  DestroyRef,
   computed,
   effect,
+  inject,
   input,
   output,
   signal,
@@ -15,7 +17,7 @@ import {
 } from '@bindings/github.com/clementherve/awake/src/features/collections/models';
 import { Protocol } from '@bindings/github.com/clementherve/awake/src/domain/models';
 
-const ROW_HEIGHT = 28;
+const ROW_HEIGHT = 26;
 const COLLECTIONS_DIRECTORY = 'collections';
 const REQUEST_FILE_EXTENSION = '.yaml';
 const DEFAULT_REQUEST_URL = 'https://api.example.com/resource';
@@ -45,6 +47,7 @@ interface TreeRow {
 export class CollectionTree {
   private readonly childrenCache = new Map<string, Entry[]>();
   private readonly expandedPaths = new Set<string>();
+  private readonly destroyRef = inject(DestroyRef);
 
   readonly workspaceRoot = input('');
   readonly requestSelected = output<string>();
@@ -72,6 +75,29 @@ export class CollectionTree {
       if (workspaceRoot) {
         void this.reload(workspaceRoot);
       }
+    });
+
+    const reloadCollections = () => {
+      const workspaceRoot = this.workspaceRoot();
+      if (workspaceRoot) {
+        void this.reload(workspaceRoot);
+      }
+    };
+    const openCollection = (event: Event) => {
+      const path = (event as CustomEvent<string>).detail;
+      if (!path) {
+        return;
+      }
+      this.selectedFolder.set(path);
+      this.selectedPath.set(null);
+      void this.revealDirectory(path);
+    };
+
+    window.addEventListener('awake:collections-changed', reloadCollections);
+    window.addEventListener('awake:open-collection', openCollection);
+    this.destroyRef.onDestroy(() => {
+      window.removeEventListener('awake:collections-changed', reloadCollections);
+      window.removeEventListener('awake:open-collection', openCollection);
     });
   }
 
@@ -199,6 +225,7 @@ export class CollectionTree {
       }
 
       this.isCreating.set(false);
+      window.dispatchEvent(new CustomEvent('awake:collections-changed'));
     } catch (error) {
       this.creationError.set(describeError(error));
     } finally {
