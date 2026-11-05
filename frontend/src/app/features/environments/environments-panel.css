@@ -16,7 +16,9 @@
 
 h1 {
   margin: 0;
-  font-size: 1.25rem;
+  font-size: 1.0625rem;
+  font-weight: 600;
+  color: var(--color-text-strong);
 }
 
 .environments-hint {
@@ -63,8 +65,9 @@ code {
   gap: 12px;
   padding: 16px;
   border: 1px solid var(--color-border);
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   background: var(--color-surface);
+  box-shadow: var(--shadow-card);
 }
 
 h2 {
@@ -88,7 +91,7 @@ h2 {
   width: 100%;
   padding: 8px 10px;
   border: 1px solid transparent;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--color-text);
   text-align: left;
@@ -183,7 +186,7 @@ input {
   border: 1px solid var(--color-border);
   background: var(--color-background);
   color: var(--color-text);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   padding: 7px 9px;
   font-size: 0.8125rem;
   min-width: 0;
@@ -250,7 +253,7 @@ input:focus {
 
 .primary-button {
   border: 1px solid var(--color-accent);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: var(--color-accent);
   color: #ffffff;
   padding: 7px 14px;
@@ -266,7 +269,7 @@ input:focus {
 
 .ghost-button {
   border: 1px solid var(--color-border);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--color-text);
   padding: 6px 10px;
@@ -280,7 +283,7 @@ input:focus {
 
 .icon-button {
   border: 1px solid transparent;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--color-text-muted);
   padding: 6px 8px;

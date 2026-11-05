@@ -9,24 +9,41 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 8px 8px 12px;
+  padding: 9px 8px 5px 12px;
+  flex: 0 0 auto;
 }
 
 .tree-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   font-size: 0.6875rem;
   font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  color: var(--color-text);
+}
+
+.tree-title::before {
+  content: '❏';
+  font-size: 0.75rem;
   color: var(--color-text-muted);
+}
+
+.tree-actions {
+  display: flex;
+  align-items: center;
+  gap: 1px;
 }
 
 .icon-button {
   border: none;
   background: transparent;
   color: var(--color-text-muted);
-  font-size: 0.875rem;
-  padding: 2px 6px;
-  border-radius: 4px;
+  font-size: 0.8125rem;
+  width: 22px;
+  height: 22px;
+  line-height: 1;
+  padding: 0;
+  border-radius: var(--radius-sm);
   cursor: pointer;
 }
 
@@ -36,13 +53,17 @@
 }
 
 .tree-message {
-  margin: 8px 12px;
-  font-size: 0.75rem;
+  margin: 4px 12px;
+  font-size: 0.6875rem;
   color: var(--color-text-muted);
 }
 
 .tree-error {
   color: var(--color-danger);
+}
+
+.tree-empty {
+  line-height: 1.5;
 }
 
 .tree-viewport {
@@ -54,14 +75,14 @@
 .tree-row {
   display: flex;
   align-items: center;
-  gap: 6px;
-  height: 28px;
+  gap: 5px;
+  height: 26px;
   padding-right: 8px;
   cursor: pointer;
   user-select: none;
-  border-radius: 4px;
   color: var(--color-text);
   outline: none;
+  border-left: 2px solid transparent;
 }
 
 .tree-row:hover {
@@ -70,17 +91,18 @@
 
 .tree-row.selected {
   background: var(--color-selection);
+  border-left-color: var(--color-accent);
 }
 
 .tree-row:focus-visible {
-  box-shadow: inset 0 0 0 1px var(--color-accent);
+  box-shadow: inset 0 0 0 1px var(--color-border-strong);
 }
 
 .chevron,
 .chevron-spacer {
   width: 10px;
   flex: 0 0 10px;
-  font-size: 0.625rem;
+  font-size: 0.5625rem;
   color: var(--color-text-muted);
   transition: transform 120ms ease;
 }
@@ -90,16 +112,16 @@
 }
 
 .folder-icon {
-  font-size: 0.75rem;
+  font-size: 0.6875rem;
   color: var(--color-text-muted);
 }
 
 .method {
-  flex: 0 0 46px;
+  flex: 0 0 38px;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 0.625rem;
+  font-size: 0.5625rem;
   font-weight: 700;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.01em;
   color: var(--color-text-muted);
 }
 
@@ -133,60 +155,57 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 0.8125rem;
-}
-
-.tree-actions {
-  display: flex;
-  align-items: center;
-  gap: 2px;
+  font-size: 0.6875rem;
 }
 
 .create-form {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  margin: 0 8px 10px 12px;
-  padding: 10px;
+  gap: 7px;
+  margin: 4px 8px 8px;
+  padding: 9px;
   border: 1px solid var(--color-border);
-  border-radius: 8px;
-  background: var(--color-background);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-card);
 }
 
 .create-field {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 3px;
 }
 
 .create-field .field-label {
-  font-size: 0.625rem;
+  font-size: 0.5625rem;
   font-weight: 600;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--color-text-muted);
 }
 
 .create-field input,
 .create-field select {
-  border: 1px solid var(--color-border);
-  background: var(--color-surface);
+  border: 1px solid transparent;
+  background: var(--color-field);
   color: var(--color-text);
-  border-radius: 6px;
-  padding: 5px 7px;
-  font-size: 0.75rem;
+  border-radius: var(--radius-sm);
+  padding: 4px 7px;
+  font-size: 0.6875rem;
   min-width: 0;
+  box-shadow: var(--shadow-input);
 }
 
 .create-field input:focus,
 .create-field select:focus {
   outline: none;
-  border-color: var(--color-accent);
+  border-color: var(--color-border-strong);
+  background: var(--color-surface-raised);
 }
 
 .create-error {
   margin: 0;
-  font-size: 0.6875rem;
+  font-size: 0.625rem;
   color: var(--color-danger);
 }
 
@@ -198,16 +217,16 @@
 .primary-button,
 .ghost-button {
   border: 1px solid var(--color-border);
-  border-radius: 6px;
-  padding: 5px 10px;
-  font-size: 0.75rem;
+  border-radius: var(--radius-sm);
+  padding: 4px 10px;
+  font-size: 0.6875rem;
   cursor: pointer;
 }
 
 .primary-button {
   background: var(--color-accent);
   border-color: var(--color-accent);
-  color: #ffffff;
+  color: var(--color-on-accent);
   font-weight: 600;
 }
 
