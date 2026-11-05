@@ -26,4 +26,5 @@ export interface Response {
     "Preview": string;
     "Encoding": string;
     "Truncated": boolean;
+    "HistoryWarning": string;
 }

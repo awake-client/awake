@@ -3,6 +3,7 @@ package app
 import (
 	"github.com/clementherve/awake/src/features/collections"
 	"github.com/clementherve/awake/src/features/environments"
+	"github.com/clementherve/awake/src/features/history"
 	"github.com/clementherve/awake/src/features/httpclient"
 	"github.com/clementherve/awake/src/features/platform"
 	"github.com/clementherve/awake/src/features/workspace"
@@ -13,13 +14,16 @@ import (
 type services struct {
 	Collections  *collections.Service
 	Environments *environments.Service
+	History      *history.Service
 	HTTPClient   *httpclient.Service
 	Platform     *platform.Service
 	Workspace    *workspace.Service
 }
 
 func newServices() (*services, error) {
-	httpClient, err := httpclient.NewService(requestSource{})
+	historyService := history.NewService()
+
+	httpClient, err := httpclient.NewService(requestSource{}, historyService)
 	if err != nil {
 		return nil, err
 	}
@@ -27,6 +31,7 @@ func newServices() (*services, error) {
 	return &services{
 		Collections:  collections.NewService(),
 		Environments: environments.NewService(),
+		History:      historyService,
 		HTTPClient:   httpClient,
 		Platform:     platform.NewService(),
 		Workspace:    workspace.NewService(),

@@ -78,6 +78,22 @@ export interface Header {
 }
 
 /**
+ * HistoryEntry is one executed request recorded in the personal history.
+ */
+export interface HistoryEntry {
+    "ID": number;
+    "RequestPath": string;
+    "RequestName": string;
+    "Method": string;
+    "URL": string;
+    "StatusCode": number;
+    "DurationMilliseconds": number;
+    "SizeBytes": number;
+    "Environment": string;
+    "ExecutedAt": string;
+}
+
+/**
  * Parameter is a query parameter.
  */
 export interface Parameter {

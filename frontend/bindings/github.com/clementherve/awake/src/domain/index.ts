@@ -11,6 +11,7 @@ export type {
     Body,
     Collection,
     Header,
+    HistoryEntry,
     Parameter,
     Request
 } from "./models.js";
