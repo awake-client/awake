@@ -4,6 +4,7 @@
 export {
     AuthenticationType,
     BodyType,
+    OAuth2GrantType,
     Protocol
 } from "./models.js";
 

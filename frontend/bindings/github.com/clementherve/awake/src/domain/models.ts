@@ -13,6 +13,19 @@ export interface Authentication {
     "Key": string;
     "Value": string;
     "Location": string;
+
+    /**
+     * OAuth 2 settings. ClientSecret may reference a secret variable; the
+     * value itself is never written to the workspace.
+     */
+    "GrantType": OAuth2GrantType;
+    "AuthorizationURL": string;
+    "TokenURL": string;
+    "ClientID": string;
+    "ClientSecret": string;
+    "Scopes": string[] | null;
+    "RedirectURL": string;
+    "Audience": string;
 }
 
 /**
@@ -92,6 +105,27 @@ export interface HistoryEntry {
     "Environment": string;
     "ExecutedAt": string;
 }
+
+/**
+ * OAuth2GrantType describes how an OAuth 2 client obtains a token.
+ */
+export enum OAuth2GrantType {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    /**
+     * OAuth2GrantAuthorizationCode opens a browser and receives a code on a
+     * loopback redirect with PKCE.
+     */
+    OAuth2GrantAuthorizationCode = "authorizationCode",
+
+    /**
+     * OAuth2GrantClientCredentials exchanges the client credentials directly.
+     */
+    OAuth2GrantClientCredentials = "clientCredentials",
+};
 
 /**
  * Parameter is a query parameter.

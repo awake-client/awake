@@ -59,6 +59,17 @@ const (
 	AuthenticationOAuth2  AuthenticationType = "oauth2"
 )
 
+// OAuth2GrantType describes how an OAuth 2 client obtains a token.
+type OAuth2GrantType string
+
+const (
+	// OAuth2GrantAuthorizationCode opens a browser and receives a code on a
+	// loopback redirect with PKCE.
+	OAuth2GrantAuthorizationCode OAuth2GrantType = "authorizationCode"
+	// OAuth2GrantClientCredentials exchanges the client credentials directly.
+	OAuth2GrantClientCredentials OAuth2GrantType = "clientCredentials"
+)
+
 // Request mirrors a request YAML file.
 type Request struct {
 	Name           string          `yaml:"name"`
@@ -96,6 +107,17 @@ type Authentication struct {
 	Key      string             `yaml:"key,omitempty"`
 	Value    string             `yaml:"value,omitempty"`
 	Location string             `yaml:"location,omitempty"`
+
+	// OAuth 2 settings. ClientSecret may reference a secret variable; the
+	// value itself is never written to the workspace.
+	GrantType        OAuth2GrantType `yaml:"grantType,omitempty"`
+	AuthorizationURL string          `yaml:"authorizationUrl,omitempty"`
+	TokenURL         string          `yaml:"tokenUrl,omitempty"`
+	ClientID         string          `yaml:"clientId,omitempty"`
+	ClientSecret     string          `yaml:"clientSecret,omitempty"`
+	Scopes           []string        `yaml:"scopes,omitempty"`
+	RedirectURL      string          `yaml:"redirectUrl,omitempty"`
+	Audience         string          `yaml:"audience,omitempty"`
 }
 
 // Body holds the request body.
@@ -113,6 +135,11 @@ func (request *Request) ApplyDefaults() {
 	}
 	if request.Authentication == nil {
 		request.Authentication = &Authentication{Type: AuthenticationInherit}
+	}
+	if request.Authentication.Type == AuthenticationOAuth2 &&
+		request.Authentication.GrantType == "" &&
+		request.Authentication.Token == "" {
+		request.Authentication.GrantType = OAuth2GrantAuthorizationCode
 	}
 	if request.Body == nil {
 		request.Body = &Body{Type: BodyNone}
@@ -145,8 +172,10 @@ func (request Request) Validate() error {
 		}
 	}
 
-	if request.Authentication != nil && !isSupportedAuthentication(request.Authentication.Type) {
-		return ErrInvalidRequest
+	if request.Authentication != nil {
+		if err := validateAuthentication(*request.Authentication); err != nil {
+			return err
+		}
 	}
 	if request.Body != nil && !isSupportedBodyType(request.Body.Type) {
 		return ErrInvalidRequest
@@ -177,6 +206,43 @@ func isSupportedAuthentication(authenticationType AuthenticationType) bool {
 	switch authenticationType {
 	case AuthenticationInherit, AuthenticationNone, AuthenticationBasic,
 		AuthenticationBearer, AuthenticationAPIKey, AuthenticationOAuth2:
+		return true
+	default:
+		return false
+	}
+}
+
+func validateAuthentication(authentication Authentication) error {
+	if !isSupportedAuthentication(authentication.Type) {
+		return ErrInvalidRequest
+	}
+	if authentication.Type != AuthenticationOAuth2 {
+		return nil
+	}
+
+	// A bare access token remains valid for requests written before the
+	// OAuth 2 flows existed.
+	if authentication.GrantType == "" && authentication.Token != "" {
+		return nil
+	}
+	if !isSupportedOAuth2GrantType(authentication.GrantType) {
+		return ErrInvalidRequest
+	}
+	if strings.TrimSpace(authentication.TokenURL) == "" ||
+		strings.TrimSpace(authentication.ClientID) == "" {
+		return ErrInvalidRequest
+	}
+	if authentication.GrantType == OAuth2GrantAuthorizationCode &&
+		strings.TrimSpace(authentication.AuthorizationURL) == "" {
+		return ErrInvalidRequest
+	}
+
+	return nil
+}
+
+func isSupportedOAuth2GrantType(grantType OAuth2GrantType) bool {
+	switch grantType {
+	case OAuth2GrantAuthorizationCode, OAuth2GrantClientCredentials:
 		return true
 	default:
 		return false

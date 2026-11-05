@@ -21,8 +21,10 @@ func (collection Collection) Validate() error {
 	if strings.TrimSpace(collection.Name) == "" {
 		return ErrInvalidCollection
 	}
-	if collection.Authentication != nil && !isSupportedAuthentication(collection.Authentication.Type) {
-		return ErrInvalidCollection
+	if collection.Authentication != nil {
+		if err := validateAuthentication(*collection.Authentication); err != nil {
+			return ErrInvalidCollection
+		}
 	}
 
 	return nil
