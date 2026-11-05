@@ -197,8 +197,38 @@ authentication:
   location: header
 ```
 
-OAuth2 stores client configuration in the YAML but keeps tokens in the
-Keychain. Supported grants: authorization code with PKCE, client credentials.
+OAuth2 stores client configuration in the YAML but keeps tokens out of the
+workspace: they stay in memory for the session. Supported grants:
+authorization code with PKCE, client credentials.
+
+```yaml
+authentication:
+  type: oauth2
+  grantType: authorizationCode
+  authorizationUrl: "{{identityUrl}}/authorize"
+  tokenUrl: "{{identityUrl}}/token"
+  clientId: "{{clientId}}"
+  clientSecret: "{{clientSecret}}"
+  scopes: [read, write]
+  redirectUrl: http://127.0.0.1:53682/callback
+  audience: https://api.example.com
+```
+
+| Field | Description |
+| --- | --- |
+| `grantType` | `authorizationCode` or `clientCredentials` |
+| `authorizationUrl` | Browser page of the authorization code flow |
+| `tokenUrl` | Token endpoint |
+| `clientId` | Client identifier |
+| `clientSecret` | Secret value or `{{secretVariable}}` reference |
+| `scopes` | Requested scopes |
+| `redirectUrl` | Loopback callback; an empty value picks a free port |
+| `audience` | Optional audience parameter |
+
+The authorization code flow opens the default browser and listens on a
+loopback address for the callback. Its access token stays in memory for the
+session and is refreshed with the refresh token when one is returned. Tokens
+are never written to the workspace or to request history.
 
 ## Private requests and local overlays
 
