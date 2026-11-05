@@ -1,5 +1,5 @@
 import { Component, computed, effect, inject, signal } from '@angular/core';
-import { Router, RouterOutlet } from '@angular/router';
+import { Router, RouterLink, RouterOutlet } from '@angular/router';
 import * as EnvironmentsService from '@bindings/github.com/clementherve/awake/src/features/environments/service';
 import { Summary } from '@bindings/github.com/clementherve/awake/src/features/environments/models';
 import { EnvironmentStore } from '@core/environment-store';
@@ -12,7 +12,7 @@ import { CollectionTree } from '@features/collections/collection-tree';
  */
 @Component({
   selector: 'app-workspace-shell',
-  imports: [RouterOutlet, CollectionTree],
+  imports: [RouterOutlet, RouterLink, CollectionTree],
   templateUrl: './workspace-shell.html',
   styleUrl: './workspace-shell.css',
 })
@@ -58,6 +58,8 @@ export class WorkspaceShell {
   }
 
   private async loadEnvironments(rootPath: string): Promise<void> {
+    this.environmentStore.select('');
+
     try {
       const summaries = (await EnvironmentsService.List(rootPath)) ?? [];
       this.environments.set(summaries);

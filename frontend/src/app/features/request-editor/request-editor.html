@@ -405,6 +405,9 @@
       }
 
       @if (response(); as current) {
+        @if (current.HistoryWarning) {
+          <p class="editor-message error">{{ current.HistoryWarning }}</p>
+        }
         @if (responseTab() === 'body') {
           <div class="response-body-container">
             @if (current.Encoding === 'base64') {

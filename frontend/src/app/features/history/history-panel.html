@@ -1,0 +1,84 @@
+<section class="history">
+  <header class="history-header">
+    <div>
+      <h1>History</h1>
+      <p class="history-hint">Requests executed in this workspace.</p>
+    </div>
+
+    <div class="history-actions">
+      @if (confirmingClear()) {
+        <button
+          type="button"
+          class="danger-button"
+          [disabled]="isClearing()"
+          (click)="clear()"
+        >
+          {{ isClearing() ? 'Clearing…' : 'Confirm clear' }}
+        </button>
+        <button type="button" class="ghost-button" (click)="cancelClear()">
+          Cancel
+        </button>
+      } @else {
+        <button
+          type="button"
+          class="ghost-button"
+          [disabled]="entries().length === 0"
+          (click)="askClear()"
+        >
+          Clear history
+        </button>
+      }
+    </div>
+  </header>
+
+  @if (errorMessage(); as message) {
+    <p class="history-error">{{ message }}</p>
+  }
+
+  @if (isLoading()) {
+    <p class="history-empty">Loading history…</p>
+  } @else if (entries().length === 0) {
+    <p class="history-empty">
+      No requests executed yet. Send a request and it will appear here.
+    </p>
+  } @else {
+    <div class="history-list">
+      @for (entry of entries(); track entry.ID) {
+        <button type="button" class="history-row" (click)="open(entry)">
+          <span class="method" [attr.data-method]="entry.Method">
+            {{ entry.Method }}
+          </span>
+
+          <span class="history-main">
+            <span class="history-name">{{ entry.RequestName }}</span>
+            <span class="history-url">{{ entry.URL }}</span>
+          </span>
+
+          <span
+            class="status"
+            [attr.data-status]="statusClass(entry.StatusCode)"
+          >
+            {{ entry.StatusCode }}
+          </span>
+
+          <span class="history-meta">{{ entry.DurationMilliseconds }} ms</span>
+          <span class="history-meta">{{ formatSize(entry.SizeBytes) }}</span>
+          <span class="history-meta history-date">
+            {{ formatDate(entry.ExecutedAt) }}
+          </span>
+        </button>
+      }
+    </div>
+
+    @if (hasMore()) {
+      <button
+        type="button"
+        class="load-more"
+        [disabled]="isLoadingMore()"
+        (click)="loadMore()"
+      >
+        {{ isLoadingMore() ? 'Loading…' : 'Load more' }}
+      </button>
+    }
+  }
+</section>

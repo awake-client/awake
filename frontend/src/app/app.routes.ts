@@ -37,6 +37,13 @@ export const routes: Routes = [
           },
         ],
       },
+      {
+        path: 'history',
+        loadComponent: () =>
+          import('@features/history/history-panel').then(
+            (module) => module.HistoryPanel,
+          ),
+      },
     ],
   },
   { path: '**', redirectTo: '' },
