@@ -1,0 +1,183 @@
+name: release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - run: go test ./src/...
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - working-directory: frontend
+        run: npm ci && npm test -- --watch=false
+
+  build:
+    name: ${{ matrix.name }}
+    needs: test
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macOS arm64
+            os: macos-latest
+            goos: darwin
+            goarch: arm64
+            tags: production,purego
+            binary: awake
+            archive: awake-macos-arm64.zip
+          - name: macOS amd64
+            os: macos-latest
+            goos: darwin
+            goarch: amd64
+            tags: production,purego
+            binary: awake
+            archive: awake-macos-amd64.zip
+          - name: Linux amd64
+            os: ubuntu-latest
+            goos: linux
+            goarch: amd64
+            tags: production,purego
+            binary: awake
+            archive: awake-linux-amd64.tar.gz
+          - name: Linux arm64
+            os: ubuntu-latest
+            goos: linux
+            goarch: arm64
+            tags: production,purego
+            binary: awake
+            archive: awake-linux-arm64.tar.gz
+          - name: Windows amd64
+            os: windows-latest
+            goos: windows
+            goarch: amd64
+            tags: production
+            binary: awake.exe
+            archive: awake-windows-amd64.zip
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Build frontend
+        working-directory: frontend
+        run: npm ci && npm run build
+
+      - name: Build binary
+        shell: bash
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: '0'
+          VERSION: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          version="${VERSION#v}"
+          ldflags="-s -w -X github.com/clementherve/awake/src/features/updates.Version=${version}"
+          if [ "${{ matrix.goos }}" = "windows" ]; then
+            ldflags="${ldflags} -H windowsgui"
+          fi
+          mkdir -p dist
+          go build \
+            -tags "${{ matrix.tags }}" \
+            -trimpath -buildvcs=false \
+            -ldflags "${ldflags}" \
+            -o "dist/${{ matrix.binary }}" .
+
+      - name: Package macOS app bundle
+        if: matrix.goos == 'darwin'
+        shell: bash
+        env:
+          VERSION: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          version="${VERSION#v}"
+          app="dist/Awake.app"
+          mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
+          cp "dist/${{ matrix.binary }}" "$app/Contents/MacOS/awake"
+          cp build/darwin/icons.icns "$app/Contents/Resources/icons.icns"
+          if [ -f build/darwin/Assets.car ]; then
+            cp build/darwin/Assets.car "$app/Contents/Resources/Assets.car"
+          fi
+          cp build/darwin/Info.plist "$app/Contents/Info.plist"
+          /usr/libexec/PlistBuddy \
+            -c "Set :CFBundleShortVersionString ${version}" \
+            -c "Set :CFBundleVersion ${version}" \
+            "$app/Contents/Info.plist"
+          /usr/bin/codesign --force --deep --sign - "$app"
+          ditto -c -k --keepParent "$app" "dist/${{ matrix.archive }}"
+
+      - name: Package Linux archive
+        if: matrix.goos == 'linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          tar -czf "dist/${{ matrix.archive }}" -C dist "${{ matrix.binary }}"
+
+      - name: Package Windows archive
+        if: matrix.goos == 'windows'
+        shell: pwsh
+        run: Compress-Archive -Path "dist/${{ matrix.binary }}" -DestinationPath "dist/${{ matrix.archive }}"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.name }}
+          path: dist/${{ matrix.archive }}
+          if-no-files-found: error
+
+  publish:
+    name: Publish release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Create or update the GitHub release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          version="${TAG#v}"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" dist/* --clobber
+          else
+            gh release create "$TAG" dist/* \
+              --title "Awake ${version}" \
+              --generate-notes
+          fi
