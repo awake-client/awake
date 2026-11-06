@@ -8,6 +8,7 @@ export {
 
 export type {
     Chunk,
+    DynamicVariable,
     Response,
     Stream,
     StreamEvent,

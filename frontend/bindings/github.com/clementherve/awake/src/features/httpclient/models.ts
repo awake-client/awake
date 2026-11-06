@@ -16,6 +16,14 @@ export interface Chunk {
 }
 
 /**
+ * DynamicVariable describes a {{$name}} placeholder generated at send time.
+ */
+export interface DynamicVariable {
+    "Name": string;
+    "Description": string;
+}
+
+/**
  * Response describes an exchange. The body itself stays on disk and is read
  * through chunks, so a large payload never crosses the bridge at once.
  */

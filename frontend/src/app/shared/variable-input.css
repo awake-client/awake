@@ -1,0 +1,168 @@
+:host {
+  position: relative;
+  display: block;
+  min-width: 0;
+  height: var(--control-height);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-field);
+  font-size: var(--text-base);
+  transition:
+    border-color 120ms ease,
+    box-shadow 120ms ease;
+  --variable-padding: 10px;
+}
+
+:host(.mono) {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+}
+
+:host(:focus-within) {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px var(--color-accent-soft);
+}
+
+:host(.bare) {
+  height: auto;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  font-size: var(--text-base);
+  --variable-padding: 12px;
+}
+
+/* The highlight layer and the input must lay out text identically. */
+.highlight,
+input {
+  font: inherit;
+  letter-spacing: normal;
+  white-space: pre;
+}
+
+.highlight {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  padding: 0 var(--variable-padding);
+  overflow: hidden;
+  pointer-events: none;
+  color: var(--color-text-strong);
+}
+
+.highlight-text {
+  will-change: transform;
+}
+
+input {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  padding: 0 var(--variable-padding);
+  border: none;
+  background: transparent;
+  color: transparent;
+  caret-color: var(--color-text-strong);
+}
+
+input:focus {
+  outline: none;
+}
+
+input::placeholder {
+  color: var(--color-text-subtle);
+}
+
+input::selection {
+  background: var(--color-selection);
+}
+
+/* Reference states ---------------------------------------------------------- */
+
+.defined,
+.missing,
+.dynamic,
+.secret {
+  border-radius: 3px;
+}
+
+.defined {
+  background: color-mix(in srgb, var(--color-success) 16%, transparent);
+  color: var(--color-success);
+}
+
+.secret {
+  background: color-mix(in srgb, var(--method-put) 16%, transparent);
+  color: var(--method-put);
+}
+
+.dynamic {
+  background: color-mix(in srgb, var(--method-patch) 16%, transparent);
+  color: var(--method-patch);
+}
+
+.missing {
+  background: color-mix(in srgb, var(--color-danger) 14%, transparent);
+  color: var(--color-danger);
+  text-decoration: underline wavy color-mix(in srgb, var(--color-danger) 60%, transparent);
+  text-underline-offset: 3px;
+}
+
+/* Suggestions --------------------------------------------------------------- */
+
+.suggestions {
+  position: fixed;
+  z-index: 200;
+  max-width: 480px;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-raised);
+  box-shadow: var(--shadow-raised);
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+}
+
+.suggestions li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  height: 28px;
+  padding: 0 8px;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+}
+
+.suggestions li.active {
+  background: var(--color-active);
+}
+
+.suggestion-name {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  color: var(--color-success);
+}
+
+.suggestion-name.secret {
+  color: var(--method-put);
+}
+
+.suggestion-name.dynamic {
+  color: var(--method-patch);
+}
+
+.suggestion-value {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-text-muted);
+}
+
+.suggestion-source {
+  font-size: var(--text-xs);
+  color: var(--color-text-subtle);
+}

@@ -30,6 +30,14 @@ export function CloseStream(identifier: string): $CancellablePromise<void> {
 }
 
 /**
+ * DynamicVariables lists the placeholders, such as {{$uuid}}, that receive a
+ * fresh value each time a request is sent.
+ */
+export function DynamicVariables(): $CancellablePromise<$models.DynamicVariable[] | null> {
+    return $Call.ByID(1815998542);
+}
+
+/**
  * OpenStream starts a server-sent events or WebSocket session. The connection
  * stays open until CloseStream or ReleaseStream is called.
  */

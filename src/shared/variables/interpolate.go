@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-var placeholderPattern = regexp.MustCompile(`\{\{\s*([A-Za-z_][A-Za-z0-9_]*)\s*\}\}`)
+var placeholderPattern = regexp.MustCompile(`\{\{\s*(\$?[A-Za-z_][A-Za-z0-9_]*)\s*\}\}`)
 
 // MissingVariablesError lists the variables referenced by a template but not
 // defined in any layer.
@@ -20,6 +20,7 @@ func (missingError *MissingVariablesError) Error() string {
 }
 
 // Interpolate replaces {{variable}} placeholders using the provided layers,
+// and {{$name}} placeholders with a freshly generated dynamic value. Layers are
 // ordered from lowest to highest precedence. It fails instead of leaving an
 // undefined placeholder behind.
 func Interpolate(input string, layers ...map[string]string) (string, error) {
@@ -35,6 +36,14 @@ func Interpolate(input string, layers ...map[string]string) (string, error) {
 	result := placeholderPattern.ReplaceAllStringFunc(input, func(placeholder string) string {
 		matches := placeholderPattern.FindStringSubmatch(placeholder)
 		name := matches[1]
+
+		if strings.HasPrefix(name, DynamicPrefix) {
+			if value, found := resolveDynamic(name); found {
+				return value
+			}
+			missing[name] = true
+			return placeholder
+		}
 
 		value, found := values[name]
 		if !found {
