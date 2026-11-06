@@ -1,6 +1,6 @@
-// Package assistant connects Awake to Claude Code, the command line agent,
-// for tasks that benefit from it. It currently proposes the resolution of
-// git conflicts in workspace files.
+// Package assistant connects Awake to command line coding agents such as
+// Claude Code and OpenCode. It proposes the resolution of git conflicts and
+// provides the chat that lets an agent change a workspace.
 package assistant
 
 import (
@@ -17,13 +17,14 @@ import (
 
 const (
 	binaryName     = "claude"
+	openCodeName   = "opencode"
 	versionTimeout = 10 * time.Second
 	mergeTimeout   = 3 * time.Minute
 	summaryPrefix  = "SUMMARY:"
 )
 
-// ErrNotInstalled is returned when the claude command cannot be found.
-var ErrNotInstalled = errors.New("assistant: Claude Code is not installed")
+// ErrNotInstalled is returned when an agent command cannot be found.
+var ErrNotInstalled = errors.New("assistant: agent command is not installed")
 
 // Status tells whether Claude Code can be used.
 type Status struct {
@@ -39,18 +40,23 @@ type Suggestion struct {
 	Summary string
 }
 
-// runner executes the claude command; tests replace it.
+// runner executes an agent command; tests replace it.
 type runner func(ctx context.Context, binary string, directory string, input string, arguments ...string) (string, error)
 
-// Service runs Claude Code in non interactive mode.
+// Service runs the supported command line agents in non interactive mode.
 type Service struct {
-	run    runner
-	lookup func() (string, error)
+	run            runner
+	lookup         func() (string, error)
+	lookupOpenCode func() (string, error)
 }
 
-// NewService returns a service using the claude command of this computer.
+// NewService returns a service using the agent commands of this computer.
 func NewService() *Service {
-	return &Service{run: runCommand, lookup: findBinary}
+	return &Service{
+		run:            runCommand,
+		lookup:         findBinary,
+		lookupOpenCode: findOpenCodeBinary,
+	}
 }
 
 // Status reports whether Claude Code is installed, and its version.
@@ -148,16 +154,31 @@ func parseSuggestion(output string) (Suggestion, error) {
 // findBinary looks for claude in the PATH, then where installers put it: a
 // desktop application on macOS does not inherit the PATH of the shell.
 func findBinary() (string, error) {
-	if binary, err := exec.LookPath(binaryName); err == nil {
-		return binary, nil
-	}
 	home, _ := os.UserHomeDir()
-	for _, candidate := range []string{
+	return findCommand(binaryName, []string{
 		filepath.Join(home, ".local", "bin", binaryName),
 		filepath.Join(home, ".claude", "local", binaryName),
 		"/opt/homebrew/bin/" + binaryName,
 		"/usr/local/bin/" + binaryName,
-	} {
+	})
+}
+
+// findOpenCodeBinary looks for opencode in the PATH, then in its installer
+// directory.
+func findOpenCodeBinary() (string, error) {
+	home, _ := os.UserHomeDir()
+	return findCommand(openCodeName, []string{
+		filepath.Join(home, ".opencode", "bin", openCodeName),
+		"/opt/homebrew/bin/" + openCodeName,
+		"/usr/local/bin/" + openCodeName,
+	})
+}
+
+func findCommand(name string, candidates []string) (string, error) {
+	if binary, err := exec.LookPath(name); err == nil {
+		return binary, nil
+	}
+	for _, candidate := range candidates {
 		if info, err := os.Stat(candidate); err == nil && !info.IsDir() {
 			return candidate, nil
 		}
@@ -173,14 +194,37 @@ func runCommand(ctx context.Context, binary string, directory string, input stri
 	command.Stdout = &stdout
 	command.Stderr = &stderr
 	if err := command.Run(); err != nil {
-		message := strings.TrimSpace(stderr.String())
-		if message == "" {
-			message = strings.TrimSpace(stdout.String())
+		return "", &commandError{
+			binary: binary,
+			err:    err,
+			stdout: stdout.String(),
+			stderr: stderr.String(),
 		}
-		if message == "" {
-			return "", fmt.Errorf("assistant: claude failed: %w", err)
-		}
-		return "", fmt.Errorf("assistant: claude failed: %s", message)
 	}
 	return stdout.String(), nil
+}
+
+// commandError keeps the output of a failed command so a caller can replace
+// the raw stream with a readable message.
+type commandError struct {
+	binary string
+	err    error
+	stdout string
+	stderr string
+}
+
+func (failure *commandError) Error() string {
+	name := filepath.Base(failure.binary)
+	message := strings.TrimSpace(failure.stderr)
+	if message == "" {
+		message = strings.TrimSpace(failure.stdout)
+	}
+	if message == "" {
+		return fmt.Sprintf("assistant: %s failed: %v", name, failure.err)
+	}
+	return fmt.Sprintf("assistant: %s failed: %s", name, message)
+}
+
+func (failure *commandError) Unwrap() error {
+	return failure.err
 }

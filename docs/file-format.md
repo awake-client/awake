@@ -8,6 +8,7 @@ them at any time.
 
 ```
 awake.yaml                      workspace configuration, tracked by git
+AGENT.md                        instructions for coding agents, tracked by git
 environments/
   development.yaml              shared variables, tracked by git
   development.local.yaml        local overrides, git ignored
@@ -26,6 +27,11 @@ local/                          private collections, same layout, git ignored
 
 The application generates the `.gitignore` entries for `*.local.yaml`,
 `local/` and `.awake/` when a workspace is created.
+
+`AGENT.md` describes the workspace conventions to command line coding agents.
+The Assistant writes a prefilled copy when the file is missing and asks the
+agent to read it before changing the workspace. The file is tracked by git, so
+the instructions travel with the workspace.
 
 ## Formatting rules
 

@@ -7,6 +7,9 @@ export {
 };
 
 export type {
+    AgentStatus,
+    ChatMessage,
+    ChatReply,
     Status,
     Suggestion
 } from "./models.js";
