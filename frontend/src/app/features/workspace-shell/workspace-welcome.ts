@@ -31,7 +31,6 @@ export class WorkspaceWelcome {
   protected readonly isLoading = signal(false);
   protected readonly errorMessage = signal<string | null>(null);
 
-
   constructor() {
     effect(() => {
       const rootPath = this.rootPath();
@@ -60,11 +59,12 @@ export class WorkspaceWelcome {
     this.errorMessage.set(null);
 
     try {
-      const [collections, environments] = await Promise.all([
+      const [collections, privateCollections, environments] = await Promise.all([
         CollectionsService.List(rootPath, ''),
+        CollectionsService.List(rootPath, 'local'),
         EnvironmentsService.List(rootPath),
       ]);
-      this.collections.set(collections ?? []);
+      this.collections.set([...(collections ?? []), ...(privateCollections ?? [])]);
       this.environments.set(environments ?? []);
     } catch (error) {
       this.errorMessage.set(describeError(error));
@@ -104,6 +104,10 @@ export class WorkspaceWelcome {
     });
   }
 
+  protected isPrivate(entry: Entry): boolean {
+    return entry.Path.startsWith('local/');
+  }
+
   /** Stable hue per collection so each card keeps its color. */
   protected collectionHue(entry: Entry): number {
     let hash = 0;
@@ -113,7 +117,6 @@ export class WorkspaceWelcome {
     return hash % 360;
   }
 }
-
 
 function describeError(error: unknown): string {
   if (error instanceof Error) {

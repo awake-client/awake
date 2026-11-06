@@ -75,7 +75,15 @@
                 {{ collection.Name.charAt(0) }}
               </span>
               <span class="collection-text">
-                <span class="collection-name">{{ collection.Name }}</span>
+                <span class="collection-name">
+                  {{ collection.Name }}
+                  @if (isPrivate(collection)) {
+                    <span class="private-badge" title="Stays on this computer, ignored by git">
+                      <app-icon name="lock" [size]="11" />
+                      Private
+                    </span>
+                  }
+                </span>
                 <span class="collection-path">{{ collection.Path }}</span>
               </span>
             </button>

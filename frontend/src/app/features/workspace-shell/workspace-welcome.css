@@ -146,7 +146,6 @@ h2 {
   color: var(--color-danger);
 }
 
-
 .empty-state {
   display: flex;
   flex-direction: column;
@@ -320,4 +319,19 @@ h2 {
   .hero-actions {
     justify-content: flex-start;
   }
+}
+
+.private-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 6px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--color-active);
+  color: var(--color-text-muted);
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 17px;
+  vertical-align: 2px;
 }
