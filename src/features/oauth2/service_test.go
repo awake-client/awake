@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/clementherve/awake/src/domain"
+	"github.com/clementherve/awake/src/shared/variables"
 )
 
 type fakeSource struct {
@@ -22,8 +23,8 @@ func (source fakeSource) LoadRequest(_ string, _ string) (domain.Request, error)
 	return source.request, nil
 }
 
-func (source fakeSource) LoadVariableLayers(_ string, _ string) ([]map[string]string, error) {
-	return source.layers, nil
+func (source fakeSource) LoadVariableLayers(_ string, _ string, _ string) ([]variables.Layer, error) {
+	return variables.Unlabeled(source.layers...), nil
 }
 
 type fakeBrowser struct {
@@ -309,5 +310,67 @@ func authorizationCodeRequest(tokenURL string) domain.Request {
 			TokenURL:         tokenURL,
 			ClientID:         "client-id",
 		},
+	}
+}
+
+func TestPasswordGrantRefreshesSilently(t *testing.T) {
+	var grants []string
+	issued := 0
+	tokenServer := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		if err := request.ParseForm(); err != nil {
+			t.Fatalf("parse form: %v", err)
+		}
+		grants = append(grants, request.Form.Get("grant_type"))
+		if request.Form.Get("grant_type") == "password" &&
+			(request.Form.Get("username") != "ada" || request.Form.Get("password") != "lovelace") {
+			t.Errorf("unexpected credentials: %v", request.Form)
+		}
+		issued++
+		writer.Header().Set("Content-Type", "application/json")
+		_, _ = fmt.Fprintf(writer, `{"access_token":"token-%d","refresh_token":"refresh-%d","expires_in":3600}`, issued, issued)
+	}))
+	defer tokenServer.Close()
+
+	authentication := domain.Authentication{
+		Type:      domain.AuthenticationOAuth2,
+		GrantType: domain.OAuth2GrantPassword,
+		TokenURL:  tokenServer.URL,
+		ClientID:  "client-id",
+		Username:  "{{user}}",
+		Password:  "{{secret}}",
+	}
+	layers := []map[string]string{{"user": "ada", "secret": "lovelace"}}
+	service := NewServiceWithDependencies(fakeSource{}, fakeBrowser{}, tokenServer.Client())
+	provider := NewProvider(service)
+
+	first, err := provider.AccessToken("/workspace", "c/r.yaml", "dev", authentication, layers)
+	if err != nil || first != "token-1" {
+		t.Fatalf("password grant: %q, %v", first, err)
+	}
+	again, err := provider.AccessToken("/workspace", "c/r.yaml", "dev", authentication, layers)
+	if err != nil || again != "token-1" {
+		t.Fatalf("a valid token must be reused: %q, %v", again, err)
+	}
+
+	// The API rejected the token: it is refreshed with the refresh token.
+	provider.ExpireAccessToken("/workspace", "c/r.yaml", "dev")
+	refreshed, err := provider.AccessToken("/workspace", "c/r.yaml", "dev", authentication, layers)
+	if err != nil || refreshed != "token-2" {
+		t.Fatalf("expected a refreshed token: %q, %v", refreshed, err)
+	}
+	if len(grants) != 2 || grants[0] != "password" || grants[1] != "refresh_token" {
+		t.Fatalf("expected a password then a refresh exchange, got %v", grants)
+	}
+}
+
+func TestPasswordGrantRequiresAUserName(t *testing.T) {
+	_, err := resolveConfiguration(domain.Authentication{
+		Type:      domain.AuthenticationOAuth2,
+		GrantType: domain.OAuth2GrantPassword,
+		TokenURL:  "https://identity.example.com/token",
+		ClientID:  "client-id",
+	}, nil)
+	if err == nil {
+		t.Fatal("expected a missing user name to be rejected")
 	}
 }

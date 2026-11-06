@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/clementherve/awake/src/domain"
+	"github.com/clementherve/awake/src/shared/variables"
 )
 
 // Source supplies the request and its variable layers to the authorization
@@ -11,7 +12,7 @@ import (
 // workspace itself.
 type Source interface {
 	LoadRequest(workspaceRoot string, relativePath string) (domain.Request, error)
-	LoadVariableLayers(workspaceRoot string, environmentFileName string) ([]map[string]string, error)
+	LoadVariableLayers(workspaceRoot string, requestPath string, environmentFileName string) ([]variables.Layer, error)
 }
 
 // Service exposes the OAuth 2 flows to the application layer.
@@ -61,6 +62,10 @@ func (service *Service) Authorize(workspaceRoot string, requestPath string, envi
 		if _, err := service.manager.fetchClientCredentials(key, configuration); err != nil {
 			return Status{}, err
 		}
+	case domain.OAuth2GrantPassword:
+		if _, err := service.manager.fetchPassword(key, configuration); err != nil {
+			return Status{}, err
+		}
 	case domain.OAuth2GrantAuthorizationCode:
 		if _, err := service.manager.authorizeCode(key, configuration, service.browser); err != nil {
 			return Status{}, err
@@ -98,10 +103,11 @@ func (service *Service) loadConfiguration(workspaceRoot string, requestPath stri
 		return configuration{}, "", ErrInvalidConfiguration
 	}
 
-	layers, err := service.source.LoadVariableLayers(workspaceRoot, environmentFileName)
+	labeledLayers, err := service.source.LoadVariableLayers(workspaceRoot, requestPath, environmentFileName)
 	if err != nil {
 		return configuration{}, "", err
 	}
+	layers := variables.Maps(labeledLayers)
 
 	resolved, err := resolveConfiguration(*request.Authentication, layers)
 	if err != nil {
@@ -139,4 +145,11 @@ func (provider Provider) AccessToken(
 		tokenKey(workspaceRoot, requestPath, environmentFileName),
 		configuration,
 	)
+}
+
+// ExpireAccessToken marks the token of a request as expired, keeping its
+// refresh token. The HTTP client calls it when the API answers 401 with a
+// token believed valid, then asks for a fresh one.
+func (provider Provider) ExpireAccessToken(workspaceRoot string, requestPath string, environmentFileName string) {
+	provider.manager.expire(tokenKey(workspaceRoot, requestPath, environmentFileName))
 }

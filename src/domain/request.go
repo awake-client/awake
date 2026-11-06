@@ -68,6 +68,9 @@ const (
 	OAuth2GrantAuthorizationCode OAuth2GrantType = "authorizationCode"
 	// OAuth2GrantClientCredentials exchanges the client credentials directly.
 	OAuth2GrantClientCredentials OAuth2GrantType = "clientCredentials"
+	// OAuth2GrantPassword exchanges a user name and password, for services
+	// that still offer the resource owner password credentials grant.
+	OAuth2GrantPassword OAuth2GrantType = "password"
 )
 
 // Request mirrors a request YAML file.
@@ -270,13 +273,17 @@ func validateAuthentication(authentication Authentication) error {
 		strings.TrimSpace(authentication.AuthorizationURL) == "" {
 		return ErrInvalidRequest
 	}
+	if authentication.GrantType == OAuth2GrantPassword &&
+		strings.TrimSpace(authentication.Username) == "" {
+		return ErrInvalidRequest
+	}
 
 	return nil
 }
 
 func isSupportedOAuth2GrantType(grantType OAuth2GrantType) bool {
 	switch grantType {
-	case OAuth2GrantAuthorizationCode, OAuth2GrantClientCredentials:
+	case OAuth2GrantAuthorizationCode, OAuth2GrantClientCredentials, OAuth2GrantPassword:
 		return true
 	default:
 		return false

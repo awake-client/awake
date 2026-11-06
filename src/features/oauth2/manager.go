@@ -46,6 +46,17 @@ func (manager *manager) accessToken(key string, configuration configuration) (st
 		return cached.token.AccessToken, nil
 	}
 
+	// An expired token is refreshed silently: with its refresh token when the
+	// server issued one, otherwise by asking again for the grants that need
+	// no user interaction.
+	if found && cached.fingerprint == configuration.fingerprint() && cached.token.RefreshToken != "" {
+		token, err := manager.refresh(key, configuration, cached.token.RefreshToken)
+		if err == nil {
+			return token.AccessToken, nil
+		}
+		manager.clear(key)
+	}
+
 	switch configuration.GrantType {
 	case domain.OAuth2GrantClientCredentials:
 		token, err := manager.fetchClientCredentials(key, configuration)
@@ -54,19 +65,31 @@ func (manager *manager) accessToken(key string, configuration configuration) (st
 		}
 		return token.AccessToken, nil
 
-	case domain.OAuth2GrantAuthorizationCode:
-		if found && cached.fingerprint == configuration.fingerprint() && cached.token.RefreshToken != "" {
-			token, err := manager.refresh(key, configuration, cached.token.RefreshToken)
-			if err == nil {
-				return token.AccessToken, nil
-			}
-			manager.clear(key)
+	case domain.OAuth2GrantPassword:
+		token, err := manager.fetchPassword(key, configuration)
+		if err != nil {
+			return "", err
 		}
-		return "", ErrAuthorizationRequired
+		return token.AccessToken, nil
 
 	default:
+		// The authorization code flow needs the user in the browser.
 		return "", ErrAuthorizationRequired
 	}
+}
+
+// expire marks the cached token of a key as expired while keeping its refresh
+// token, so the next request refreshes it. It is used when the API rejects a
+// token the client still believed valid.
+func (manager *manager) expire(key string) {
+	manager.mutex.Lock()
+	defer manager.mutex.Unlock()
+	cached, found := manager.tokens[key]
+	if !found {
+		return
+	}
+	cached.token.ExpiresAt = manager.now().Add(-time.Second)
+	manager.tokens[key] = cached
 }
 
 func (manager *manager) status(key string, configuration configuration) Status {
@@ -113,6 +136,21 @@ func (manager *manager) store(key string, configuration configuration, token Tok
 func (manager *manager) fetchClientCredentials(key string, configuration configuration) (Token, error) {
 	token, err := manager.requestToken(configuration, url.Values{
 		"grant_type": {"client_credentials"},
+	})
+	if err != nil {
+		return Token{}, err
+	}
+
+	manager.store(key, configuration, token)
+	return token, nil
+}
+
+// fetchPassword exchanges the user name and password for a token.
+func (manager *manager) fetchPassword(key string, configuration configuration) (Token, error) {
+	token, err := manager.requestToken(configuration, url.Values{
+		"grant_type": {"password"},
+		"username":   {configuration.Username},
+		"password":   {configuration.Password},
 	})
 	if err != nil {
 		return Token{}, err

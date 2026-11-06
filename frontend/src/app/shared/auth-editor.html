@@ -1,0 +1,264 @@
+<div class="type-picker" role="radiogroup" aria-label="Authentication type">
+  @for (option of types(); track option.type) {
+    <button
+      type="button"
+      role="radio"
+      class="type-option"
+      [class.selected]="value().Type === option.type"
+      [attr.aria-checked]="value().Type === option.type"
+      (click)="selectType(option.type)"
+    >
+      <app-icon [name]="option.icon" [size]="14" />
+      {{ option.label }}
+    </button>
+  }
+</div>
+
+@switch (value().Type) {
+  @case (AuthenticationType.AuthenticationInherit) {
+    <div class="inherit-card">
+      <app-icon name="layers" [size]="16" />
+      <div>
+        <p class="inherit-title">
+          {{ describe(inherited()) }}
+          @if (inheritedFrom()) {
+            <span class="inherit-source">from {{ inheritedFrom() }}</span>
+          }
+        </p>
+        <p class="hint">
+          This request uses the authentication of its collection. Change it there to update every
+          request that inherits it.
+        </p>
+        @if (collectionPath()) {
+          <a
+            class="inherit-link"
+            [routerLink]="collectionLink()"
+            [queryParams]="{ tab: 'authentication' }"
+          >
+            Edit the collection authentication
+            <app-icon name="chevron-right" [size]="12" />
+          </a>
+        }
+      </div>
+    </div>
+  }
+
+  @case (AuthenticationType.AuthenticationNone) {
+    <p class="hint">No credentials are sent.</p>
+  }
+
+  @case (AuthenticationType.AuthenticationBasic) {
+    <div class="grid">
+      <label class="field">
+        <span class="field-label">Username</span>
+        <app-variable-input
+          [value]="value().Username"
+          (valueChange)="update('Username', $event)"
+          placeholder="{{ '{{username}}' }}"
+          ariaLabel="Username"
+        />
+      </label>
+      <label class="field">
+        <span class="field-label">Password</span>
+        <input
+          class="input mono"
+          type="password"
+          [value]="value().Password"
+          (input)="update('Password', inputValue($event))"
+          placeholder="{{ '{{password}}' }}"
+          autocomplete="new-password"
+        />
+      </label>
+    </div>
+  }
+
+  @case (AuthenticationType.AuthenticationBearer) {
+    <label class="field">
+      <span class="field-label">Token</span>
+      <app-variable-input
+        [value]="value().Token"
+        (valueChange)="update('Token', $event)"
+        placeholder="{{ '{{accessToken}}' }}"
+        ariaLabel="Token"
+      />
+      <span class="hint">Sent as <code>Authorization: Bearer &lt;token&gt;</code>.</span>
+    </label>
+  }
+
+  @case (AuthenticationType.AuthenticationAPIKey) {
+    <div class="grid">
+      <label class="field">
+        <span class="field-label">Key</span>
+        <app-variable-input
+          [value]="value().Key"
+          (valueChange)="update('Key', $event)"
+          placeholder="X-API-Key"
+          ariaLabel="Key"
+        />
+      </label>
+      <label class="field">
+        <span class="field-label">Value</span>
+        <app-variable-input
+          [value]="value().Value"
+          (valueChange)="update('Value', $event)"
+          placeholder="{{ '{{apiKey}}' }}"
+          ariaLabel="Value"
+        />
+      </label>
+    </div>
+    <div class="field">
+      <span class="field-label">Add to</span>
+      <div class="segmented">
+        <button
+          type="button"
+          [class.selected]="value().Location !== 'query'"
+          (click)="update('Location', 'header')"
+        >
+          Headers
+        </button>
+        <button
+          type="button"
+          [class.selected]="value().Location === 'query'"
+          (click)="update('Location', 'query')"
+        >
+          Query parameters
+        </button>
+      </div>
+    </div>
+  }
+
+  @case (AuthenticationType.AuthenticationOAuth2) {
+    <div class="field">
+      <span class="field-label">Grant type</span>
+      <div class="segmented">
+        <button
+          type="button"
+          [class.selected]="usesBrowser()"
+          (click)="selectGrantType(OAuth2GrantType.OAuth2GrantAuthorizationCode)"
+        >
+          Authorization code (PKCE)
+        </button>
+        <button
+          type="button"
+          [class.selected]="value().GrantType === OAuth2GrantType.OAuth2GrantClientCredentials"
+          (click)="selectGrantType(OAuth2GrantType.OAuth2GrantClientCredentials)"
+        >
+          Client credentials
+        </button>
+        <button
+          type="button"
+          [class.selected]="value().GrantType === OAuth2GrantType.OAuth2GrantPassword"
+          (click)="selectGrantType(OAuth2GrantType.OAuth2GrantPassword)"
+        >
+          Password
+        </button>
+      </div>
+    </div>
+
+    <div class="grid">
+      @if (value().GrantType === OAuth2GrantType.OAuth2GrantPassword) {
+        <label class="field">
+          <span class="field-label">Username</span>
+          <app-variable-input
+            [value]="value().Username"
+            (valueChange)="update('Username', $event)"
+            placeholder="{{ '{{username}}' }}"
+            ariaLabel="Username"
+          />
+        </label>
+        <label class="field">
+          <span class="field-label">Password</span>
+          <input
+            class="input mono"
+            type="password"
+            [value]="value().Password"
+            (input)="update('Password', inputValue($event))"
+            placeholder="{{ '{{password}}' }}"
+            autocomplete="new-password"
+          />
+        </label>
+      }
+      @if (usesBrowser()) {
+        <label class="field">
+          <span class="field-label">Authorization URL</span>
+          <app-variable-input
+            [value]="value().AuthorizationURL"
+            (valueChange)="update('AuthorizationURL', $event)"
+            placeholder="https://identity.example.com/authorize"
+            ariaLabel="Authorization URL"
+          />
+        </label>
+      }
+      <label class="field">
+        <span class="field-label">Token URL</span>
+        <app-variable-input
+          [value]="value().TokenURL"
+          (valueChange)="update('TokenURL', $event)"
+          placeholder="https://identity.example.com/token"
+          ariaLabel="Token URL"
+        />
+      </label>
+      <label class="field">
+        <span class="field-label">Client ID</span>
+        <app-variable-input
+          [value]="value().ClientID"
+          (valueChange)="update('ClientID', $event)"
+          placeholder="{{ '{{clientId}}' }}"
+          ariaLabel="Client ID"
+        />
+      </label>
+      <label class="field">
+        <span class="field-label">Client secret</span>
+        <input
+          class="input mono"
+          type="password"
+          [value]="value().ClientSecret"
+          (input)="update('ClientSecret', inputValue($event))"
+          placeholder="{{ '{{clientSecret}}' }}"
+          autocomplete="new-password"
+        />
+      </label>
+      <label class="field">
+        <span class="field-label">Scopes</span>
+        <input
+          class="input mono"
+          type="text"
+          [value]="scopesText()"
+          (change)="updateScopes(inputValue($event))"
+          placeholder="read write"
+          spellcheck="false"
+        />
+      </label>
+      <label class="field">
+        <span class="field-label">Audience</span>
+        <app-variable-input
+          [value]="value().Audience"
+          (valueChange)="update('Audience', $event)"
+          placeholder="https://api.example.com"
+          ariaLabel="Audience"
+        />
+      </label>
+      @if (usesBrowser()) {
+        <label class="field wide">
+          <span class="field-label">Redirect URL</span>
+          <app-variable-input
+            [value]="value().RedirectURL"
+            (valueChange)="update('RedirectURL', $event)"
+            placeholder="http://127.0.0.1:53682/callback"
+            ariaLabel="Redirect URL"
+          />
+          <span class="hint">
+            Leave empty to listen on a random loopback port. The redirect must point to this
+            computer.
+          </span>
+        </label>
+      }
+    </div>
+    <p class="hint">
+      Reference secrets declared in the environment for the client secret and the password; their
+      values stay in the keychain. Expired tokens are refreshed automatically, and a request
+      rejected with 401 is retried once with a fresh token.
+    </p>
+    <ng-content select="[oauth2Actions]" />
+  }
+}

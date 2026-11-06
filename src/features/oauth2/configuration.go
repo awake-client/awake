@@ -18,6 +18,9 @@ type configuration struct {
 	Scopes           []string
 	RedirectURL      string
 	Audience         string
+	// Username and Password are used by the password grant only.
+	Username string
+	Password string
 }
 
 func resolveConfiguration(authentication domain.Authentication, layers []map[string]string) (configuration, error) {
@@ -55,6 +58,14 @@ func resolveConfiguration(authentication domain.Authentication, layers []map[str
 	}
 	if err := interpolateInto(&resolved.Audience, authentication.Audience, layers); err != nil {
 		return configuration{}, err
+	}
+	if grantType == domain.OAuth2GrantPassword {
+		if err := interpolateInto(&resolved.Username, authentication.Username, layers); err != nil {
+			return configuration{}, err
+		}
+		if err := interpolateInto(&resolved.Password, authentication.Password, layers); err != nil {
+			return configuration{}, err
+		}
 	}
 
 	resolved.Scopes = make([]string, 0, len(authentication.Scopes))
@@ -96,6 +107,10 @@ func (configuration configuration) validate() error {
 			return fmt.Errorf("%w: authorization URL is required", ErrInvalidConfiguration)
 		}
 	case domain.OAuth2GrantClientCredentials:
+	case domain.OAuth2GrantPassword:
+		if strings.TrimSpace(configuration.Username) == "" {
+			return fmt.Errorf("%w: user name is required", ErrInvalidConfiguration)
+		}
 	default:
 		return fmt.Errorf("%w: unsupported grant type", ErrInvalidConfiguration)
 	}
@@ -117,5 +132,6 @@ func (configuration configuration) fingerprint() string {
 		string(configuration.GrantType),
 		configuration.TokenURL,
 		configuration.ClientID,
+		configuration.Username,
 	}, "\x00")
 }
