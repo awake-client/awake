@@ -22,6 +22,7 @@ import {
   CreationRequest,
   notifyCollectionsChanged,
 } from '@core/collection-events';
+import { TabsStore } from '@core/tabs-store';
 import { WorkspaceStore } from '@core/workspace-store';
 import { Icon, IconName } from '@shared/icon';
 import { ParsedRequestInput, isCurlCommand, parseRequestInput } from './request-input';
@@ -87,6 +88,7 @@ interface FolderOption {
 export class NewEntryDialog {
   private readonly workspaceStore = inject(WorkspaceStore);
   private readonly router = inject(Router);
+  private readonly tabsStore = inject(TabsStore);
   private readonly dialog = viewChild<ElementRef<HTMLDialogElement>>('dialog');
   private readonly nameField = viewChild<ElementRef<HTMLInputElement>>('nameField');
   private readonly requestField =
@@ -328,6 +330,7 @@ export class NewEntryDialog {
       notifyCollectionsChanged({ created, kind: this.kind() });
       if (this.kind() === 'request') {
         await this.router.navigate(['/workspace/request', ...created.split('/')]);
+        this.tabsStore.pin(created);
       }
     } catch (error) {
       this.errorMessage.set(describeError(error));
