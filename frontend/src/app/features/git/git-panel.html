@@ -1,209 +1,351 @@
-<section class="git-panel">
+<section class="git">
   <header class="git-header">
     <div>
       <h1>Git</h1>
-      <p class="git-hint">Synchronize this workspace with its remote.</p>
+      <p class="subtitle">Share this workspace with your team through its repository.</p>
     </div>
-
-    @if (isRepository()) {
-      <div class="git-actions">
-        <button type="button" class="ghost-button" [disabled]="isBusy()" (click)="pull()">
-          Pull
-        </button>
-        <button type="button" class="ghost-button" [disabled]="isBusy()" (click)="push()">
-          Push
-        </button>
-        <button type="button" class="ghost-button" [disabled]="isLoading()" (click)="load()">
-          Refresh
-        </button>
-      </div>
-    }
   </header>
 
   @if (errorMessage(); as message) {
-    <p class="git-message error">{{ message }}</p>
+    <p class="notice error">
+      <app-icon name="alert" [size]="14" />
+      {{ message }}
+    </p>
   }
   @if (statusMessage(); as message) {
-    <p class="git-message success">{{ message }}</p>
-  }
-
-  @if (isRepository()) {
-    <article class="sync-card">
-      <header class="sync-header">
-        <div>
-          <h2>Automatic sync</h2>
-          <p class="sync-status" [attr.data-state]="gitSync.state()">
-            <span class="sync-dot"></span>
-            {{ gitSync.label() }}
-            @if (gitSync.message()) {
-              <span class="sync-detail">— {{ gitSync.message() }}</span>
-            }
-          </p>
-        </div>
-        <button
-          type="button"
-          class="ghost-button"
-          [disabled]="gitSync.state() === 'syncing'"
-          (click)="syncNow()"
-        >
-          Sync now
-        </button>
-      </header>
-
-      <div class="sync-settings">
-        <label class="sync-option">
-          <input
-            type="checkbox"
-            [ngModel]="automaticPull()"
-            (ngModelChange)="automaticPull.set($event)"
-          />
-          Pull the team's changes
-        </label>
-        <label class="sync-option">
-          <input
-            type="checkbox"
-            [ngModel]="automaticPush()"
-            (ngModelChange)="automaticPush.set($event)"
-          />
-          Push my commits
-        </label>
-        <label class="sync-option">
-          every
-          <select [ngModel]="syncInterval()" (ngModelChange)="syncInterval.set($event)">
-            @for (interval of syncIntervals; track interval.value) {
-              <option [value]="interval.value">{{ interval.label }}</option>
-            }
-          </select>
-        </label>
-        <button
-          type="button"
-          class="primary-button"
-          [disabled]="isSavingSync()"
-          (click)="saveSyncSettings()"
-        >
-          {{ isSavingSync() ? 'Saving…' : 'Save' }}
-        </button>
-      </div>
-      <p class="sync-hint">
-        Stored in <code>awake.yaml</code> and shared with the team. Only committed changes are
-        pushed; a sync stops on conflicts until they are resolved below.
-      </p>
-    </article>
+    <p class="notice success">
+      <app-icon name="check" [size]="14" />
+      {{ message }}
+    </p>
   }
 
   @if (isLoading()) {
-    <p class="git-empty">Reading repository…</p>
+    <p class="muted">Reading the repository…</p>
   } @else if (isRepository() === false) {
-    <div class="git-empty-state">
-      <p>This workspace is not a git repository yet.</p>
-      <button type="button" class="primary-button" [disabled]="isBusy()" (click)="initialize()">
-        {{ isBusy() ? 'Initializing…' : 'Initialize repository' }}
+    <div class="empty">
+      <span class="empty-icon"><app-icon name="git" [size]="28" /></span>
+      <h2>Track this workspace with git</h2>
+      <p>
+        Awake stores requests as YAML files. A git repository keeps their history and lets your team
+        pull and push changes, with conflicts resolved right here.
+      </p>
+      <button
+        type="button"
+        class="btn btn-primary"
+        [disabled]="busy() !== null"
+        (click)="initialize()"
+      >
+        {{ busy() === 'initialize' ? 'Creating…' : 'Create a repository' }}
       </button>
     </div>
   } @else if (status(); as current) {
-    <div class="git-branch">
-      <span class="branch-name">{{ current.Branch }}</span>
-      @if (current.Upstream) {
-        <span class="branch-upstream">{{ current.Upstream }}</span>
-      }
-      @if (current.Ahead > 0) {
-        <span class="branch-count">↑ {{ current.Ahead }}</span>
-      }
-      @if (current.Behind > 0) {
-        <span class="branch-count">↓ {{ current.Behind }}</span>
-      }
-    </div>
-
-    @if (conflicts.length > 0) {
-      <div class="conflict-banner">
-        <strong>{{ conflicts.length }} conflicted file(s).</strong>
-        Resolve each file to finish the merge.
+    <!-- Where the branch stands, and the one button to sync it. -->
+    <section class="branch-card">
+      <div class="branch">
+        <span class="branch-icon"><app-icon name="git" [size]="18" /></span>
+        <div class="branch-text">
+          <p class="branch-name">
+            {{ current.Branch || 'main' }}
+            @if (current.Upstream) {
+              <span class="upstream">→ {{ current.Upstream }}</span>
+            }
+          </p>
+          <p class="branch-summary" [class.attention]="conflicts().length > 0">{{ summary() }}</p>
+        </div>
       </div>
-    }
 
-    @if (changes.length === 0) {
-      <p class="git-empty">Working tree clean.</p>
-    } @else {
-      <div class="change-list">
-        @for (change of changes; track change.Path) {
-          <div class="change-row" [class.conflicted]="change.Conflicted">
-            <span class="change-status">{{ changeLabel(change) }}</span>
-            <span class="change-path">{{ change.Path }}</span>
-            @if (change.Conflicted) {
-              <button type="button" class="ghost-button small" (click)="openConflict(change.Path)">
-                Resolve
+      <div class="branch-actions">
+        @if (hasUpstream()) {
+          <button
+            type="button"
+            class="btn btn-ghost btn-sm"
+            [disabled]="busy() !== null"
+            title="Fetch and merge the team's commits"
+            (click)="pull()"
+          >
+            <app-icon name="download" [size]="14" />
+            Pull
+            @if (behind() > 0) {
+              <span class="count">{{ behind() }}</span>
+            }
+          </button>
+          <button
+            type="button"
+            class="btn btn-ghost btn-sm"
+            [disabled]="busy() !== null || ahead() === 0"
+            title="Publish your commits"
+            (click)="push()"
+          >
+            <app-icon name="upload" [size]="14" />
+            Push
+            @if (ahead() > 0) {
+              <span class="count">{{ ahead() }}</span>
+            }
+          </button>
+          <button
+            type="button"
+            class="btn btn-primary"
+            [disabled]="busy() !== null || conflicts().length > 0"
+            title="Pull, then push your commits"
+            (click)="sync()"
+          >
+            <app-icon name="refresh" [size]="14" [class.spinning]="busy() === 'sync'" />
+            {{ busy() === 'sync' ? 'Syncing…' : 'Sync' }}
+          </button>
+        }
+      </div>
+    </section>
+
+    <div class="layout">
+      <div class="main">
+        @if (conflicts().length > 0) {
+          <section class="card conflicts">
+            <header class="card-header">
+              <app-icon name="alert" [size]="15" />
+              <h2>Conflicts</h2>
+              <span class="hint">You and a teammate changed the same file. Pick a version.</span>
+            </header>
+            @for (change of conflicts(); track change.Path) {
+              <button
+                type="button"
+                class="file conflict-file"
+                [class.selected]="conflictPath() === change.Path"
+                (click)="openConflict(change.Path)"
+              >
+                <span class="badge" data-tone="conflict">Conflict</span>
+                <span class="file-path">
+                  <span class="folder">{{ pathParts(change.Path).folder }}</span
+                  >{{ pathParts(change.Path).file }}
+                </span>
+                <span class="resolve-link">Resolve</span>
               </button>
             }
-          </div>
+
+            @if (conflictPath(); as path) {
+              <div class="resolver">
+                @if (isLoadingConflict()) {
+                  <p class="muted">Loading both versions…</p>
+                } @else if (conflictVersions(); as versions) {
+                  <div class="versions">
+                    <article class="version">
+                      <header>
+                        <h3>Yours</h3>
+                        <button
+                          type="button"
+                          class="btn btn-sm"
+                          [disabled]="busy() !== null"
+                          (click)="resolve('local')"
+                        >
+                          Keep yours
+                        </button>
+                      </header>
+                      <app-code-editor
+                        [value]="decode(versions.Local)"
+                        [lang]="languageOf(path)"
+                        [readOnly]="true"
+                      />
+                    </article>
+                    <article class="version">
+                      <header>
+                        <h3>Theirs</h3>
+                        <button
+                          type="button"
+                          class="btn btn-sm"
+                          [disabled]="busy() !== null"
+                          (click)="resolve('incoming')"
+                        >
+                          Keep theirs
+                        </button>
+                      </header>
+                      <app-code-editor
+                        [value]="decode(versions.Incoming)"
+                        [lang]="languageOf(path)"
+                        [readOnly]="true"
+                      />
+                    </article>
+                  </div>
+                  <div class="claude">
+                    @if (suggestion(); as proposal) {
+                      <header class="claude-header">
+                        <app-icon name="sparkles" [size]="15" />
+                        <h3>Claude's proposal</h3>
+                        <span class="hint">Review and edit it before using it.</span>
+                      </header>
+                      @if (proposal.summary) {
+                        <p class="claude-summary">{{ proposal.summary }}</p>
+                      }
+                      <app-code-editor
+                        class="claude-editor"
+                        [value]="proposal.content"
+                        [lang]="languageOf(path)"
+                        (valueChange)="editSuggestion($event)"
+                      />
+                      <div class="claude-actions">
+                        <button
+                          type="button"
+                          class="btn btn-ghost btn-sm"
+                          (click)="discardSuggestion()"
+                        >
+                          Discard
+                        </button>
+                        <button
+                          type="button"
+                          class="btn btn-primary btn-sm"
+                          [disabled]="busy() !== null"
+                          (click)="useSuggestion()"
+                        >
+                          Use this version
+                        </button>
+                      </div>
+                    } @else if (claudeInstalled()) {
+                      <button
+                        type="button"
+                        class="btn claude-button"
+                        [disabled]="isSuggesting()"
+                        (click)="suggestWithClaude()"
+                      >
+                        <app-icon name="sparkles" [size]="15" [class.pulsing]="isSuggesting()" />
+                        {{
+                          isSuggesting()
+                            ? 'Claude is merging both versions…'
+                            : 'Resolve with Claude'
+                        }}
+                      </button>
+                      <span class="hint">
+                        Claude Code combines both versions. It only sees this file and cannot change
+                        anything until you accept its proposal.
+                      </span>
+                    } @else {
+                      <span class="hint">
+                        Install Claude Code to get a merged version proposed automatically.
+                      </span>
+                    }
+                    @if (suggestionError(); as error) {
+                      <p class="claude-error">{{ error }}</p>
+                    }
+                  </div>
+                  <button type="button" class="btn btn-ghost btn-sm" (click)="closeConflict()">
+                    Decide later
+                  </button>
+                }
+              </div>
+            }
+          </section>
         }
+
+        <section class="card">
+          <header class="card-header">
+            <app-icon name="file" [size]="15" />
+            <h2>Changes</h2>
+            @if (pending().length > 0) {
+              <span class="count">{{ pending().length }}</span>
+            }
+          </header>
+
+          @if (pending().length === 0) {
+            <p class="clean">
+              <app-icon name="check" [size]="15" />
+              Nothing to commit. Your files match the last commit.
+            </p>
+          } @else {
+            <div class="files">
+              @for (change of pending(); track change.Path) {
+                <div class="file">
+                  <span class="badge" [attr.data-tone]="changeKind(change).tone">
+                    {{ changeKind(change).label }}
+                  </span>
+                  <span class="file-path" [title]="change.Path">
+                    <span class="folder">{{ pathParts(change.Path).folder }}</span
+                    >{{ pathParts(change.Path).file }}
+                  </span>
+                </div>
+              }
+            </div>
+
+            <div class="commit">
+              <textarea
+                class="input"
+                rows="2"
+                [value]="commitMessage()"
+                (input)="commitMessage.set(inputValue($event))"
+                (keydown)="handleCommitKeydown($event)"
+                placeholder="Describe your changes, for example: add the invoices endpoints"
+              ></textarea>
+              <div class="commit-actions">
+                <span class="hint">All changes are included. ⌘↵ to commit.</span>
+                <button
+                  type="button"
+                  class="btn"
+                  [disabled]="busy() !== null || commitMessage().trim() === ''"
+                  (click)="commit(false)"
+                >
+                  {{ busy() === 'commit' ? 'Committing…' : 'Commit' }}
+                </button>
+                @if (hasUpstream()) {
+                  <button
+                    type="button"
+                    class="btn btn-primary"
+                    [disabled]="busy() !== null || commitMessage().trim() === ''"
+                    (click)="commit(true)"
+                  >
+                    {{ busy() === 'commit-push' ? 'Publishing…' : 'Commit & push' }}
+                  </button>
+                }
+              </div>
+            </div>
+          }
+        </section>
       </div>
 
-      <div class="commit-box">
-        <label class="field">
-          <span class="field-label">Commit message</span>
-          <input
-            type="text"
-            name="commitMessage"
-            [ngModel]="commitMessage()"
-            (ngModelChange)="commitMessage.set($event)"
-            placeholder="feat: describe the change"
-            autocomplete="off"
-          />
-        </label>
-
-        <button
-          type="button"
-          class="primary-button"
-          [disabled]="isBusy() || commitMessage().trim() === ''"
-          (click)="commit()"
-        >
-          {{ isBusy() ? 'Working…' : 'Stage all and commit' }}
-        </button>
-      </div>
-    }
-
-    @if (conflictPath(); as path) {
-      <section class="conflict-view">
-        <header class="conflict-header">
-          <span class="conflict-path">{{ path }}</span>
-          <button type="button" class="ghost-button small" (click)="closeConflict()">Close</button>
+      <aside class="card side">
+        <header class="card-header">
+          <app-icon name="refresh" [size]="15" />
+          <h2>Automatic sync</h2>
         </header>
-
-        @if (isLoadingConflict()) {
-          <p class="git-empty">Loading versions…</p>
-        } @else if (conflictVersions(); as versions) {
-          <div class="conflict-columns">
-            <article class="conflict-column">
-              <h2>Base</h2>
-              <pre>{{ decode(versions.Base) }}</pre>
-            </article>
-            <article class="conflict-column">
-              <h2>Local</h2>
-              <pre>{{ decode(versions.Local) }}</pre>
-              <button
-                type="button"
-                class="primary-button"
-                [disabled]="isBusy()"
-                (click)="resolve('local')"
-              >
-                Keep local
-              </button>
-            </article>
-            <article class="conflict-column">
-              <h2>Incoming</h2>
-              <pre>{{ decode(versions.Incoming) }}</pre>
-              <button
-                type="button"
-                class="primary-button"
-                [disabled]="isBusy()"
-                (click)="resolve('incoming')"
-              >
-                Keep incoming
-              </button>
-            </article>
-          </div>
+        <p class="sync-state" [attr.data-state]="gitSync.state()">
+          <span class="dot"></span>
+          {{ gitSync.label() }}
+        </p>
+        @if (gitSync.message()) {
+          <p class="hint">{{ gitSync.message() }}</p>
         }
-      </section>
-    }
+
+        <label class="switch">
+          <input
+            type="checkbox"
+            [checked]="settings()?.AutomaticPull ?? false"
+            (change)="updateSync({ AutomaticPull: checked($event) })"
+          />
+          <span class="track"></span>
+          <span>Pull the team's changes</span>
+        </label>
+        <label class="switch">
+          <input
+            type="checkbox"
+            [checked]="settings()?.AutomaticPush ?? false"
+            (change)="updateSync({ AutomaticPush: checked($event) })"
+          />
+          <span class="track"></span>
+          <span>Push my commits</span>
+        </label>
+        <select
+          [disabled]="!settings()?.AutomaticPull && !settings()?.AutomaticPush"
+          (change)="updateSync({ SynchronizationInterval: inputValue($event) })"
+        >
+          @for (interval of syncIntervals; track interval.value) {
+            <option
+              [value]="interval.value"
+              [selected]="(settings()?.SynchronizationInterval || '5m') === interval.value"
+            >
+              {{ interval.label }}
+            </option>
+          }
+        </select>
+        <p class="hint">
+          Saved in <code>awake.yaml</code>, so the whole team shares these settings. Only committed
+          changes are pushed, and syncing pauses while a conflict is open.
+        </p>
+      </aside>
+    </div>
   }
 </section>
