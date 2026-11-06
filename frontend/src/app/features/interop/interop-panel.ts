@@ -24,11 +24,7 @@ const FORMAT_LABELS: Record<Format, string> = {
 export class InteropPanel {
   private readonly workspaceStore = inject(WorkspaceStore);
 
-  protected readonly formats = [
-    Format.FormatOpenAPI,
-    Format.FormatPostman,
-    Format.FormatBruno,
-  ];
+  protected readonly formats = [Format.FormatOpenAPI, Format.FormatPostman, Format.FormatBruno];
   protected readonly formatLabels = FORMAT_LABELS;
 
   protected readonly importFormat = signal<Format>(Format.FormatOpenAPI);
@@ -99,11 +95,7 @@ export class InteropPanel {
     this.importWarnings.set([]);
 
     try {
-      const result = await InteropService.Import(
-        workspaceRoot,
-        sourcePath,
-        this.importFormat(),
-      );
+      const result = await InteropService.Import(workspaceRoot, sourcePath, this.importFormat());
 
       this.importMessage.set(
         `Imported ${result.Requests} request(s) into ${result.Collections} collection(s).`,
@@ -143,9 +135,7 @@ export class InteropPanel {
       const paths = result.Paths ?? [];
       this.exportPaths.set(paths);
       this.exportMessage.set(
-        paths.length === 1
-          ? 'Export written.'
-          : `Export written as ${paths.length} files.`,
+        paths.length === 1 ? 'Export written.' : `Export written as ${paths.length} files.`,
       );
     } catch (error) {
       this.exportError.set(describeError(error));

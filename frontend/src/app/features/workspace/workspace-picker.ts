@@ -51,9 +51,7 @@ export class WorkspacePicker {
   }
 
   protected async openWorkspace(): Promise<void> {
-    await this.runOperation(this.workspacePath(), (rootPath) =>
-      WorkspaceService.Open(rootPath),
-    );
+    await this.runOperation(this.workspacePath(), (rootPath) => WorkspaceService.Open(rootPath));
   }
 
   /** Lets the user pick an existing workspace and opens it right away. */

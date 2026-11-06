@@ -1,12 +1,4 @@
-import {
-  Component,
-  ElementRef,
-  computed,
-  effect,
-  inject,
-  signal,
-  viewChild,
-} from '@angular/core';
+import { Component, ElementRef, computed, effect, inject, signal, viewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import * as CollectionsService from '@bindings/github.com/clementherve/awake/src/features/collections/service';
@@ -34,8 +26,7 @@ const COLLECTIONS_PREFIX = 'collections/';
 export class CommandPalette {
   private readonly router = inject(Router);
   private readonly workspaceStore = inject(WorkspaceStore);
-  private readonly searchInput =
-    viewChild<ElementRef<HTMLInputElement>>('searchInput');
+  private readonly searchInput = viewChild<ElementRef<HTMLInputElement>>('searchInput');
 
   protected readonly isOpen = signal(false);
   protected readonly isLoading = signal(false);
@@ -56,8 +47,7 @@ export class CommandPalette {
         if (terms.length === 0) {
           return true;
         }
-        const haystack =
-          `${entry.Name} ${entry.Path} ${entry.Method}`.toLowerCase();
+        const haystack = `${entry.Name} ${entry.Path} ${entry.Method}`.toLowerCase();
         return terms.every((term) => haystack.includes(term));
       })
       .slice(0, VISIBLE_RESULT_LIMIT);
@@ -100,11 +90,7 @@ export class CommandPalette {
 
     try {
       this.entries.set(
-        (await CollectionsService.SearchRequests(
-          workspaceRoot,
-          '',
-          RESULT_LIMIT,
-        )) ?? [],
+        (await CollectionsService.SearchRequests(workspaceRoot, '', RESULT_LIMIT)) ?? [],
       );
     } catch (error) {
       this.errorMessage.set(describeError(error));
@@ -124,10 +110,7 @@ export class CommandPalette {
 
   protected async choose(entry: Entry): Promise<void> {
     this.close();
-    await this.router.navigate([
-      '/workspace/request',
-      ...entry.Path.split('/'),
-    ]);
+    await this.router.navigate(['/workspace/request', ...entry.Path.split('/')]);
   }
 
   protected chooseActive(): void {
