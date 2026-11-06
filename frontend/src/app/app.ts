@@ -1,5 +1,7 @@
-import { Component } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
+import { suppressDefaultContextMenu } from '@core/context-menu';
+import { ThemeStore } from '@core/theme-store';
 
 @Component({
   imports: [RouterOutlet],
@@ -7,4 +9,11 @@ import { RouterOutlet } from '@angular/router';
   styleUrl: './app.css',
   templateUrl: './app.html',
 })
-export class App {}
+export class App {
+  // Created at startup so the saved theme applies before anything renders.
+  private readonly theme = inject(ThemeStore);
+
+  constructor() {
+    suppressDefaultContextMenu();
+  }
+}
