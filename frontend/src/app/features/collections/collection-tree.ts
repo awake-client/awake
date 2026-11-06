@@ -1,29 +1,28 @@
 import { ScrollingModule } from '@angular/cdk/scrolling';
-import {
-  Component,
-  DestroyRef,
-  computed,
-  effect,
-  inject,
-  input,
-  output,
-  signal,
-} from '@angular/core';
-import { FormsModule } from '@angular/forms';
+import { Component, DestroyRef, effect, inject, input, output, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { NavigationEnd, Router } from '@angular/router';
+import { filter } from 'rxjs';
 import * as CollectionsService from '@bindings/github.com/clementherve/awake/src/features/collections/service';
 import {
   Entry,
   Kind,
 } from '@bindings/github.com/clementherve/awake/src/features/collections/models';
-import { Protocol } from '@bindings/github.com/clementherve/awake/src/domain/models';
+import {
+  COLLECTIONS_CHANGED_EVENT,
+  CollectionsChange,
+  CreationKind,
+  requestEntryCreation,
+} from '@core/collection-events';
+import { Icon } from '@shared/icon';
 
-const ROW_HEIGHT = 26;
-const COLLECTIONS_DIRECTORY = 'collections';
-const REQUEST_FILE_EXTENSION = '.yaml';
-const DEFAULT_REQUEST_URL = 'https://api.example.com/resource';
+const ROW_HEIGHT = 28;
 
-/** Kind of entry the tree can create. */
-type CreationKind = 'collection' | 'request';
+/** Short labels keep the method column narrow. */
+const METHOD_LABELS: Record<string, string> = {
+  DELETE: 'DEL',
+  OPTIONS: 'OPT',
+};
 
 /** One visible line of the flattened collection tree. */
 interface TreeRow {
@@ -33,14 +32,14 @@ interface TreeRow {
 }
 
 /**
- * Lists the collection tree, lazily loads directories as they expand and
- * creates collections or requests. Only expanded rows are kept in memory and
- * rendered through a virtual viewport, so a workspace with thousands of
- * requests stays responsive.
+ * Lists the collection tree and lazily loads directories as they expand.
+ * Only expanded rows are kept in memory and rendered through a virtual
+ * viewport, so a workspace with thousands of requests stays responsive.
+ * Creation itself happens in the new entry dialog.
  */
 @Component({
   selector: 'app-collection-tree',
-  imports: [ScrollingModule, FormsModule],
+  imports: [ScrollingModule, Icon],
   templateUrl: './collection-tree.html',
   styleUrl: './collection-tree.css',
 })
@@ -48,6 +47,7 @@ export class CollectionTree {
   private readonly childrenCache = new Map<string, Entry[]>();
   private readonly expandedPaths = new Set<string>();
   private readonly destroyRef = inject(DestroyRef);
+  private readonly router = inject(Router);
 
   readonly workspaceRoot = input('');
   readonly requestSelected = output<string>();
@@ -58,16 +58,7 @@ export class CollectionTree {
   protected readonly errorMessage = signal<string | null>(null);
   protected readonly selectedPath = signal<string | null>(null);
   protected readonly selectedFolder = signal<string | null>(null);
-
-  protected readonly isCreating = signal(false);
-  protected readonly creationKind = signal<CreationKind>('collection');
-  protected readonly creationName = signal('');
-  protected readonly creationUrl = signal(DEFAULT_REQUEST_URL);
-  protected readonly creationError = signal<string | null>(null);
-  protected readonly isSavingEntry = signal(false);
-  protected readonly canCreateRequest = computed(
-    () => this.selectedFolder() !== null,
-  );
+  protected readonly isMenuOpen = signal(false);
 
   constructor() {
     effect(() => {
@@ -77,11 +68,9 @@ export class CollectionTree {
       }
     });
 
-    const reloadCollections = () => {
-      const workspaceRoot = this.workspaceRoot();
-      if (workspaceRoot) {
-        void this.reload(workspaceRoot);
-      }
+    const collectionsChanged = (event: Event) => {
+      const change = (event as CustomEvent<CollectionsChange | undefined>).detail;
+      void this.applyChange(change ?? {});
     };
     const openCollection = (event: Event) => {
       const path = (event as CustomEvent<string>).detail;
@@ -92,13 +81,35 @@ export class CollectionTree {
       this.selectedPath.set(null);
       void this.revealDirectory(path);
     };
+    const closeMenu = () => this.isMenuOpen.set(false);
 
-    window.addEventListener('awake:collections-changed', reloadCollections);
+    // Keep the highlighted request in sync with the page on screen, whether it
+    // was opened from the tree, the search palette or the history.
+    this.router.events
+      .pipe(
+        filter((event) => event instanceof NavigationEnd),
+        takeUntilDestroyed(),
+      )
+      .subscribe(() => this.syncSelectionWithRoute());
+
+    window.addEventListener(COLLECTIONS_CHANGED_EVENT, collectionsChanged);
     window.addEventListener('awake:open-collection', openCollection);
+    document.addEventListener('click', closeMenu);
     this.destroyRef.onDestroy(() => {
-      window.removeEventListener('awake:collections-changed', reloadCollections);
+      window.removeEventListener(COLLECTIONS_CHANGED_EVENT, collectionsChanged);
       window.removeEventListener('awake:open-collection', openCollection);
+      document.removeEventListener('click', closeMenu);
     });
+  }
+
+  protected methodLabel(method: string | undefined): string {
+    const normalized = (method || 'GET').toUpperCase();
+    return METHOD_LABELS[normalized] ?? normalized;
+  }
+
+  /** Depths at which a vertical guide is drawn to the left of a row. */
+  protected indentGuides(row: TreeRow): number[] {
+    return Array.from({ length: row.depth }, (_, index) => index);
   }
 
   protected isRequest(row: TreeRow): boolean {
@@ -117,17 +128,32 @@ export class CollectionTree {
     await this.toggle(row);
   }
 
+  /**
+   * Reloads the tree from disk and expands again the folders that were open,
+   * so a refresh never collapses what the user was looking at.
+   */
   protected async reload(workspaceRoot: string): Promise<void> {
     this.isLoading.set(true);
     this.errorMessage.set(null);
 
+    const previouslyExpanded = [...this.expandedPaths].sort(
+      (first, second) => first.split('/').length - second.split('/').length,
+    );
+
     try {
-      const entries = await CollectionsService.List(workspaceRoot, '');
+      const entries = (await CollectionsService.List(workspaceRoot, '')) ?? [];
 
       this.childrenCache.clear();
       this.expandedPaths.clear();
-      this.childrenCache.set('', entries ?? []);
-      this.rows.set(this.toRows(entries ?? [], 0));
+      this.childrenCache.set('', entries);
+      this.rows.set(this.toRows(entries, 0));
+
+      for (const path of previouslyExpanded) {
+        const row = this.rows().find((candidate) => candidate.entry.Path === path);
+        if (row && !row.expanded) {
+          await this.toggle(row);
+        }
+      }
     } catch (error) {
       this.errorMessage.set(describeError(error));
     } finally {
@@ -142,111 +168,83 @@ export class CollectionTree {
     }
   }
 
-  protected openCreation(): void {
-    this.creationKind.set(
-      this.selectedFolder() === null ? 'collection' : 'request',
-    );
-    this.creationName.set('');
-    this.creationUrl.set(DEFAULT_REQUEST_URL);
-    this.creationError.set(null);
-    this.isCreating.set(true);
+  protected toggleMenu(event: Event): void {
+    event.stopPropagation();
+    this.isMenuOpen.update((open) => !open);
   }
 
-  protected closeCreation(): void {
-    this.isCreating.set(false);
-    this.creationError.set(null);
+  /** Opens the creation dialog with the current selection as location. */
+  protected create(kind: CreationKind): void {
+    this.isMenuOpen.set(false);
+    requestEntryCreation({ kind, folder: this.currentFolder() });
   }
 
-  protected selectCreationKind(event: Event): void {
-    this.creationKind.set(
-      (event.target as HTMLSelectElement).value as CreationKind,
-    );
-  }
-
-  protected async createEntry(event: Event): Promise<void> {
-    event.preventDefault();
-
-    const workspaceRoot = this.workspaceRoot();
-    const name = this.creationName().trim();
-    const kind = this.creationKind();
-
-    if (!workspaceRoot) {
-      return;
-    }
-    if (name === '') {
-      this.creationError.set('Give the entry a name.');
-      return;
-    }
-
-    const slug = slugify(name);
-    if (slug === '') {
-      this.creationError.set('The name needs at least one letter or digit.');
-      return;
-    }
-
-    if (kind === 'request' && this.selectedFolder() === null) {
-      this.creationError.set('Select a collection or folder first.');
-      return;
-    }
-
-    this.isSavingEntry.set(true);
-    this.creationError.set(null);
-
-    try {
-      if (kind === 'collection') {
-        const collectionPath = `${COLLECTIONS_DIRECTORY}/${slug}`;
-        await CollectionsService.CreateCollection(workspaceRoot, collectionPath, {
-          Name: name,
-          Variables: null,
-          Authentication: null,
-          Documentation: '',
-        });
-        await this.reload(workspaceRoot);
-      } else {
-        const directory = this.selectedFolder() as string;
-        const requestPath = `${directory}/${slug}${REQUEST_FILE_EXTENSION}`;
-        await CollectionsService.CreateRequest(workspaceRoot, requestPath, {
-          Name: name,
-          Method: 'GET',
-          URL: this.creationUrl().trim() || DEFAULT_REQUEST_URL,
-          Protocol: Protocol.ProtocolHTTP,
-          Parameters: null,
-          Headers: null,
-          Authentication: null,
-          Body: null,
-          Scripts: null,
-          Documentation: '',
-        });
-
-        await this.reload(workspaceRoot);
-        await this.revealDirectory(directory);
-        this.selectedPath.set(requestPath);
-        this.requestSelected.emit(requestPath);
-      }
-
-      this.isCreating.set(false);
-      window.dispatchEvent(new CustomEvent('awake:collections-changed'));
-    } catch (error) {
-      this.creationError.set(describeError(error));
-    } finally {
-      this.isSavingEntry.set(false);
-    }
+  /** Opens the creation dialog for a folder row without toggling the row. */
+  protected createIn(event: Event, kind: CreationKind, row: TreeRow): void {
+    event.stopPropagation();
+    this.selectedFolder.set(row.entry.Path);
+    this.selectedPath.set(null);
+    requestEntryCreation({ kind, folder: row.entry.Path });
   }
 
   protected trackByPath(_index: number, row: TreeRow): string {
     return row.entry.Path;
   }
 
+  private syncSelectionWithRoute(): void {
+    const prefix = '/workspace/request/';
+    const url = this.router.url.split(/[?#]/)[0];
+    if (url.startsWith(prefix)) {
+      this.selectedPath.set(decodeURIComponent(url.slice(prefix.length)));
+      this.selectedFolder.set(null);
+    } else {
+      this.selectedPath.set(null);
+    }
+  }
+
+  private currentFolder(): string | undefined {
+    const selectedFolder = this.selectedFolder();
+    if (selectedFolder) {
+      return selectedFolder;
+    }
+    const selectedPath = this.selectedPath();
+    if (selectedPath && selectedPath.includes('/')) {
+      return selectedPath.slice(0, selectedPath.lastIndexOf('/'));
+    }
+    return undefined;
+  }
+
+  /** Reloads after a change and reveals the entry that was just created. */
+  private async applyChange(change: CollectionsChange): Promise<void> {
+    const workspaceRoot = this.workspaceRoot();
+    if (!workspaceRoot) {
+      return;
+    }
+    await this.reload(workspaceRoot);
+
+    const created = change.created;
+    if (!created) {
+      return;
+    }
+    if (change.kind === 'request') {
+      await this.revealDirectory(created.slice(0, created.lastIndexOf('/')));
+      this.selectedPath.set(created);
+      this.selectedFolder.set(null);
+    } else {
+      await this.revealDirectory(created.slice(0, created.lastIndexOf('/')));
+      this.selectedFolder.set(created);
+      this.selectedPath.set(null);
+    }
+  }
+
   private async toggle(row: TreeRow): Promise<void> {
     const rows = this.rows();
-    const index = rows.findIndex(
-      (candidate) => candidate.entry.Path === row.entry.Path,
-    );
+    const index = rows.findIndex((candidate) => candidate.entry.Path === row.entry.Path);
     if (index < 0) {
       return;
     }
 
-    if (row.expanded) {
+    if (rows[index].expanded) {
       this.collapse(index, rows);
       return;
     }
@@ -259,8 +257,7 @@ export class CollectionTree {
     let children = this.childrenCache.get(row.entry.Path);
     if (!children) {
       try {
-        children =
-          (await CollectionsService.List(workspaceRoot, row.entry.Path)) ?? [];
+        children = (await CollectionsService.List(workspaceRoot, row.entry.Path)) ?? [];
       } catch (error) {
         this.errorMessage.set(describeError(error));
         return;
@@ -272,17 +269,13 @@ export class CollectionTree {
     const currentIndex = currentRows.findIndex(
       (candidate) => candidate.entry.Path === row.entry.Path,
     );
-    if (currentIndex < 0) {
+    if (currentIndex < 0 || currentRows[currentIndex].expanded) {
       return;
     }
 
     const updatedRows = [...currentRows];
-    updatedRows[currentIndex] = { ...row, expanded: true };
-    updatedRows.splice(
-      currentIndex + 1,
-      0,
-      ...this.toRows(children, row.depth + 1),
-    );
+    updatedRows[currentIndex] = { ...currentRows[currentIndex], expanded: true };
+    updatedRows.splice(currentIndex + 1, 0, ...this.toRows(children, row.depth + 1));
 
     this.expandedPaths.add(row.entry.Path);
     this.rows.set(updatedRows);
@@ -296,44 +289,31 @@ export class CollectionTree {
       endIndex += 1;
     }
 
+    this.expandedPaths.delete(row.entry.Path);
     const updatedRows = [...rows];
     updatedRows[index] = { ...row, expanded: false };
     updatedRows.splice(index + 1, endIndex - index - 1);
     this.rows.set(updatedRows);
   }
 
-  /** Expands each ancestor of a directory so a freshly created request shows. */
+  /** Expands a directory and each of its ancestors. */
   private async revealDirectory(directoryPath: string): Promise<void> {
     const segments = directoryPath.split('/');
     let prefix = segments[0];
 
     for (let index = 1; index < segments.length; index += 1) {
       prefix = `${prefix}/${segments[index]}`;
-      const row = this.rows().find(
-        (candidate) => candidate.entry.Path === prefix,
-      );
+      const row = this.rows().find((candidate) => candidate.entry.Path === prefix);
       if (row && !row.expanded) {
         await this.toggle(row);
       }
     }
   }
 
+  /** Rows start collapsed; expansion inserts their children explicitly. */
   private toRows(entries: Entry[], depth: number): TreeRow[] {
-    return entries.map((entry) => ({
-      entry,
-      depth,
-      expanded: this.expandedPaths.has(entry.Path),
-    }));
+    return entries.map((entry) => ({ entry, depth, expanded: false }));
   }
-}
-
-function slugify(value: string): string {
-  return value
-    .normalize('NFKD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
 }
 
 function describeError(error: unknown): string {

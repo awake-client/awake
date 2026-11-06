@@ -1,0 +1,200 @@
+<dialog
+  #dialog
+  class="dialog"
+  [attr.aria-label]="title()"
+  (click)="closeOnBackdrop($event)"
+  (keydown)="handleKeydown($event)"
+>
+  <form class="panel" (submit)="submit($event)">
+    <header class="panel-header">
+      <span class="kind-tile" [attr.data-kind]="kind()" aria-hidden="true">
+        <app-icon
+          [name]="kind() === 'request' ? 'send' : kind() === 'folder' ? 'folder' : 'box'"
+          [size]="16"
+        />
+      </span>
+      <h2>{{ title() }}</h2>
+      <button
+        type="button"
+        class="icon-btn"
+        aria-label="Close"
+        title="Close (Esc)"
+        (click)="close()"
+      >
+        <app-icon name="close" [size]="15" />
+      </button>
+    </header>
+
+    <div class="panel-body">
+      @if (kind() === 'request') {
+        <div class="type-grid" role="radiogroup" aria-label="Request type">
+          @for (option of requestTypes; track option.type) {
+            <button
+              type="button"
+              role="radio"
+              class="type-card"
+              [class.selected]="requestType() === option.type"
+              [attr.aria-checked]="requestType() === option.type"
+              (click)="selectType(option.type)"
+            >
+              <app-icon [name]="option.icon" [size]="16" />
+              <span class="type-label">{{ option.label }}</span>
+              <span class="type-hint">{{ option.hint }}</span>
+            </button>
+          }
+        </div>
+
+        <div class="field">
+          <span class="field-label">
+            {{ requestType() === 'curl' ? 'cURL command' : 'URL' }}
+          </span>
+          @if (requestType() === 'curl') {
+            <textarea
+              #requestField
+              class="input request-curl"
+              name="requestText"
+              rows="5"
+              [ngModel]="requestText()"
+              (ngModelChange)="updateRequestText($event)"
+              placeholder="curl -X POST https://api.example.com/users -H 'Content-Type: application/json' -d '{&quot;name&quot;:&quot;Ada&quot;}'"
+              spellcheck="false"
+              autocomplete="off"
+            ></textarea>
+          } @else {
+            <div class="request-field">
+              @if (requestType() !== 'websocket') {
+                <select
+                  class="method-select"
+                  name="method"
+                  [attr.data-method]="effectiveMethod()"
+                  [ngModel]="effectiveMethod()"
+                  (ngModelChange)="selectMethod($event)"
+                  aria-label="HTTP method"
+                >
+                  @for (httpMethod of httpMethods; track httpMethod) {
+                    <option [value]="httpMethod">{{ httpMethod }}</option>
+                  }
+                </select>
+              }
+              <input
+                #requestField
+                class="request-url"
+                type="text"
+                name="requestText"
+                [ngModel]="requestText()"
+                (ngModelChange)="updateRequestText($event)"
+                (paste)="handlePaste($event)"
+                (blur)="splitMethodOnBlur()"
+                [placeholder]="
+                  requestType() === 'websocket'
+                    ? 'wss://stream.example.com'
+                    : 'https://api.example.com/users — or paste a cURL command'
+                "
+                spellcheck="false"
+                autocomplete="off"
+              />
+            </div>
+          }
+
+          @if (detection(); as detected) {
+            <p class="detection">
+              <app-icon name="check" [size]="13" />
+              Detected {{ detected }}
+            </p>
+          } @else if (requestType() !== 'curl') {
+            <p class="field-hint">
+              Paste a cURL command or type <code>POST https://…</code> and the form fills itself.
+            </p>
+          }
+          @for (warning of parsed().warnings; track warning) {
+            <p class="warning">
+              <app-icon name="alert" [size]="13" />
+              {{ warning }}
+            </p>
+          }
+        </div>
+      }
+
+      <label class="field">
+        <span class="field-label">Name</span>
+        <input
+          #nameField
+          class="input"
+          type="text"
+          name="name"
+          [ngModel]="name()"
+          (ngModelChange)="updateName($event)"
+          [placeholder]="
+            kind() === 'request' ? 'Get users' : kind() === 'folder' ? 'Invoices' : 'Platform API'
+          "
+          autocomplete="off"
+          spellcheck="false"
+        />
+      </label>
+
+      @if (kind() !== 'collection') {
+        <label class="field">
+          <span class="field-label">Location</span>
+          <select
+            name="location"
+            [ngModel]="location()"
+            (ngModelChange)="location.set($event)"
+            [disabled]="folders().length === 0"
+          >
+            @for (folder of folders(); track folder.path) {
+              <option [value]="folder.path">{{ folder.label }}</option>
+            } @empty {
+              <option value="">No collection yet</option>
+            }
+          </select>
+        </label>
+      }
+
+      <div class="options">
+        <button
+          type="button"
+          class="options-toggle"
+          [attr.aria-expanded]="showOptions()"
+          (click)="showOptions.set(!showOptions())"
+        >
+          <app-icon name="chevron-right" [size]="13" [class.open]="showOptions()" />
+          Options
+        </button>
+        @if (showOptions()) {
+          <label class="field">
+            <span class="field-label">
+              {{ kind() === 'request' ? 'File name' : 'Directory name' }}
+            </span>
+            <div class="file-name">
+              <input
+                class="input mono"
+                type="text"
+                name="fileName"
+                [ngModel]="fileNameValue()"
+                (ngModelChange)="updateFileName($event)"
+                spellcheck="false"
+                autocomplete="off"
+              />
+              @if (kind() === 'request') {
+                <span class="file-extension">.yaml</span>
+              }
+            </div>
+            <span class="field-hint mono">{{ targetPath() }}</span>
+          </label>
+        }
+      </div>
+
+      @if (errorMessage(); as message) {
+        <p class="error">{{ message }}</p>
+      }
+    </div>
+
+    <footer class="panel-footer">
+      <span class="shortcut"><kbd>⌘</kbd><kbd>↵</kbd> to create</span>
+      <button type="button" class="btn btn-ghost" (click)="close()">Cancel</button>
+      <button type="submit" class="btn btn-primary" [disabled]="isSaving()">
+        {{ isSaving() ? 'Creating…' : 'Create' }}
+      </button>
+    </footer>
+  </form>
+</dialog>

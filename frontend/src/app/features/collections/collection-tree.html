@@ -3,129 +3,130 @@
   <div class="tree-actions">
     <button
       type="button"
-      class="icon-button"
-      aria-label="Create a collection or request"
-      title="Create a collection or request"
-      (click)="openCreation()"
-    >
-      +
-    </button>
-    <button
-      type="button"
-      class="icon-button"
+      class="icon-btn"
       aria-label="Refresh collections"
       title="Refresh collections"
       (click)="refresh()"
     >
-      ↻
+      <app-icon name="refresh" [size]="14" />
     </button>
+    <div class="menu-anchor">
+      <button
+        type="button"
+        class="icon-btn"
+        [class.open]="isMenuOpen()"
+        aria-label="New…"
+        title="New request or collection"
+        aria-haspopup="menu"
+        [attr.aria-expanded]="isMenuOpen()"
+        (click)="toggleMenu($event)"
+      >
+        <app-icon name="plus" [size]="16" />
+      </button>
+      @if (isMenuOpen()) {
+        <div class="menu" role="menu" (click)="$event.stopPropagation()">
+          <button
+            type="button"
+            role="menuitem"
+            class="menu-item"
+            [disabled]="rows().length === 0"
+            (click)="create('request')"
+          >
+            <app-icon name="send" [size]="14" />
+            New request
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            class="menu-item"
+            [disabled]="rows().length === 0"
+            (click)="create('folder')"
+          >
+            <app-icon name="folder-plus" [size]="14" />
+            New folder
+          </button>
+          <button type="button" role="menuitem" class="menu-item" (click)="create('collection')">
+            <app-icon name="box" [size]="14" />
+            New collection
+          </button>
+        </div>
+      }
+    </div>
   </div>
 </div>
-
-@if (isCreating()) {
-  <form class="create-form" (submit)="createEntry($event)">
-    <label class="create-field">
-      <span class="field-label">Create</span>
-      <select
-        name="creationKind"
-        [ngModel]="creationKind()"
-        (ngModelChange)="selectCreationKind($event)"
-      >
-        <option value="collection">Collection</option>
-        <option value="request" [disabled]="!canCreateRequest()">
-          Request in selected folder
-        </option>
-      </select>
-    </label>
-
-    <label class="create-field">
-      <span class="field-label">Name</span>
-      <input
-        type="text"
-        name="creationName"
-        [ngModel]="creationName()"
-        (ngModelChange)="creationName.set($event)"
-        placeholder="Platform API"
-        autocomplete="off"
-        spellcheck="false"
-      />
-    </label>
-
-    @if (creationKind() === 'request') {
-      <label class="create-field">
-        <span class="field-label">URL</span>
-        <input
-          type="text"
-          name="creationUrl"
-          [ngModel]="creationUrl()"
-          (ngModelChange)="creationUrl.set($event)"
-          placeholder="https://api.example.com/resources"
-          autocomplete="off"
-          spellcheck="false"
-        />
-      </label>
-    }
-
-    @if (creationError(); as message) {
-      <p class="create-error">{{ message }}</p>
-    }
-
-    <div class="create-actions">
-      <button
-        type="submit"
-        class="primary-button"
-        [disabled]="isSavingEntry()"
-      >
-        {{ isSavingEntry() ? 'Creating…' : 'Create' }}
-      </button>
-      <button type="button" class="ghost-button" (click)="closeCreation()">
-        Cancel
-      </button>
-    </div>
-  </form>
-}
 
 @if (errorMessage(); as message) {
   <p class="tree-message tree-error">{{ message }}</p>
 }
 
 @if (!isLoading() && rows().length === 0 && !errorMessage()) {
-  <p class="tree-message tree-empty">
-    No collections yet. Use + to create one.
-  </p>
+  <div class="tree-empty">
+    <p>No collection yet.</p>
+    <button type="button" class="btn btn-sm" (click)="create('collection')">
+      <app-icon name="plus" [size]="14" />
+      New collection
+    </button>
+  </div>
 }
 
-<cdk-virtual-scroll-viewport
-  class="tree-viewport"
-  role="tree"
-  [itemSize]="rowHeight"
->
+<cdk-virtual-scroll-viewport class="tree-viewport" role="tree" [itemSize]="rowHeight">
   <div
     *cdkVirtualFor="let row of rows(); trackBy: trackByPath"
     class="tree-row"
     role="treeitem"
     tabindex="0"
-    [class.selected]="
-      selectedPath() === row.entry.Path ||
-      selectedFolder() === row.entry.Path
-    "
+    [class.selected]="selectedPath() === row.entry.Path || selectedFolder() === row.entry.Path"
     [class.folder]="!isRequest(row)"
+    [class.root]="row.depth === 0"
     [attr.aria-expanded]="isRequest(row) ? null : row.expanded"
-    [style.padding-left.px]="8 + row.depth * 16"
+    [style.padding-left.px]="8 + row.depth * 14"
     (click)="activate(row)"
     (keydown.enter)="activate(row)"
     (keydown.space)="activate(row)"
   >
+    @for (level of indentGuides(row); track level) {
+      <span class="indent-guide" [style.left.px]="15 + level * 14"></span>
+    }
     @if (isRequest(row)) {
-      <span class="chevron-spacer"></span>
-      <span class="method" [attr.data-method]="row.entry.Method || 'GET'">
-        {{ row.entry.Method || 'GET' }}
+      <span class="method-chip" [attr.data-method]="row.entry.Method || 'GET'">
+        {{ methodLabel(row.entry.Method) }}
       </span>
     } @else {
-      <span class="chevron" [class.expanded]="row.expanded">▸</span>
-      <span class="folder-icon">▤</span>
+      <app-icon class="chevron" name="chevron-right" [size]="14" [class.expanded]="row.expanded" />
+      @if (row.depth === 0) {
+        <app-icon class="folder-icon" name="box" [size]="14" />
+      } @else {
+        <app-icon
+          class="folder-icon"
+          [name]="row.expanded ? 'folder-open' : 'folder'"
+          [size]="14"
+        />
+      }
     }
 
     <span class="entry-name">{{ row.entry.Name }}</span>
+
+    @if (!isRequest(row)) {
+      <span class="row-actions">
+        <button
+          type="button"
+          class="icon-btn"
+          title="New folder here"
+          aria-label="New folder here"
+          (click)="createIn($event, 'folder', row)"
+        >
+          <app-icon name="folder-plus" [size]="14" />
+        </button>
+        <button
+          type="button"
+          class="icon-btn"
+          title="New request here"
+          aria-label="New request here"
+          (click)="createIn($event, 'request', row)"
+        >
+          <app-icon name="plus" [size]="14" />
+        </button>
+      </span>
+    }
   </div>
 </cdk-virtual-scroll-viewport>
