@@ -53,13 +53,26 @@ frontend. Features communicate through events or through interfaces declared
 by the consumer, never through direct imports of another feature's internals.
 See [docs/conventions.md](docs/conventions.md) for the full rules.
 
-## Claude Code integration
+## Coding agent integration
 
 When [Claude Code](https://claude.com/claude-code) is installed, a git conflict
 can be resolved with Claude from the Git panel. Awake runs the `claude`
 command without any tool: Claude only receives the base, local and incoming
 versions of the conflicted file and answers with a merged version, which the
 user reviews and can edit before it is applied.
+
+The Assistant page is a chat over the workspace. Choose Claude Code or
+[OpenCode](https://opencode.ai), describe the change you want, and the agent
+works at the workspace root with its file tools. Every change appears in
+`git diff` and stays reviewable. OpenCode uses its configured model; the model
+selector next to the agent lists the models it knows when the default one
+cannot call tools. A short context prompt tells the agent that
+requests, collections and environments are YAML files, and a prefilled
+`AGENT.md` is installed on first use unless the workspace already has one.
+Typical requests are renaming unclear requests or extracting repeated base
+URLs: a request to `http://localhost:8080/users` can become
+`{{baseUrl}}/users` with a `development` environment holding
+`baseUrl: http://localhost:8080`.
 
 ## Workspace layout
 

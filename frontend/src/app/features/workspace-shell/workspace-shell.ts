@@ -28,6 +28,7 @@ interface SidebarSection {
 }
 
 const SIDEBAR_SECTIONS: SidebarSection[] = [
+  { route: '/workspace/assistant', label: 'Assistant', icon: 'sparkles' },
   { route: '/workspace/environments', label: 'Environments', icon: 'globe' },
   { route: '/workspace/history', label: 'History', icon: 'history' },
   { route: '/workspace/git', label: 'Git', icon: 'git' },

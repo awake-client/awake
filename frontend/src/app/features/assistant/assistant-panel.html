@@ -1,0 +1,149 @@
+<section class="assistant">
+  <header class="assistant-header">
+    <div>
+      <h1>Assistant</h1>
+      <p class="assistant-hint">
+        Chat with a coding agent. It can read and edit the YAML files of this workspace directly.
+      </p>
+    </div>
+    @if (messages().length > 0) {
+      <button type="button" class="btn btn-ghost btn-sm" (click)="clear()">
+        <app-icon name="plus" [size]="14" />
+        New chat
+      </button>
+    }
+  </header>
+
+  <div class="agent-bar">
+    <div class="agent-selector" role="group" aria-label="Agent">
+      @for (option of agents(); track option.Name) {
+        <button
+          type="button"
+          class="agent-option"
+          [class.active]="option.Name === agent()"
+          [disabled]="!option.Installed || isSending()"
+          [title]="
+            option.Installed
+              ? option.Label + ' ' + option.Version
+              : option.Label + ' is not installed'
+          "
+          (click)="selectAgent(option.Name)"
+        >
+          <app-icon [name]="agentIcon(option.Name)" [size]="14" />
+          {{ option.Label }}
+          @if (option.Installed) {
+            <span class="agent-version">{{ option.Version }}</span>
+          } @else {
+            <span class="agent-missing">not installed</span>
+          }
+        </button>
+      }
+    </div>
+    @if (agent() === 'opencode') {
+      <label class="model-picker">
+        <span class="model-label">Model</span>
+        <select
+          [ngModel]="model()"
+          (ngModelChange)="selectModel($event)"
+          [disabled]="isSending() || isLoadingModels()"
+          title="OpenCode model used by the chat"
+        >
+          <option value="">OpenCode default</option>
+          @for (option of models(); track option) {
+            <option [value]="option">{{ option }}</option>
+          }
+        </select>
+      </label>
+      @if (isLoadingModels()) {
+        <span class="muted">Loading models…</span>
+      }
+    }
+    @if (isLoadingAgents()) {
+      <span class="muted">Checking agents…</span>
+    }
+  </div>
+
+  @if (!isLoadingAgents() && !hasInstalledAgent()) {
+    <p class="notice warning">
+      <app-icon name="alert" [size]="14" />
+      Neither Claude Code nor OpenCode is installed. Install one of them to use the assistant.
+    </p>
+  }
+
+  <p class="context-line">
+    <app-icon name="sparkles" [size]="13" />
+    Context sent with every message: Awake workspace, YAML requests and environments
+    @if (workspaceRoot()) {
+      · <code>{{ workspaceRoot() }}</code>
+    }
+  </p>
+
+  <section #messageList class="chat" aria-live="polite">
+    @if (messages().length === 0) {
+      <div class="empty">
+        <span class="empty-icon"><app-icon name="sparkles" [size]="26" /></span>
+        <h2>What should I change?</h2>
+        <p>
+          Ask for a request rename, a new environment, a cleanup, or anything about this codebase.
+        </p>
+        <div class="suggestions">
+          @for (suggestion of suggestions; track suggestion) {
+            <button type="button" class="suggestion" (click)="useSuggestion(suggestion)">
+              {{ suggestion }}
+            </button>
+          }
+        </div>
+      </div>
+    } @else {
+      @for (message of messages(); track $index) {
+        <article class="message" [attr.data-role]="message.role">
+          <span class="message-author">
+            {{ message.role === 'user' ? 'You' : message.agent || 'Assistant' }}
+          </span>
+          <p class="message-content">{{ message.content }}</p>
+        </article>
+      }
+      @if (isSending()) {
+        <article class="message" data-role="assistant">
+          <span class="message-author">{{ selectedAgent()?.Label || 'Assistant' }}</span>
+          <p class="message-content working">
+            <app-icon name="refresh" [size]="13" class="spinning" />
+            Working on it…
+          </p>
+        </article>
+      }
+    }
+  </section>
+
+  @if (createdAgentFile()) {
+    <p class="notice info">
+      <app-icon name="file" [size]="14" />
+      Added <code>AGENT.md</code> at the workspace root so the agent follows the same conventions in
+      future conversations.
+    </p>
+  }
+
+  @if (errorMessage(); as message) {
+    <p class="notice error">
+      <app-icon name="alert" [size]="14" />
+      {{ message }}
+    </p>
+  }
+
+  <div class="composer">
+    <textarea
+      [ngModel]="draft()"
+      (ngModelChange)="draft.set($event)"
+      (keydown)="handleKeydown($event)"
+      placeholder="Ask the agent to change something in this workspace…"
+      rows="3"
+    ></textarea>
+    <div class="composer-actions">
+      <span class="composer-hint">Enter to send · Shift+Enter for a new line</span>
+      <button type="button" class="btn btn-primary" [disabled]="!canSend()" (click)="send()">
+        <app-icon name="send" [size]="14" />
+        Send
+      </button>
+    </div>
+  </div>
+</section>

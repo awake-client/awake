@@ -60,6 +60,11 @@ export const routes: Routes = [
         ],
       },
       {
+        path: 'assistant',
+        loadComponent: () =>
+          import('@features/assistant/assistant-panel').then((module) => module.AssistantPanel),
+      },
+      {
         path: 'environments',
         loadComponent: () =>
           import('@features/environments/environments-panel').then(
