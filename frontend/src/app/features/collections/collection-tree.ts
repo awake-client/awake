@@ -17,6 +17,7 @@ import {
   requestEntryCreation,
 } from '@core/collection-events';
 import { Confirmation } from '@core/confirmation';
+import { Prompt } from '@core/prompt';
 import { TabsStore } from '@core/tabs-store';
 import { Icon } from '@shared/icon';
 
@@ -66,6 +67,7 @@ export class CollectionTree {
   private readonly destroyRef = inject(DestroyRef);
   private readonly router = inject(Router);
   private readonly confirmation = inject(Confirmation);
+  private readonly prompt = inject(Prompt);
   private readonly tabsStore = inject(TabsStore);
 
   readonly workspaceRoot = input('');
@@ -282,6 +284,50 @@ export class CollectionTree {
     this.rowMenu.set(null);
     if (menu) {
       void this.router.navigate(['/workspace/collection', ...menu.row.entry.Path.split('/')]);
+    }
+  }
+
+  protected renameFromRowMenu(): void {
+    const menu = this.rowMenu();
+    this.rowMenu.set(null);
+    if (menu) {
+      void this.renameCollection(menu.row);
+    }
+  }
+
+  /**
+   * Renames a collection: its display name, shown by the tree and its
+   * settings. Its directory keeps its path, so requests, environments and
+   * their stored secrets stay where they are.
+   */
+  protected async renameCollection(row: TreeRow): Promise<void> {
+    const workspaceRoot = this.workspaceRoot();
+    if (!workspaceRoot || row.section || row.depth !== 0) {
+      return;
+    }
+
+    const name = await this.prompt.ask({
+      title: `Rename the collection “${row.entry.Name}”`,
+      message: 'The name shown in the tree and the collection settings.',
+      label: 'Collection name',
+      icon: 'box',
+      value: row.entry.Name,
+      confirmLabel: 'Rename',
+    });
+    if (!name || name === row.entry.Name) {
+      return;
+    }
+
+    try {
+      const collection = await CollectionsService.LoadCollection(workspaceRoot, row.entry.Path);
+      await CollectionsService.UpdateCollection(workspaceRoot, row.entry.Path, {
+        ...collection,
+        Name: name,
+      });
+      this.selected.set(row.entry.Path);
+      notifyCollectionsChanged();
+    } catch (error) {
+      this.errorMessage.set(describeError(error));
     }
   }
 

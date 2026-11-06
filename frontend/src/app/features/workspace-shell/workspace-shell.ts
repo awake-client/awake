@@ -15,6 +15,7 @@ import { CommandPalette } from '@features/command-palette/command-palette';
 import { NewEntryDialog } from '@features/new-entry/new-entry-dialog';
 import { ConfirmationDialog } from '@shared/confirmation-dialog';
 import { Icon, IconName } from '@shared/icon';
+import { PromptDialog } from '@shared/prompt-dialog';
 import { ResizeHandle } from '@shared/resize-handle';
 import { collectionScopeOf, visibleEnvironments } from './environment-scope';
 import { EnvironmentChoice, EnvironmentPicker } from './environment-picker';
@@ -53,6 +54,7 @@ const SIDEBAR_SECTIONS: SidebarSection[] = [
     CommandPalette,
     NewEntryDialog,
     ConfirmationDialog,
+    PromptDialog,
     RequestTabs,
     EnvironmentPicker,
     ThemePicker,

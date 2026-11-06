@@ -188,6 +188,10 @@
       <hr class="menu-separator" />
     }
     @if (menu.row.depth === 0) {
+      <button type="button" role="menuitem" class="menu-item" (click)="renameFromRowMenu()">
+        <app-icon name="pencil" [size]="14" />
+        Rename…
+      </button>
       <button type="button" role="menuitem" class="menu-item" (click)="openSettings()">
         <app-icon name="settings" [size]="14" />
         Collection settings
