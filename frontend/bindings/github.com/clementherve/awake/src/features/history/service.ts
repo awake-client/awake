@@ -22,6 +22,28 @@ export function Clear(workspaceRoot: string): $CancellablePromise<void> {
 }
 
 /**
+ * ClearForRequest removes every execution of one request.
+ */
+export function ClearForRequest(workspaceRoot: string, requestPath: string): $CancellablePromise<void> {
+    return $Call.ByID(1469389374, workspaceRoot, requestPath);
+}
+
+/**
+ * Delete removes one history entry and its payload.
+ */
+export function Delete(workspaceRoot: string, identifier: number): $CancellablePromise<void> {
+    return $Call.ByID(2773241314, workspaceRoot, identifier);
+}
+
+/**
+ * Entry returns one history entry with the payload sent and the response
+ * received, when they were recorded.
+ */
+export function Entry(workspaceRoot: string, identifier: number): $CancellablePromise<domain$0.HistoryEntry> {
+    return $Call.ByID(2535066891, workspaceRoot, identifier);
+}
+
+/**
  * List returns history entries from newest to oldest. Pass a zero beforeID for
  * the first page and the last seen identifier for the next one.
  */
@@ -30,8 +52,23 @@ export function List(workspaceRoot: string, limit: number, beforeID: number): $C
 }
 
 /**
+ * ListForRequest returns the executions of one request, newest first.
+ */
+export function ListForRequest(workspaceRoot: string, requestPath: string, limit: number, beforeID: number): $CancellablePromise<domain$0.HistoryEntry[] | null> {
+    return $Call.ByID(1263670069, workspaceRoot, requestPath, limit, beforeID);
+}
+
+/**
  * Record appends an executed request to the history.
  */
 export function Record(workspaceRoot: string, entry: domain$0.HistoryEntry): $CancellablePromise<void> {
     return $Call.ByID(3540955524, workspaceRoot, entry);
+}
+
+/**
+ * RenameRequests follows requests that moved: entries recorded under a path,
+ * or under a folder path, are attached to the new location.
+ */
+export function RenameRequests(workspaceRoot: string, $from: string, to: string): $CancellablePromise<void> {
+    return $Call.ByID(3792007221, workspaceRoot, $from, to);
 }

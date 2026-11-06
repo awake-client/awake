@@ -3,12 +3,14 @@ import { Router } from '@angular/router';
 import * as HistoryService from '@bindings/github.com/clementherve/awake/src/features/history/service';
 import { HistoryEntry } from '@bindings/github.com/clementherve/awake/src/domain/models';
 import { WorkspaceStore } from '@core/workspace-store';
+import { Icon } from '@shared/icon';
 
 const PAGE_SIZE = 50;
 
 /** Lists the requests executed in this workspace, newest first. */
 @Component({
   selector: 'app-history-panel',
+  imports: [Icon],
   templateUrl: './history-panel.html',
   styleUrl: './history-panel.css',
 })
@@ -58,8 +60,7 @@ export class HistoryPanel {
     this.isLoadingMore.set(true);
 
     try {
-      const entries =
-        (await HistoryService.List(workspaceRoot, PAGE_SIZE, lastEntry.ID)) ?? [];
+      const entries = (await HistoryService.List(workspaceRoot, PAGE_SIZE, lastEntry.ID)) ?? [];
       this.entries.update((current) => [...current, ...entries]);
       this.hasMore.set(entries.length === PAGE_SIZE);
     } catch (error) {
@@ -70,10 +71,22 @@ export class HistoryPanel {
   }
 
   protected open(entry: HistoryEntry): void {
-    void this.router.navigate([
-      '/workspace/request',
-      ...entry.RequestPath.split('/'),
-    ]);
+    void this.router.navigate(['/workspace/request', ...entry.RequestPath.split('/')]);
+  }
+
+  /** Deletes one execution from the history. */
+  protected async remove(entry: HistoryEntry, event: Event): Promise<void> {
+    event.stopPropagation();
+    const rootPath = this.workspaceStore.rootPath();
+    if (!rootPath) {
+      return;
+    }
+    try {
+      await HistoryService.Delete(rootPath, entry.ID);
+      this.entries.update((entries) => entries.filter((candidate) => candidate.ID !== entry.ID));
+    } catch (error) {
+      this.errorMessage.set(error instanceof Error ? error.message : String(error));
+    }
   }
 
   protected askClear(): void {

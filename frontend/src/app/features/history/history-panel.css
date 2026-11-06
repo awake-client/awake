@@ -173,3 +173,25 @@ h1 {
 .load-more {
   margin-top: 12px;
 }
+
+.row-delete {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-muted);
+  opacity: 0;
+}
+
+.history-row:hover .row-delete,
+.history-row:focus-within .row-delete {
+  opacity: 1;
+}
+
+.row-delete:hover {
+  background: color-mix(in srgb, var(--color-danger) 14%, transparent);
+  color: var(--color-danger);
+}

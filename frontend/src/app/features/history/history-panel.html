@@ -7,17 +7,10 @@
 
     <div class="history-actions">
       @if (confirmingClear()) {
-        <button
-          type="button"
-          class="danger-button"
-          [disabled]="isClearing()"
-          (click)="clear()"
-        >
+        <button type="button" class="danger-button" [disabled]="isClearing()" (click)="clear()">
           {{ isClearing() ? 'Clearing…' : 'Confirm clear' }}
         </button>
-        <button type="button" class="ghost-button" (click)="cancelClear()">
-          Cancel
-        </button>
+        <button type="button" class="ghost-button" (click)="cancelClear()">Cancel</button>
       } @else {
         <button
           type="button"
@@ -38,9 +31,7 @@
   @if (isLoading()) {
     <p class="history-empty">Loading history…</p>
   } @else if (entries().length === 0) {
-    <p class="history-empty">
-      No requests executed yet. Send a request and it will appear here.
-    </p>
+    <p class="history-empty">No requests executed yet. Send a request and it will appear here.</p>
   } @else {
     <div class="history-list">
       @for (entry of entries(); track entry.ID) {
@@ -54,10 +45,7 @@
             <span class="history-url">{{ entry.URL }}</span>
           </span>
 
-          <span
-            class="status"
-            [attr.data-status]="statusClass(entry.StatusCode)"
-          >
+          <span class="status" [attr.data-status]="statusClass(entry.StatusCode)">
             {{ entry.StatusCode }}
           </span>
 
@@ -66,17 +54,23 @@
           <span class="history-meta history-date">
             {{ formatDate(entry.ExecutedAt) }}
           </span>
+          <span
+            class="row-delete"
+            role="button"
+            tabindex="0"
+            title="Delete this execution"
+            aria-label="Delete this execution"
+            (click)="remove(entry, $event)"
+            (keydown.enter)="remove(entry, $event)"
+          >
+            <app-icon name="trash" [size]="13" />
+          </span>
         </button>
       }
     </div>
 
     @if (hasMore()) {
-      <button
-        type="button"
-        class="load-more"
-        [disabled]="isLoadingMore()"
-        (click)="loadMore()"
-      >
+      <button type="button" class="load-more" [disabled]="isLoadingMore()" (click)="loadMore()">
         {{ isLoadingMore() ? 'Loading…' : 'Load more' }}
       </button>
     }
