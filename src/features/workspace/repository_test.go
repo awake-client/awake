@@ -207,3 +207,26 @@ func TestUpdateGitStoresSynchronizationSettings(t *testing.T) {
 		t.Fatal("expected an invalid interval to be rejected")
 	}
 }
+
+func TestUpdateColorAcceptsOnlyKnownColors(t *testing.T) {
+	rootPath := t.TempDir()
+	service := NewService()
+	if _, err := service.Create(rootPath, CreateOptions{Name: "Colors", Mode: ModeTeam}); err != nil {
+		t.Fatalf("create workspace: %v", err)
+	}
+
+	updated, err := service.UpdateColor(rootPath, "teal")
+	if err != nil || updated.Color != "teal" {
+		t.Fatalf("expected teal, got %q, %v", updated.Color, err)
+	}
+	reopened, err := service.Open(rootPath)
+	if err != nil || reopened.Color != "teal" {
+		t.Fatalf("the color must be persisted, got %q, %v", reopened.Color, err)
+	}
+	if _, err := service.UpdateColor(rootPath, "#ff0000"); err == nil {
+		t.Fatal("expected an unknown color to be rejected")
+	}
+	if cleared, err := service.UpdateColor(rootPath, ""); err != nil || cleared.Color != "" {
+		t.Fatalf("an empty color removes it, got %q, %v", cleared.Color, err)
+	}
+}

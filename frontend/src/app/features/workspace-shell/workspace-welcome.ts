@@ -2,16 +2,18 @@ import { Component, DestroyRef, computed, effect, inject, signal } from '@angula
 import { RouterLink } from '@angular/router';
 import * as CollectionsService from '@bindings/github.com/clementherve/awake/src/features/collections/service';
 import { Entry } from '@bindings/github.com/clementherve/awake/src/features/collections/models';
+import * as WorkspaceService from '@bindings/github.com/clementherve/awake/src/features/workspace/service';
 import * as EnvironmentsService from '@bindings/github.com/clementherve/awake/src/features/environments/service';
 import { Summary } from '@bindings/github.com/clementherve/awake/src/features/environments/models';
 import { WorkspaceStore } from '@core/workspace-store';
 import { requestEntryCreation } from '@core/collection-events';
+import { ColorPicker } from '@shared/color-picker';
 import { Icon } from '@shared/icon';
 
 /** Workspace overview shown in the editor area until a request is selected. */
 @Component({
   selector: 'app-workspace-welcome',
-  imports: [RouterLink, Icon],
+  imports: [RouterLink, Icon, ColorPicker],
   templateUrl: './workspace-welcome.html',
   styleUrl: './workspace-welcome.css',
 })
@@ -62,7 +64,7 @@ export class WorkspaceWelcome {
       const [collections, privateCollections, environments] = await Promise.all([
         CollectionsService.List(rootPath, ''),
         CollectionsService.List(rootPath, 'local'),
-        EnvironmentsService.List(rootPath),
+        EnvironmentsService.List(rootPath, ''),
       ]);
       this.collections.set([...(collections ?? []), ...(privateCollections ?? [])]);
       this.environments.set(environments ?? []);
@@ -90,6 +92,24 @@ export class WorkspaceWelcome {
     }
 
     window.dispatchEvent(new CustomEvent('awake:open-collection', { detail: entry.Path }));
+  }
+
+  protected readonly workspaceColor = computed(
+    () => this.workspaceStore.workspace()?.configuration.Color ?? '',
+  );
+
+  /** Stores the workspace color in awake.yaml, shared with the team. */
+  protected async setWorkspaceColor(color: string): Promise<void> {
+    const rootPath = this.rootPath();
+    if (!rootPath) {
+      return;
+    }
+    try {
+      const configuration = await WorkspaceService.UpdateColor(rootPath, color);
+      this.workspaceStore.open(rootPath, configuration);
+    } catch (error) {
+      this.errorMessage.set(describeError(error));
+    }
   }
 
   protected newCollection(): void {

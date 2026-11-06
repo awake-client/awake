@@ -12,6 +12,11 @@ export interface Configuration {
     "DefaultEnvironment": string;
     "Variables": { [_ in string]?: string } | null;
     "Git": GitConfiguration | null;
+
+    /**
+     * Color names one of the colors listed in domain.Colors.
+     */
+    "Color": string;
 }
 
 /**

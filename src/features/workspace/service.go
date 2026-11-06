@@ -32,3 +32,18 @@ func (service *Service) UpdateGit(rootPath string, git GitConfiguration) (Config
 	}
 	return configuration, nil
 }
+
+// UpdateColor stores the color of the workspace in awake.yaml.
+func (service *Service) UpdateColor(rootPath string, color string) (Configuration, error) {
+	repository := NewRepository(rootPath)
+	configuration, err := repository.Load()
+	if err != nil {
+		return Configuration{}, err
+	}
+
+	configuration.Color = color
+	if err := repository.Save(configuration); err != nil {
+		return Configuration{}, err
+	}
+	return configuration, nil
+}

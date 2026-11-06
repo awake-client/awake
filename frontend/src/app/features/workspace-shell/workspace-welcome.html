@@ -1,9 +1,15 @@
 <section class="overview">
-  <header class="hero">
+  <header class="hero" [attr.data-color]="workspaceColor() || null">
     <div class="hero-text">
       <p class="hero-eyebrow">Workspace</p>
       <h1>{{ workspaceName() }}</h1>
       <p class="hero-path" [title]="rootPath()">{{ rootPath() }}</p>
+      <app-color-picker
+        class="hero-color"
+        label="Workspace color"
+        [value]="workspaceColor()"
+        (valueChange)="setWorkspaceColor($event)"
+      />
     </div>
 
     <div class="hero-actions">
@@ -69,6 +75,7 @@
             >
               <span
                 class="collection-avatar"
+                [attr.data-color]="collection.Color || null"
                 [style.--hue]="collectionHue(collection)"
                 aria-hidden="true"
               >

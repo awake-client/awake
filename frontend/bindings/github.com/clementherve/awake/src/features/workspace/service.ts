@@ -29,6 +29,13 @@ export function Open(rootPath: string): $CancellablePromise<$models.Configuratio
 }
 
 /**
+ * UpdateColor stores the color of the workspace in awake.yaml.
+ */
+export function UpdateColor(rootPath: string, color: string): $CancellablePromise<$models.Configuration> {
+    return $Call.ByID(3658605154, rootPath, color);
+}
+
+/**
  * UpdateGit replaces the git synchronization settings stored in awake.yaml.
  */
 export function UpdateGit(rootPath: string, git: $models.GitConfiguration): $CancellablePromise<$models.Configuration> {

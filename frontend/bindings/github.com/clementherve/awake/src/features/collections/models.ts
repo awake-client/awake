@@ -11,6 +11,11 @@ export interface Entry {
     "Kind": Kind;
     "Method": string;
     "HasChildren": boolean;
+
+    /**
+     * Color of a collection, from its collection.yaml.
+     */
+    "Color": string;
 }
 
 /**

@@ -14,6 +14,7 @@ export type {
     Collection,
     Header,
     HistoryEntry,
+    HistoryExchange,
     Parameter,
     Request,
     ScriptOutcome,

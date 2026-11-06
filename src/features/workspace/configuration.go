@@ -1,6 +1,10 @@
 package workspace
 
-import "time"
+import (
+	"time"
+
+	"github.com/clementherve/awake/src/domain"
+)
 
 // SupportedVersion is the newest workspace format version this build can read.
 const SupportedVersion = 1
@@ -24,6 +28,8 @@ type Configuration struct {
 	DefaultEnvironment string            `yaml:"defaultEnvironment,omitempty"`
 	Variables          map[string]string `yaml:"variables,omitempty"`
 	Git                *GitConfiguration `yaml:"git,omitempty"`
+	// Color names one of the colors listed in domain.Colors.
+	Color string `yaml:"color,omitempty"`
 }
 
 // GitConfiguration describes how the workspace synchronizes with its remote.
@@ -56,6 +62,9 @@ func (configuration Configuration) validate() error {
 		return ErrInvalidConfiguration
 	}
 	if configuration.Mode != ModeTeam && configuration.Mode != ModePersonal {
+		return ErrInvalidConfiguration
+	}
+	if !domain.IsColor(configuration.Color) {
 		return ErrInvalidConfiguration
 	}
 

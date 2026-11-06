@@ -79,6 +79,11 @@ export interface Collection {
     "Variables": { [_ in string]?: string } | null;
     "Authentication": Authentication | null;
     "Documentation": string;
+
+    /**
+     * Color names one of the colors listed in Colors.
+     */
+    "Color": string;
 }
 
 /**
@@ -104,6 +109,26 @@ export interface HistoryEntry {
     "SizeBytes": number;
     "Environment": string;
     "ExecutedAt": string;
+
+    /**
+     * Exchange holds what was sent and received. Lists leave it empty; it is
+     * loaded for a single entry.
+     */
+    "Exchange": HistoryExchange | null;
+}
+
+/**
+ * HistoryExchange is the payload of an executed request and the response it
+ * received, as stored in the history. Credentials are redacted before they
+ * are recorded.
+ */
+export interface HistoryExchange {
+    "RequestHeaders": { [_ in string]?: string[] | null } | null;
+    "RequestBody": string;
+    "ResponseHeaders": { [_ in string]?: string[] | null } | null;
+    "ResponseBody": string;
+    "ResponseEncoding": string;
+    "ResponseTruncated": boolean;
 }
 
 /**
@@ -125,6 +150,12 @@ export enum OAuth2GrantType {
      * OAuth2GrantClientCredentials exchanges the client credentials directly.
      */
     OAuth2GrantClientCredentials = "clientCredentials",
+
+    /**
+     * OAuth2GrantPassword exchanges a user name and password, for services
+     * that still offer the resource owner password credentials grant.
+     */
+    OAuth2GrantPassword = "password",
 };
 
 /**

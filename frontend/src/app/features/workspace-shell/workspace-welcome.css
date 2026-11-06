@@ -335,3 +335,24 @@ h2 {
   line-height: 17px;
   vertical-align: 2px;
 }
+
+.hero-color {
+  display: block;
+  margin-top: 12px;
+}
+
+/* A workspace color replaces the sunrise glow of the header. */
+.hero[data-color] {
+  background:
+    radial-gradient(
+      120% 140% at 0% 0%,
+      color-mix(in srgb, var(--entity-color) 14%, transparent) 0%,
+      transparent 55%
+    ),
+    var(--color-background);
+}
+
+.collection-avatar[data-color] {
+  background: color-mix(in srgb, var(--entity-color) 18%, transparent);
+  color: var(--entity-color);
+}
