@@ -487,3 +487,68 @@ option {
   font-weight: 700;
   letter-spacing: 0.03em;
 }
+
+/*
+ * Entity colors. Workspaces, collections and environments store a color name;
+ * `data-color` maps it to `--entity-color`, tuned for each theme.
+ */
+[data-color] {
+  --entity-color: var(--color-text-muted);
+}
+[data-color='orange'] {
+  --entity-color: #e5622a;
+}
+[data-color='amber'] {
+  --entity-color: #c98a0b;
+}
+[data-color='green'] {
+  --entity-color: #23915f;
+}
+[data-color='teal'] {
+  --entity-color: #0f8f8a;
+}
+[data-color='blue'] {
+  --entity-color: #3c6fd9;
+}
+[data-color='violet'] {
+  --entity-color: #8a55d6;
+}
+[data-color='pink'] {
+  --entity-color: #d6458f;
+}
+[data-color='red'] {
+  --entity-color: #d23f4f;
+}
+[data-color='gray'] {
+  --entity-color: #7f786f;
+}
+
+@media (prefers-color-scheme: dark) {
+  [data-color='orange'] {
+    --entity-color: #ff8a4c;
+  }
+  [data-color='amber'] {
+    --entity-color: #f2c45a;
+  }
+  [data-color='green'] {
+    --entity-color: #6fd3a0;
+  }
+  [data-color='teal'] {
+    --entity-color: #4fd1c5;
+  }
+  [data-color='blue'] {
+    --entity-color: #7ea8ff;
+  }
+  [data-color='violet'] {
+    --entity-color: #c79cff;
+  }
+  [data-color='pink'] {
+    --entity-color: #ff7eb6;
+  }
+  [data-color='red'] {
+    --entity-color: #ff6b7a;
+  }
+  [data-color='gray'] {
+    --entity-color: #8e8f9e;
+  }
+}
