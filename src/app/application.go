@@ -57,11 +57,12 @@ func Run(frontendAssets embed.FS) error {
 		Title:            mainWindowTitle,
 		Width:            mainWindowWidth,
 		Height:           mainWindowHeight,
-		BackgroundColour: application.NewRGB(18, 18, 20),
+		BackgroundColour: application.NewRGB(30, 30, 30),
 		Mac: application.MacWindow{
-			InvisibleTitleBarHeight: 38,
-			Backdrop:                application.MacBackdropTranslucent,
-			TitleBar:                application.MacTitleBarHiddenInset,
+			// The web title bar declares its own drag region through the
+			// --wails-draggable CSS property, so its buttons stay clickable.
+			Backdrop: application.MacBackdropTranslucent,
+			TitleBar: application.MacTitleBarHiddenInset,
 		},
 		URL: "/",
 	})
