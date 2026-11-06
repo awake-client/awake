@@ -27,6 +27,70 @@
     <p class="git-message success">{{ message }}</p>
   }
 
+  @if (isRepository()) {
+    <article class="sync-card">
+      <header class="sync-header">
+        <div>
+          <h2>Automatic sync</h2>
+          <p class="sync-status" [attr.data-state]="gitSync.state()">
+            <span class="sync-dot"></span>
+            {{ gitSync.label() }}
+            @if (gitSync.message()) {
+              <span class="sync-detail">— {{ gitSync.message() }}</span>
+            }
+          </p>
+        </div>
+        <button
+          type="button"
+          class="ghost-button"
+          [disabled]="gitSync.state() === 'syncing'"
+          (click)="syncNow()"
+        >
+          Sync now
+        </button>
+      </header>
+
+      <div class="sync-settings">
+        <label class="sync-option">
+          <input
+            type="checkbox"
+            [ngModel]="automaticPull()"
+            (ngModelChange)="automaticPull.set($event)"
+          />
+          Pull the team's changes
+        </label>
+        <label class="sync-option">
+          <input
+            type="checkbox"
+            [ngModel]="automaticPush()"
+            (ngModelChange)="automaticPush.set($event)"
+          />
+          Push my commits
+        </label>
+        <label class="sync-option">
+          every
+          <select [ngModel]="syncInterval()" (ngModelChange)="syncInterval.set($event)">
+            @for (interval of syncIntervals; track interval.value) {
+              <option [value]="interval.value">{{ interval.label }}</option>
+            }
+          </select>
+        </label>
+        <button
+          type="button"
+          class="primary-button"
+          [disabled]="isSavingSync()"
+          (click)="saveSyncSettings()"
+        >
+          {{ isSavingSync() ? 'Saving…' : 'Save' }}
+        </button>
+      </div>
+      <p class="sync-hint">
+        Stored in <code>awake.yaml</code> and shared with the team. Only committed changes are
+        pushed; a sync stops on conflicts until they are resolved below.
+      </p>
+    </article>
+  }
+
   @if (isLoading()) {
     <p class="git-empty">Reading repository…</p>
   } @else if (isRepository() === false) {
@@ -102,9 +166,7 @@
       <section class="conflict-view">
         <header class="conflict-header">
           <span class="conflict-path">{{ path }}</span>
-          <button type="button" class="ghost-button small" (click)="closeConflict()">
-            Close
-          </button>
+          <button type="button" class="ghost-button small" (click)="closeConflict()">Close</button>
         </header>
 
         @if (isLoadingConflict()) {
@@ -118,14 +180,24 @@
             <article class="conflict-column">
               <h2>Local</h2>
               <pre>{{ decode(versions.Local) }}</pre>
-              <button type="button" class="primary-button" [disabled]="isBusy()" (click)="resolve('local')">
+              <button
+                type="button"
+                class="primary-button"
+                [disabled]="isBusy()"
+                (click)="resolve('local')"
+              >
                 Keep local
               </button>
             </article>
             <article class="conflict-column">
               <h2>Incoming</h2>
               <pre>{{ decode(versions.Incoming) }}</pre>
-              <button type="button" class="primary-button" [disabled]="isBusy()" (click)="resolve('incoming')">
+              <button
+                type="button"
+                class="primary-button"
+                [disabled]="isBusy()"
+                (click)="resolve('incoming')"
+              >
                 Keep incoming
               </button>
             </article>

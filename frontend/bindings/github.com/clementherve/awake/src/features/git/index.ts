@@ -6,9 +6,14 @@ export {
     Service
 };
 
+export {
+    SyncOutcome
+} from "./models.js";
+
 export type {
     Change,
     ConflictVersions,
     PullResult,
-    Status
+    Status,
+    SyncResult
 } from "./models.js";

@@ -27,3 +27,10 @@ export function Create(rootPath: string, options: $models.CreateOptions): $Cance
 export function Open(rootPath: string): $CancellablePromise<$models.Configuration> {
     return $Call.ByID(3752288082, rootPath);
 }
+
+/**
+ * UpdateGit replaces the git synchronization settings stored in awake.yaml.
+ */
+export function UpdateGit(rootPath: string, git: $models.GitConfiguration): $CancellablePromise<$models.Configuration> {
+    return $Call.ByID(3190673329, rootPath, git);
+}

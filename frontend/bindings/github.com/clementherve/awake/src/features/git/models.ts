@@ -42,3 +42,49 @@ export interface Status {
     "Behind": number;
     "Changes": Change[] | null;
 }
+
+/**
+ * SyncOutcome tells what an automatic synchronization did.
+ */
+export enum SyncOutcome {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    /**
+     * SyncSkipped means the workspace has no repository or no upstream branch.
+     */
+    SyncSkipped = "skipped",
+
+    /**
+     * SyncDone means the requested pull and push ran without conflict.
+     */
+    SyncDone = "done",
+
+    /**
+     * SyncConflicts means conflicts must be resolved before syncing again.
+     */
+    SyncConflicts = "conflicts",
+};
+
+/**
+ * SyncResult describes one automatic synchronization.
+ */
+export interface SyncResult {
+    "Outcome": SyncOutcome;
+
+    /**
+     * Reason explains a skipped synchronization.
+     */
+    "Reason": string;
+
+    /**
+     * Pulled is true when the pull brought new commits.
+     */
+    "Pulled": boolean;
+    "Pushed": boolean;
+    "Conflicts": string[] | null;
+    "Ahead": number;
+    "Behind": number;
+}

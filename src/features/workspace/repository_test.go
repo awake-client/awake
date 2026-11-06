@@ -175,3 +175,35 @@ func TestSaveWritesCanonicalYaml(t *testing.T) {
 		t.Errorf("expected Renamed, got %q", opened.Name)
 	}
 }
+
+func TestUpdateGitStoresSynchronizationSettings(t *testing.T) {
+	rootPath := t.TempDir()
+	service := NewService()
+	if _, err := service.Create(rootPath, CreateOptions{Name: "Team", Mode: ModeTeam}); err != nil {
+		t.Fatalf("create workspace: %v", err)
+	}
+
+	updated, err := service.UpdateGit(rootPath, GitConfiguration{
+		AutomaticPull:           true,
+		AutomaticPush:           true,
+		SynchronizationInterval: "2m",
+	})
+	if err != nil {
+		t.Fatalf("update git settings: %v", err)
+	}
+	if updated.Git == nil || !updated.Git.AutomaticPull || updated.Git.SynchronizationInterval != "2m" {
+		t.Fatalf("unexpected configuration: %+v", updated.Git)
+	}
+
+	reloaded, err := service.Open(rootPath)
+	if err != nil {
+		t.Fatalf("reopen workspace: %v", err)
+	}
+	if reloaded.Git == nil || !reloaded.Git.AutomaticPush {
+		t.Fatalf("settings were not persisted: %+v", reloaded.Git)
+	}
+
+	if _, err := service.UpdateGit(rootPath, GitConfiguration{SynchronizationInterval: "soon"}); err == nil {
+		t.Fatal("expected an invalid interval to be rejected")
+	}
+}

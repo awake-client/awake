@@ -6,7 +6,18 @@ import {
   ConflictVersions,
   Status,
 } from '@bindings/github.com/clementherve/awake/src/features/git/models';
+import * as WorkspaceService from '@bindings/github.com/clementherve/awake/src/features/workspace/service';
+import { GitSync } from '@core/git-sync';
 import { WorkspaceStore } from '@core/workspace-store';
+
+/** Intervals offered for automatic synchronization, as Go durations. */
+const SYNC_INTERVALS = [
+  { value: '1m', label: 'minute' },
+  { value: '5m', label: '5 minutes' },
+  { value: '15m', label: '15 minutes' },
+  { value: '30m', label: '30 minutes' },
+  { value: '1h', label: 'hour' },
+];
 
 /** Shows the git state of the workspace and lets the user synchronize it. */
 @Component({
@@ -17,6 +28,15 @@ import { WorkspaceStore } from '@core/workspace-store';
 })
 export class GitPanel {
   private readonly workspaceStore = inject(WorkspaceStore);
+  protected readonly gitSync = inject(GitSync);
+
+  protected readonly syncIntervals = SYNC_INTERVALS;
+  protected readonly automaticPull = signal(this.gitSync.settings()?.AutomaticPull ?? false);
+  protected readonly automaticPush = signal(this.gitSync.settings()?.AutomaticPush ?? false);
+  protected readonly syncInterval = signal(
+    this.gitSync.settings()?.SynchronizationInterval || '5m',
+  );
+  protected readonly isSavingSync = signal(false);
 
   protected readonly isRepository = signal<boolean | null>(null);
   protected readonly status = signal<Status | null>(null);
@@ -32,6 +52,39 @@ export class GitPanel {
 
   constructor() {
     void this.load();
+  }
+
+  /** Stores the automatic synchronization settings in awake.yaml. */
+  protected async saveSyncSettings(): Promise<void> {
+    const rootPath = this.workspaceStore.rootPath();
+    if (!rootPath) {
+      return;
+    }
+
+    this.isSavingSync.set(true);
+    this.errorMessage.set(null);
+    this.statusMessage.set(null);
+    try {
+      const current = this.gitSync.settings();
+      const configuration = await WorkspaceService.UpdateGit(rootPath, {
+        Remote: current?.Remote ?? '',
+        Branch: current?.Branch ?? '',
+        AutomaticPull: this.automaticPull(),
+        AutomaticPush: this.automaticPush(),
+        SynchronizationInterval: this.syncInterval(),
+      });
+      this.workspaceStore.open(rootPath, configuration);
+      this.statusMessage.set('Synchronization settings saved in awake.yaml.');
+    } catch (error) {
+      this.errorMessage.set(error instanceof Error ? error.message : String(error));
+    } finally {
+      this.isSavingSync.set(false);
+    }
+  }
+
+  protected async syncNow(): Promise<void> {
+    await this.gitSync.syncNow();
+    await this.load();
   }
 
   protected get changes(): Change[] {
@@ -105,9 +158,7 @@ export class GitPanel {
         `Pull produced ${result.Conflicts?.length ?? 0} conflict(s). Resolve them below.`,
       );
     } else {
-      this.statusMessage.set(
-        result.AlreadyUpToDate ? 'Already up to date.' : 'Pulled changes.',
-      );
+      this.statusMessage.set(result.AlreadyUpToDate ? 'Already up to date.' : 'Pulled changes.');
     }
 
     await this.load();
@@ -133,9 +184,7 @@ export class GitPanel {
     this.errorMessage.set(null);
 
     try {
-      this.conflictVersions.set(
-        await GitService.ConflictVersions(workspaceRoot, path),
-      );
+      this.conflictVersions.set(await GitService.ConflictVersions(workspaceRoot, path));
     } catch (error) {
       this.errorMessage.set(describeError(error));
     } finally {

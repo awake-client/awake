@@ -284,3 +284,81 @@ h1 {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* Automatic sync ------------------------------------------------------------ */
+
+.sync-card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px 18px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+}
+
+.sync-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.sync-header h2 {
+  margin: 0 0 4px;
+  font-size: var(--text-md);
+  font-weight: 600;
+  color: var(--color-text-strong);
+}
+
+.sync-status {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0;
+  color: var(--color-text-muted);
+}
+
+.sync-detail {
+  color: var(--color-text-subtle);
+}
+
+.sync-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--color-text-subtle);
+}
+
+.sync-status[data-state='synced'] .sync-dot {
+  background: var(--color-success);
+}
+
+.sync-status[data-state='syncing'] .sync-dot {
+  background: var(--color-accent);
+}
+
+.sync-status[data-state='conflicts'] .sync-dot,
+.sync-status[data-state='error'] .sync-dot {
+  background: var(--color-danger);
+}
+
+.sync-settings {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 18px;
+}
+
+.sync-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--color-text);
+}
+
+.sync-hint {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-subtle);
+}
