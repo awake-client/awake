@@ -36,17 +36,10 @@
       </div>
 
       @if (isLive()) {
-        <button type="button" class="stream-button" (click)="disconnect()">
-          Disconnect
-        </button>
+        <button type="button" class="stream-button" (click)="disconnect()">Disconnect</button>
       }
 
-      <button
-        type="button"
-        class="stream-close"
-        aria-label="Close stream"
-        (click)="release()"
-      >
+      <button type="button" class="stream-close" aria-label="Close stream" (click)="release()">
         ×
       </button>
     }
@@ -68,9 +61,7 @@
             <div class="event-header">
               <span class="event-direction">{{ directionLabel(event) }}</span>
               <span class="event-label">{{ eventLabel(event) }}</span>
-              <span class="event-time">{{
-                formatTime(event.TimestampMilliseconds)
-              }}</span>
+              <span class="event-time">{{ formatTime(event.TimestampMilliseconds) }}</span>
             </div>
             @if (event.Data) {
               <pre class="event-data">{{ displayData(event) }}</pre>
@@ -116,8 +107,6 @@
       </div>
     }
   } @else {
-    <p class="empty-stream">
-      Press Connect to open the {{ protocolLabel() }} session.
-    </p>
+    <p class="empty-stream">Press Connect to open the {{ protocolLabel() }} session.</p>
   }
 </section>

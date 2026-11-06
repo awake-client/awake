@@ -479,3 +479,7 @@
 .variable-warning:hover {
   background: color-mix(in srgb, var(--color-danger) 20%, transparent);
 }
+
+.history-panel {
+  height: 100%;
+}

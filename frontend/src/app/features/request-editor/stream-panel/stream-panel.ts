@@ -31,8 +31,7 @@ const POLL_INTERVAL_MILLISECONDS = 250;
 })
 export class StreamPanel {
   private readonly workspaceStore = inject(WorkspaceStore);
-  private readonly eventLog =
-    viewChild<ElementRef<HTMLDivElement>>('eventLog');
+  private readonly eventLog = viewChild<ElementRef<HTMLDivElement>>('eventLog');
 
   readonly protocol = input.required<Protocol>();
   readonly requestPath = input.required<string>();
@@ -45,9 +44,7 @@ export class StreamPanel {
   protected readonly errorMessage = signal<string | null>(null);
   protected readonly message = signal('');
   protected readonly activeTab = signal<'events' | 'headers'>('events');
-  protected readonly isWebSocket = computed(
-    () => this.protocol() === Protocol.ProtocolWebSocket,
-  );
+  protected readonly isWebSocket = computed(() => this.protocol() === Protocol.ProtocolWebSocket);
   readonly isLive = computed(() => {
     const stream = this.stream();
     return stream !== null && !stream.Closed;
@@ -59,8 +56,7 @@ export class StreamPanel {
       return [];
     }
 
-    const headers: Record<string, string[] | null | undefined> =
-      stream.Headers ?? {};
+    const headers: Record<string, string[] | null | undefined> = stream.Headers ?? {};
     return Object.entries(headers).map(([name, values]) => ({
       name,
       value: (values ?? []).join(', '),
@@ -243,10 +239,7 @@ export class StreamPanel {
     this.isPolling.set(true);
 
     try {
-      const page = await HTTPClientService.ReadStreamEvents(
-        stream.ID,
-        this.nextIndex,
-      );
+      const page = await HTTPClientService.ReadStreamEvents(stream.ID, this.nextIndex);
 
       if ((page.Events?.length ?? 0) > 0) {
         this.events.update((events) => [...events, ...(page.Events ?? [])]);
@@ -256,9 +249,7 @@ export class StreamPanel {
       if (page.Closed) {
         this.stopPolling();
         this.stream.update((current) =>
-          current
-            ? { ...current, Closed: true, Error: page.Error }
-            : current,
+          current ? { ...current, Closed: true, Error: page.Error } : current,
         );
         this.errorMessage.set(page.Error || null);
       }

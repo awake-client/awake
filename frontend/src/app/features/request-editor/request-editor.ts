@@ -1,8 +1,18 @@
-import { Component, computed, effect, inject, signal, viewChild } from '@angular/core';
+import {
+  Component,
+  DestroyRef,
+  ElementRef,
+  computed,
+  effect,
+  inject,
+  signal,
+  viewChild,
+} from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import * as CollectionsService from '@bindings/github.com/clementherve/awake/src/features/collections/service';
+import * as HistoryService from '@bindings/github.com/clementherve/awake/src/features/history/service';
 import * as HTTPClientService from '@bindings/github.com/clementherve/awake/src/features/httpclient/service';
 import {
   Chunk,
@@ -23,17 +33,46 @@ import {
   ScriptOutcome,
 } from '@bindings/github.com/clementherve/awake/src/domain/models';
 import { EnvironmentStore } from '@core/environment-store';
+import { COLLECTIONS_CHANGED_EVENT, CollectionsChange } from '@core/collection-events';
+import { LayoutStore, RESPONSE_RATIO } from '@core/layout-store';
 import { StashedEditorState, TabsStore } from '@core/tabs-store';
 import { VariableStore } from '@core/variable-store';
 import { WorkspaceStore } from '@core/workspace-store';
+import { AuthEditor } from '@shared/auth-editor';
+import { CodeEditor, CodeLanguage, prettyJson } from '@shared/code-editor';
+import { ResizeHandle } from '@shared/resize-handle';
 import { Icon } from '@shared/icon';
 import { VariableInput } from '@shared/variable-input';
+import { RequestHistory } from './request-history/request-history';
 import { StreamPanel } from './stream-panel/stream-panel';
 
 /** Sections of the request editor. */
-type EditorTab = 'parameters' | 'headers' | 'authentication' | 'body' | 'scripts' | 'documentation';
+type EditorTab =
+  'parameters' | 'headers' | 'authentication' | 'body' | 'scripts' | 'documentation' | 'history';
 
 const HTTP_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'] as const;
+
+/** Reason phrases for the statuses shown from the history. */
+const STATUS_TEXTS: Record<number, string> = {
+  200: 'OK',
+  201: 'Created',
+  202: 'Accepted',
+  204: 'No Content',
+  301: 'Moved Permanently',
+  302: 'Found',
+  304: 'Not Modified',
+  400: 'Bad Request',
+  401: 'Unauthorized',
+  403: 'Forbidden',
+  404: 'Not Found',
+  409: 'Conflict',
+  422: 'Unprocessable Entity',
+  429: 'Too Many Requests',
+  500: 'Internal Server Error',
+  502: 'Bad Gateway',
+  503: 'Service Unavailable',
+  504: 'Gateway Timeout',
+};
 
 const TAB_LABELS: Record<EditorTab, string> = {
   parameters: 'Parameters',
@@ -42,6 +81,7 @@ const TAB_LABELS: Record<EditorTab, string> = {
   body: 'Body',
   scripts: 'Scripts',
   documentation: 'Documentation',
+  history: 'History',
 };
 
 /**
@@ -50,9 +90,19 @@ const TAB_LABELS: Record<EditorTab, string> = {
  */
 @Component({
   selector: 'app-request-editor',
-  imports: [FormsModule, RouterLink, StreamPanel, Icon, VariableInput],
+  imports: [
+    FormsModule,
+    RouterLink,
+    StreamPanel,
+    RequestHistory,
+    Icon,
+    AuthEditor,
+    CodeEditor,
+    ResizeHandle,
+    VariableInput,
+  ],
   templateUrl: './request-editor.html',
-  styleUrls: ['./request-editor.css', './request-response.css'],
+  styleUrls: ['./request-editor.css', './request-layout.css', './request-response.css'],
   host: {
     '(document:keydown)': 'handleShortcut($event)',
     '(document:click)': 'closeKindMenu()',
@@ -64,6 +114,9 @@ export class RequestEditor {
   private readonly workspaceStore = inject(WorkspaceStore);
   private readonly variableStore = inject(VariableStore);
   private readonly tabsStore = inject(TabsStore);
+  private readonly editor = viewChild.required<ElementRef<HTMLElement>>('editor');
+  protected readonly layout = inject(LayoutStore);
+  protected readonly defaultResponseRatio = RESPONSE_RATIO.default;
   private readonly streamPanel = viewChild<StreamPanel>(StreamPanel);
 
   protected readonly AuthenticationType = AuthenticationType;
@@ -73,9 +126,35 @@ export class RequestEditor {
   protected readonly httpMethods = HTTP_METHODS;
   protected readonly tabs = Object.keys(TAB_LABELS) as EditorTab[];
   protected readonly tabLabels = TAB_LABELS;
+  /** Labels used when the request pane is narrow, side by side. */
+  protected readonly shortTabLabels: Record<EditorTab, string> = {
+    parameters: 'Params',
+    headers: 'Headers',
+    authentication: 'Auth',
+    body: 'Body',
+    scripts: 'Scripts',
+    documentation: 'Docs',
+    history: 'History',
+  };
+  protected readonly bodyTypes = [
+    { type: BodyType.BodyNone, label: 'None' },
+    { type: BodyType.BodyJSON, label: 'JSON' },
+    { type: BodyType.BodyText, label: 'Text' },
+    { type: BodyType.BodyXML, label: 'XML' },
+    { type: BodyType.BodyFormURLEncoded, label: 'Form' },
+    { type: BodyType.BodyMultipart, label: 'Multipart' },
+    { type: BodyType.BodyBinary, label: 'Binary' },
+  ];
   protected readonly selectedEnvironment = this.environmentStore.selected;
 
   protected readonly requestPath = signal('');
+  /** The collection of the request, whose authentication it may inherit. */
+  protected readonly collectionPath = computed(() => {
+    const segments = this.requestPath().split('/');
+    return segments.length >= 3 ? `${segments[0]}/${segments[1]}` : '';
+  });
+  protected readonly collectionName = signal('');
+  protected readonly inheritedAuthentication = signal<Authentication | null>(null);
   /** Request path split for the breadcrumb, without the collections root. */
   protected readonly pathSegments = computed(() => {
     const segments = this.requestPath().split('/').filter(Boolean);
@@ -146,6 +225,35 @@ export class RequestEditor {
 
   protected readonly streamLive = computed(() => this.streamPanel()?.isLive() ?? false);
 
+  protected readonly bodyLanguage = computed<CodeLanguage>(() => {
+    switch (this.body().Type) {
+      case BodyType.BodyJSON:
+        return 'json';
+      case BodyType.BodyXML:
+        return 'xml';
+      default:
+        return 'text';
+    }
+  });
+
+  /** Language of the response, from its content type. */
+  protected readonly responseLanguage = computed<CodeLanguage>(() => {
+    const contentType = (this.response()?.ContentType ?? '').toLowerCase();
+    if (contentType.includes('json')) {
+      return 'json';
+    }
+    if (contentType.includes('xml') || contentType.includes('html')) {
+      return 'xml';
+    }
+    return prettyJson(this.responseBody()) !== this.responseBody() ? 'json' : 'text';
+  });
+
+  /** The response body, indented when it is JSON. */
+  protected readonly formattedResponseBody = computed(() => prettyJson(this.responseBody()));
+
+  /** Set when the response shown is the last run read from the history. */
+  protected readonly lastRunAt = signal<string | null>(null);
+
   protected readonly isKindMenuOpen = signal(false);
 
   /** Label of the method and protocol picker: the method, SSE or WS. */
@@ -202,6 +310,33 @@ export class RequestEditor {
       }
     });
 
+    // Follow the request when it moves in the tree, keeping unsaved edits.
+    const collectionsChanged = (event: Event) => {
+      void this.loadCollection(this.collectionPath());
+      const moved = (event as CustomEvent<CollectionsChange | null>).detail?.moved;
+      const path = this.requestPath();
+      if (moved && path && (path === moved.from || path.startsWith(`${moved.from}/`))) {
+        this.requestPath.set(moved.to + path.slice(moved.from.length));
+      }
+    };
+    window.addEventListener(COLLECTIONS_CHANGED_EVENT, collectionsChanged);
+    inject(DestroyRef).onDestroy(() =>
+      window.removeEventListener(COLLECTIONS_CHANGED_EVENT, collectionsChanged),
+    );
+
+    // Load what an inheriting request receives from its collection.
+    effect(() => {
+      void this.loadCollection(this.collectionPath());
+    });
+
+    // Confirmations such as "Saved" fade after a moment.
+    effect((onCleanup) => {
+      if (this.statusMessage()) {
+        const timer = setTimeout(() => this.statusMessage.set(null), 2500);
+        onCleanup(() => clearTimeout(timer));
+      }
+    });
+
     // Keep the tab title, method and unsaved marker in sync with the editor.
     effect(() => {
       const path = this.requestPath();
@@ -220,6 +355,16 @@ export class RequestEditor {
   ngOnDestroy(): void {
     void this.streamPanel()?.release();
     this.stashCurrent();
+  }
+
+  /** Turns the handle position into the share of the editor the response takes. */
+  protected resizeResponse(position: { x: number; y: number }): void {
+    const rect = this.editor().nativeElement.getBoundingClientRect();
+    const ratio =
+      this.layout.editorLayout() === 'side'
+        ? (rect.right - position.x) / rect.width
+        : (rect.bottom - position.y) / rect.height;
+    this.layout.setResponseRatio(ratio);
   }
 
   protected selectTab(tab: EditorTab): void {
@@ -280,6 +425,7 @@ export class RequestEditor {
 
     this.isSending.set(true);
     this.responseError.set(null);
+    this.lastRunAt.set(null);
     await this.closeResponse();
 
     try {
@@ -333,6 +479,7 @@ export class RequestEditor {
   }
 
   protected async closeResponsePanel(): Promise<void> {
+    this.lastRunAt.set(null);
     await this.closeResponse();
     this.responseError.set(null);
   }
@@ -442,71 +589,93 @@ export class RequestEditor {
     this.headers.update((headers) => headers.filter((_header, position) => position !== index));
   }
 
-  protected selectAuthenticationType(event: Event): void {
-    const type = (event.target as HTMLSelectElement).value as AuthenticationType;
-    this.authentication.update((authentication) => {
-      if (type !== AuthenticationType.AuthenticationOAuth2) {
-        return { ...authentication, Type: type };
+  /**
+   * Shows the last execution of the request, from the history, so opening a
+   * request always shows what it returned last time.
+   */
+  private async loadLastRun(path: string): Promise<void> {
+    const rootPath = this.workspaceStore.rootPath();
+    if (!rootPath) {
+      return;
+    }
+    try {
+      const [latest] = (await HistoryService.ListForRequest(rootPath, path, 1, 0)) ?? [];
+      if (!latest) {
+        return;
       }
-      return {
-        ...authentication,
-        Type: type,
-        GrantType: authentication.GrantType || OAuth2GrantType.OAuth2GrantAuthorizationCode,
-      };
-    });
-
-    if (type === AuthenticationType.AuthenticationOAuth2) {
-      void this.refreshOAuth2Status();
-    } else {
-      this.oauth2Status.set(null);
-      this.oauth2Error.set(null);
+      const entry = await HistoryService.Entry(rootPath, latest.ID);
+      const exchange = entry.Exchange;
+      // The user may have moved on, or sent the request, in the meantime.
+      if (!exchange || this.requestPath() !== path || this.response() || this.isSending()) {
+        return;
+      }
+      const emptyOutcome = { Logs: null, Tests: null, Error: '' };
+      this.response.set({
+        ID: '',
+        StatusCode: entry.StatusCode,
+        Status: `${entry.StatusCode} ${STATUS_TEXTS[entry.StatusCode] ?? ''}`.trim(),
+        Headers: exchange.ResponseHeaders,
+        DurationMilliseconds: entry.DurationMilliseconds,
+        Size: entry.SizeBytes,
+        ContentType: exchange.ResponseHeaders?.['Content-Type']?.[0] ?? '',
+        Preview: exchange.ResponseBody,
+        Encoding: exchange.ResponseEncoding,
+        Truncated: exchange.ResponseTruncated,
+        HistoryWarning: '',
+        PreRequestOutcome: emptyOutcome,
+        PostResponseOutcome: emptyOutcome,
+      });
+      this.responseBody.set(exchange.ResponseEncoding === 'base64' ? '' : exchange.ResponseBody);
+      this.responseHasMore.set(false);
+      this.lastRunAt.set(entry.ExecutedAt);
+    } catch {
+      // Without history, the editor simply opens without a response.
     }
   }
 
-  protected updateAuthentication(
-    field:
-      | 'Username'
-      | 'Password'
-      | 'Token'
-      | 'Key'
-      | 'Value'
-      | 'Location'
-      | 'AuthorizationURL'
-      | 'TokenURL'
-      | 'ClientID'
-      | 'ClientSecret'
-      | 'RedirectURL'
-      | 'Audience',
-    value: string,
-  ): void {
-    this.authentication.update((authentication) => ({
-      ...authentication,
-      [field]: value,
-    }));
+  protected lastRunLabel(executedAt: string): string {
+    const minutes = Math.round((Date.now() - new Date(executedAt).getTime()) / 60_000);
+    if (minutes < 1) {
+      return 'just now';
+    }
+    if (minutes < 60) {
+      return `${minutes} min ago`;
+    }
+    if (minutes < 1440) {
+      return `${Math.floor(minutes / 60)} h ago`;
+    }
+    return new Date(executedAt).toLocaleDateString();
   }
 
-  protected selectGrantType(event: Event): void {
-    const grantType = (event.target as HTMLSelectElement).value as OAuth2GrantType;
-    this.authentication.update((authentication) => ({
-      ...authentication,
-      GrantType: grantType,
-    }));
-    void this.refreshOAuth2Status();
+  private async loadCollection(collectionPath: string): Promise<void> {
+    const rootPath = this.workspaceStore.rootPath();
+    if (!rootPath || !collectionPath) {
+      this.collectionName.set('');
+      this.inheritedAuthentication.set(null);
+      return;
+    }
+    try {
+      const collection = await CollectionsService.LoadCollection(rootPath, collectionPath);
+      this.collectionName.set(collection.Name);
+      this.inheritedAuthentication.set(collection.Authentication);
+    } catch {
+      this.collectionName.set('');
+      this.inheritedAuthentication.set(null);
+    }
   }
 
-  protected updateScopes(value: string): void {
-    const scopes = value
-      .split(/[\s,]+/)
-      .map((scope) => scope.trim())
-      .filter((scope) => scope !== '');
-    this.authentication.update((authentication) => ({
-      ...authentication,
-      Scopes: scopes,
-    }));
-  }
-
-  protected scopesText(): string {
-    return (this.authentication().Scopes ?? []).join(' ');
+  protected setAuthentication(authentication: Authentication): void {
+    const previous = this.authentication();
+    this.authentication.set(authentication);
+    if (authentication.Type !== AuthenticationType.AuthenticationOAuth2) {
+      this.oauth2Status.set(null);
+      this.oauth2Error.set(null);
+    } else if (
+      previous.Type !== authentication.Type ||
+      previous.GrantType !== authentication.GrantType
+    ) {
+      void this.refreshOAuth2Status();
+    }
   }
 
   protected async authorizeOAuth2(): Promise<void> {
@@ -569,8 +738,15 @@ export class RequestEditor {
     return `Token stored until ${new Date(status.ExpiresAtMilliseconds).toLocaleString()}.`;
   }
 
-  protected selectBodyType(event: Event): void {
-    const type = (event.target as HTMLSelectElement).value as BodyType;
+  protected formatBody(): void {
+    const content = this.body().Content;
+    const formatted = prettyJson(content);
+    if (formatted !== content) {
+      this.updateBodyContent(formatted);
+    }
+  }
+
+  protected selectBodyType(type: BodyType): void {
     this.body.update((body) => ({ ...body, Type: type }));
   }
 
@@ -629,6 +805,7 @@ export class RequestEditor {
       responseTab: this.responseTab(),
       responseError: this.responseError(),
       activeTab: this.activeTab(),
+      lastRunAt: this.lastRunAt(),
     };
     this.tabsStore.stash(path, state);
     // The store owns the response handle from now on.
@@ -645,14 +822,20 @@ export class RequestEditor {
     this.responseTab.set((state['responseTab'] as 'body' | 'headers' | 'scripts') ?? 'body');
     this.responseError.set((state['responseError'] as string | null) ?? null);
     this.activeTab.set((state['activeTab'] as EditorTab) ?? 'parameters');
+    this.lastRunAt.set((state['lastRunAt'] as string | null) ?? null);
   }
 
   private async load(path: string): Promise<void> {
+    // Already on screen, for instance after the request moved in the tree.
+    if (path === this.requestPath() && !this.isLoading()) {
+      return;
+    }
     await this.streamPanel()?.release();
     if (this.requestPath() && this.requestPath() !== path) {
       this.stashCurrent();
     }
     await this.closeResponse();
+    this.lastRunAt.set(null);
     this.requestPath.set(path);
     this.errorMessage.set(null);
     this.statusMessage.set(null);
@@ -671,6 +854,7 @@ export class RequestEditor {
         path,
       );
       this.applyRequest(request);
+      void this.loadLastRun(path);
     } catch (error) {
       this.errorMessage.set(describeError(error));
     } finally {
@@ -730,7 +914,7 @@ export class RequestEditor {
     this.responseHasMore.set(false);
     this.responseNextOffset = 0;
 
-    if (!response) {
+    if (!response?.ID) {
       return;
     }
 

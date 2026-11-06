@@ -1,4 +1,8 @@
-<section class="request-editor">
+<section
+  #editor
+  class="request-editor"
+  [class.side]="layout.editorLayout() === 'side'"
+>
   <div class="request-section">
     <header class="editor-toolbar">
       <div class="request-meta">
@@ -10,6 +14,9 @@
             }
           }
         </span>
+        @if (statusMessage(); as message) {
+          <span class="saved-badge">{{ message }}</span>
+        }
         @if (isDirty()) {
           <span class="dirty-badge" title="Unsaved changes (⌘S to save)"> Unsaved </span>
         }
@@ -22,6 +29,15 @@
         >
           <app-icon name="save" [size]="13" />
           {{ isSaving() ? 'Saving…' : 'Save' }}
+        </button>
+        <button
+          type="button"
+          class="icon-btn"
+          [title]="layout.editorLayout() === 'side' ? 'Show the response below' : 'Show the response on the right'"
+          [attr.aria-label]="layout.editorLayout() === 'side' ? 'Show the response below' : 'Show the response on the right'"
+          (click)="layout.toggleEditorLayout()"
+        >
+          <app-icon [name]="layout.editorLayout() === 'side' ? 'layout-rows' : 'layout-columns'" [size]="15" />
         </button>
       </div>
 
@@ -60,7 +76,9 @@
                       role="menuitemradio"
                       class="method-option"
                       [attr.data-method]="httpMethod"
-                      [class.current]="protocol() === Protocol.ProtocolHTTP && method() === httpMethod"
+                      [class.current]="
+                        protocol() === Protocol.ProtocolHTTP && method() === httpMethod
+                      "
                       (click)="chooseMethod(httpMethod)"
                     >
                       {{ httpMethod }}
@@ -128,9 +146,6 @@
     @if (errorMessage(); as message) {
       <p class="editor-message error">{{ message }}</p>
     }
-    @if (statusMessage(); as message) {
-      <p class="editor-message success">{{ message }}</p>
-    }
 
     @if (isLoading()) {
       <p class="editor-message">Loading request…</p>
@@ -145,7 +160,8 @@
             [attr.aria-selected]="activeTab() === tab"
             (click)="selectTab(tab)"
           >
-            {{ tabLabels[tab] }}
+  <span class="full-label">{{ tabLabels[tab] }}</span>
+          <span class="short-label">{{ shortTabLabels[tab] }}</span>
             @if (tab === 'parameters' && parameters().length > 0) {
               <span class="tab-count">{{ parameters().length }}</span>
             }
@@ -251,276 +267,85 @@
           }
 
           @case ('authentication') {
-            <div class="form-panel">
-              <label class="field">
-                <span class="field-label">Type</span>
-                <select
-                  [ngModel]="authentication().Type"
-                  (ngModelChange)="selectAuthenticationType($event)"
+            <app-auth-editor
+              [authentication]="authentication()"
+              (authenticationChange)="setAuthentication($event)"
+              [inherited]="inheritedAuthentication()"
+              [inheritedFrom]="collectionName()"
+              [collectionPath]="collectionPath()"
+            >
+              <div oauth2Actions class="oauth2-actions">
+                <button
+                  type="button"
+                  class="btn btn-sm"
+                  [disabled]="oauth2Busy()"
+                  (click)="authorizeOAuth2()"
                 >
-                  <option [value]="AuthenticationType.AuthenticationInherit">
-                    Inherit from collection
-                  </option>
-                  <option [value]="AuthenticationType.AuthenticationNone">None</option>
-                  <option [value]="AuthenticationType.AuthenticationBasic">Basic</option>
-                  <option [value]="AuthenticationType.AuthenticationBearer">Bearer token</option>
-                  <option [value]="AuthenticationType.AuthenticationAPIKey">API key</option>
-                  <option [value]="AuthenticationType.AuthenticationOAuth2">OAuth 2</option>
-                </select>
-              </label>
-
-              @switch (authentication().Type) {
-                @case (AuthenticationType.AuthenticationBasic) {
-                  <label class="field">
-                    <span class="field-label">Username</span>
-                    <input
-                      class="input"
-                      type="text"
-                      [ngModel]="authentication().Username"
-                      (ngModelChange)="updateAuthentication('Username', $event)"
-                      placeholder="{{ '{{username}}' }}"
-                      spellcheck="false"
-                    />
-                  </label>
-                  <label class="field">
-                    <span class="field-label">Password</span>
-                    <input
-                      class="input"
-                      type="password"
-                      [ngModel]="authentication().Password"
-                      (ngModelChange)="updateAuthentication('Password', $event)"
-                      placeholder="{{ 'Secret name or {{password}}' }}"
-                    />
-                  </label>
-                }
-
-                @case (AuthenticationType.AuthenticationBearer) {
-                  <label class="field">
-                    <span class="field-label">Token</span>
-                    <input
-                      class="input"
-                      type="text"
-                      [ngModel]="authentication().Token"
-                      (ngModelChange)="updateAuthentication('Token', $event)"
-                      placeholder="{{ '{{accessToken}}' }}"
-                      spellcheck="false"
-                    />
-                  </label>
-                }
-
-                @case (AuthenticationType.AuthenticationAPIKey) {
-                  <label class="field">
-                    <span class="field-label">Key</span>
-                    <input
-                      class="input"
-                      type="text"
-                      [ngModel]="authentication().Key"
-                      (ngModelChange)="updateAuthentication('Key', $event)"
-                      placeholder="X-API-Key"
-                      spellcheck="false"
-                    />
-                  </label>
-                  <label class="field">
-                    <span class="field-label">Value</span>
-                    <input
-                      class="input"
-                      type="text"
-                      [ngModel]="authentication().Value"
-                      (ngModelChange)="updateAuthentication('Value', $event)"
-                      placeholder="{{ '{{apiKey}}' }}"
-                      spellcheck="false"
-                    />
-                  </label>
-                  <label class="field">
-                    <span class="field-label">Location</span>
-                    <select
-                      [ngModel]="authentication().Location"
-                      (ngModelChange)="updateAuthentication('Location', $event)"
-                    >
-                      <option value="header">Header</option>
-                      <option value="query">Query parameter</option>
-                    </select>
-                  </label>
-                }
-
-                @case (AuthenticationType.AuthenticationOAuth2) {
-                  <label class="field">
-                    <span class="field-label">Grant type</span>
-                    <select
-                      [ngModel]="authentication().GrantType"
-                      (ngModelChange)="selectGrantType($event)"
-                    >
-                      <option [value]="OAuth2GrantType.OAuth2GrantAuthorizationCode">
-                        Authorization code (PKCE)
-                      </option>
-                      <option [value]="OAuth2GrantType.OAuth2GrantClientCredentials">
-                        Client credentials
-                      </option>
-                    </select>
-                  </label>
-
-                  @if (
-                    authentication().GrantType === OAuth2GrantType.OAuth2GrantAuthorizationCode
-                  ) {
-                    <label class="field">
-                      <span class="field-label">Authorization URL</span>
-                      <input
-                        class="input"
-                        type="text"
-                        [ngModel]="authentication().AuthorizationURL"
-                        (ngModelChange)="updateAuthentication('AuthorizationURL', $event)"
-                        placeholder="https://identity.example.com/authorize"
-                        spellcheck="false"
-                      />
-                    </label>
-                    <label class="field">
-                      <span class="field-label">Redirect URL</span>
-                      <input
-                        class="input"
-                        type="text"
-                        [ngModel]="authentication().RedirectURL"
-                        (ngModelChange)="updateAuthentication('RedirectURL', $event)"
-                        placeholder="http://127.0.0.1:53682/callback"
-                        spellcheck="false"
-                      />
-                      <span class="field-hint">
-                        Leave empty to listen on a random loopback port. The redirect must point to
-                        this computer.
-                      </span>
-                    </label>
-                  }
-
-                  <label class="field">
-                    <span class="field-label">Token URL</span>
-                    <input
-                      class="input"
-                      type="text"
-                      [ngModel]="authentication().TokenURL"
-                      (ngModelChange)="updateAuthentication('TokenURL', $event)"
-                      placeholder="https://identity.example.com/token"
-                      spellcheck="false"
-                    />
-                  </label>
-                  <label class="field">
-                    <span class="field-label">Client ID</span>
-                    <input
-                      class="input"
-                      type="text"
-                      [ngModel]="authentication().ClientID"
-                      (ngModelChange)="updateAuthentication('ClientID', $event)"
-                      placeholder="{{ '{{clientId}}' }}"
-                      spellcheck="false"
-                    />
-                  </label>
-                  <label class="field">
-                    <span class="field-label">Client secret</span>
-                    <input
-                      class="input"
-                      type="password"
-                      [ngModel]="authentication().ClientSecret"
-                      (ngModelChange)="updateAuthentication('ClientSecret', $event)"
-                      placeholder="{{ '{{clientSecret}}' }}"
-                      autocomplete="new-password"
-                    />
-                    <span class="field-hint">
-                      Reference a secret variable declared in the environment; the value stays in
-                      the keychain.
-                    </span>
-                  </label>
-                  <label class="field">
-                    <span class="field-label">Scopes</span>
-                    <input
-                      class="input"
-                      type="text"
-                      [ngModel]="scopesText()"
-                      (ngModelChange)="updateScopes($event)"
-                      placeholder="read write"
-                      spellcheck="false"
-                    />
-                    <span class="field-hint">Separate scopes with spaces.</span>
-                  </label>
-                  <label class="field">
-                    <span class="field-label">Audience</span>
-                    <input
-                      class="input"
-                      type="text"
-                      [ngModel]="authentication().Audience"
-                      (ngModelChange)="updateAuthentication('Audience', $event)"
-                      placeholder="https://api.example.com"
-                      spellcheck="false"
-                    />
-                  </label>
-
-                  <div class="oauth2-actions">
-                    <button
-                      type="button"
-                      class="add-button"
-                      [disabled]="oauth2Busy()"
-                      (click)="authorizeOAuth2()"
-                    >
-                      {{
-                        oauth2Busy()
-                          ? 'Authorizing…'
-                          : authentication().GrantType ===
-                              OAuth2GrantType.OAuth2GrantClientCredentials
-                            ? 'Get token'
-                            : 'Authorize in browser'
-                      }}
-                    </button>
-                    <button
-                      type="button"
-                      class="add-button danger"
-                      [disabled]="oauth2Busy()"
-                      (click)="clearOAuth2()"
-                    >
-                      Clear token
-                    </button>
-                  </div>
-
-                  <p class="panel-note">{{ oauth2Expiry() }}</p>
-                  @if (oauth2Error(); as message) {
-                    <p class="oauth2-error">{{ message }}</p>
-                  }
-                }
-
-                @default {
-                  <p class="panel-note">
-                    This request uses the authentication configured on its collection or no
-                    authentication at all.
-                  </p>
-                }
+                  {{
+                    oauth2Busy()
+                      ? 'Authorizing…'
+                      : authentication().GrantType !== OAuth2GrantType.OAuth2GrantAuthorizationCode && authentication().GrantType
+                        ? 'Get token'
+                        : 'Authorize in browser'
+                  }}
+                </button>
+                <button
+                  type="button"
+                  class="btn btn-sm btn-ghost"
+                  [disabled]="oauth2Busy()"
+                  (click)="clearOAuth2()"
+                >
+                  Clear token
+                </button>
+                <span class="panel-note">{{ oauth2Expiry() }}</span>
+              </div>
+              @if (oauth2Error(); as message) {
+                <p oauth2Actions class="oauth2-error">{{ message }}</p>
               }
-            </div>
+            </app-auth-editor>
           }
 
           @case ('body') {
-            <div class="form-panel">
-              <label class="field">
-                <span class="field-label">Type</span>
-                <select [ngModel]="body().Type" (ngModelChange)="selectBodyType($event)">
-                  <option [value]="BodyType.BodyNone">None</option>
-                  <option [value]="BodyType.BodyJSON">JSON</option>
-                  <option [value]="BodyType.BodyText">Text</option>
-                  <option [value]="BodyType.BodyXML">XML</option>
-                  <option [value]="BodyType.BodyFormURLEncoded">Form URL encoded</option>
-                  <option [value]="BodyType.BodyMultipart">Multipart</option>
-                  <option [value]="BodyType.BodyBinary">Binary</option>
-                </select>
-              </label>
+            <div class="body-panel">
+              <div class="body-toolbar">
+                <div class="body-types" role="radiogroup" aria-label="Body type">
+                  @for (option of bodyTypes; track option.type) {
+                    <button
+                      type="button"
+                      role="radio"
+                      [class.selected]="body().Type === option.type"
+                      [attr.aria-checked]="body().Type === option.type"
+                      (click)="selectBodyType(option.type)"
+                    >
+                      {{ option.label }}
+                    </button>
+                  }
+                </div>
+                @if (body().Type === BodyType.BodyJSON) {
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-ghost"
+                    title="Indent the JSON body"
+                    (click)="formatBody()"
+                  >
+                    <app-icon name="code" [size]="13" />
+                    Format
+                  </button>
+                }
+              </div>
 
               @if (body().Type === BodyType.BodyMultipart || body().Type === BodyType.BodyBinary) {
                 <p class="panel-note">Multipart and binary bodies arrive with the HTTP client.</p>
-              } @else if (body().Type !== BodyType.BodyNone) {
-                <label class="field field-grow">
-                  <span class="field-label">Content</span>
-                  <textarea
-                    class="input body-content"
-                    [ngModel]="body().Content"
-                    (ngModelChange)="updateBodyContent($event)"
-                    spellcheck="false"
-                    placeholder="Request body"
-                  ></textarea>
-                </label>
+              } @else if (body().Type === BodyType.BodyNone) {
+                <p class="panel-note">This request sends no body.</p>
+              } @else {
+                <app-code-editor
+                  class="body-editor"
+                  [value]="body().Content"
+                  [lang]="bodyLanguage()"
+                  placeholder="Request body — use {{ '{{variables}}' }} anywhere"
+                  (valueChange)="updateBodyContent($event)"
+                />
               }
             </div>
           }
@@ -557,6 +382,14 @@
             </div>
           }
 
+          @case ('history') {
+            <app-request-history
+              class="history-panel"
+              [requestPath]="requestPath()"
+              [refreshKey]="response()"
+            />
+          }
+
           @case ('documentation') {
             <div class="form-panel">
               <label class="field field-grow">
@@ -575,14 +408,24 @@
     }
   </div>
 
+  @if (isStreaming() || isSending() || response() || responseError()) {
+    <app-resize-handle
+      [orientation]="layout.editorLayout() === 'side' ? 'vertical' : 'horizontal'"
+      title="Drag to resize, double click to reset"
+      (resize)="resizeResponse($event)"
+      (reset)="layout.setResponseRatio(defaultResponseRatio)"
+    />
+  }
+
   @if (isStreaming()) {
     <app-stream-panel
+      [style.flex-basis.%]="layout.responseRatio() * 100"
       [protocol]="protocol()"
       [requestPath]="requestPath()"
       [environmentFileName]="selectedEnvironment()"
     />
   } @else if (isSending() || response() || responseError()) {
-    <section class="response-section">
+    <section class="response-section" [style.flex-basis.%]="layout.responseRatio() * 100">
       <header class="response-toolbar">
         @if (isSending()) {
           <span class="response-meta">Sending request…</span>
@@ -595,9 +438,29 @@
           @if (current.Truncated) {
             <span class="response-warning">truncated</span>
           }
+          @if (lastRunAt(); as executedAt) {
+            <span class="last-run" title="Last execution, from the history">
+              Last run · {{ lastRunLabel(executedAt) }}
+            </span>
+          }
+        } @else if (responseError()) {
+          <span class="status-pill" data-status="server-error">Failed</span>
+          <span class="response-meta">The request could not be sent</span>
         }
 
         <span class="response-spacer"></span>
+
+        @if (!response() && responseError()) {
+          <button
+            type="button"
+            class="response-close"
+            aria-label="Close"
+            title="Close"
+            (click)="closeResponsePanel()"
+          >
+            <app-icon name="close" [size]="14" />
+          </button>
+        }
 
         @if (response()) {
           <div class="response-tabs">
@@ -654,7 +517,12 @@
             @if (current.Encoding === 'base64') {
               <p class="empty-panel">Binary response ({{ formatSize(current.Size) }}).</p>
             } @else {
-              <pre class="response-body">{{ responseBody() }}</pre>
+              <app-code-editor
+                class="response-body"
+                [value]="formattedResponseBody()"
+                [lang]="responseLanguage()"
+                [readOnly]="true"
+              />
             }
 
             @if (responseHasMore()) {
