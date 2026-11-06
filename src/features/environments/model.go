@@ -6,12 +6,17 @@ import (
 	"errors"
 	"regexp"
 	"strings"
+
+	"github.com/clementherve/awake/src/domain"
 )
 
 const (
 	directoryName = "environments"
-	fileExtension = ".yaml"
-	localSuffix   = ".local" + fileExtension
+	// The two roots holding collections, shared through git or private.
+	sharedCollectionsRoot  = "collections"
+	privateCollectionsRoot = "local"
+	fileExtension          = ".yaml"
+	localSuffix            = ".local" + fileExtension
 )
 
 var (
@@ -20,6 +25,8 @@ var (
 	ErrEnvironmentNotFound = errors.New("environments: environment not found")
 	// ErrInvalidEnvironment is returned when an environment file is malformed.
 	ErrInvalidEnvironment = errors.New("environments: invalid environment")
+	// ErrInvalidScope is returned for a scope that is not a collection path.
+	ErrInvalidScope = errors.New("environments: invalid scope")
 )
 
 var (
@@ -32,6 +39,8 @@ type Environment struct {
 	Name            string            `yaml:"name"`
 	Variables       map[string]string `yaml:"variables,omitempty"`
 	SecretVariables []string          `yaml:"secretVariables,omitempty"`
+	// Color names one of the colors listed in domain.Colors.
+	Color string `yaml:"color,omitempty"`
 }
 
 // Summary describes an environment listed in the interface.
@@ -39,6 +48,7 @@ type Summary struct {
 	Name              string
 	FileName          string
 	HasLocalOverrides bool
+	Color             string
 }
 
 // ResolvedEnvironment combines a shared environment with its local overrides.
@@ -81,7 +91,7 @@ func (environment ResolvedEnvironment) SecretNames() []string {
 }
 
 func (environment Environment) validate() error {
-	if strings.TrimSpace(environment.Name) == "" {
+	if strings.TrimSpace(environment.Name) == "" || !domain.IsColor(environment.Color) {
 		return ErrInvalidEnvironment
 	}
 

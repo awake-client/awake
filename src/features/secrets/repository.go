@@ -20,8 +20,8 @@ func NewRepository(keychain Keychain) *Repository {
 }
 
 // States reports which declared secrets have a stored value.
-func (repository *Repository) States(workspaceRoot string, environmentFileName string) ([]SecretState, error) {
-	context, err := repository.loadContext(workspaceRoot, environmentFileName)
+func (repository *Repository) States(workspaceRoot string, scope string, environmentFileName string) ([]SecretState, error) {
+	context, err := repository.loadContext(workspaceRoot, scope, environmentFileName)
 	if err != nil {
 		return nil, err
 	}
@@ -40,8 +40,8 @@ func (repository *Repository) States(workspaceRoot string, environmentFileName s
 
 // Values returns every stored secret of the environment. Missing values are
 // omitted so the variable resolver can report the name that the request uses.
-func (repository *Repository) Values(workspaceRoot string, environmentFileName string) (map[string]string, error) {
-	context, err := repository.loadContext(workspaceRoot, environmentFileName)
+func (repository *Repository) Values(workspaceRoot string, scope string, environmentFileName string) (map[string]string, error) {
+	context, err := repository.loadContext(workspaceRoot, scope, environmentFileName)
 	if err != nil {
 		return nil, err
 	}
@@ -61,8 +61,8 @@ func (repository *Repository) Values(workspaceRoot string, environmentFileName s
 }
 
 // Set stores or replaces one declared secret.
-func (repository *Repository) Set(workspaceRoot string, environmentFileName string, name string, value string) error {
-	context, err := repository.loadContext(workspaceRoot, environmentFileName)
+func (repository *Repository) Set(workspaceRoot string, scope string, environmentFileName string, name string, value string) error {
+	context, err := repository.loadContext(workspaceRoot, scope, environmentFileName)
 	if err != nil {
 		return err
 	}
@@ -74,8 +74,8 @@ func (repository *Repository) Set(workspaceRoot string, environmentFileName stri
 }
 
 // Delete removes one declared secret from the keychain.
-func (repository *Repository) Delete(workspaceRoot string, environmentFileName string, name string) error {
-	context, err := repository.loadContext(workspaceRoot, environmentFileName)
+func (repository *Repository) Delete(workspaceRoot string, scope string, environmentFileName string, name string) error {
+	context, err := repository.loadContext(workspaceRoot, scope, environmentFileName)
 	if err != nil {
 		return err
 	}
@@ -107,15 +107,26 @@ func (context environmentContext) requireDeclared(name string) error {
 	return ErrSecretNotDeclared
 }
 
-func (repository *Repository) loadContext(workspaceRoot string, environmentFileName string) (environmentContext, error) {
+func (repository *Repository) loadContext(workspaceRoot string, scope string, environmentFileName string) (environmentContext, error) {
 	configuration, err := workspace.NewRepository(workspaceRoot).Load()
 	if err != nil {
 		return environmentContext{}, fmt.Errorf("load workspace for secrets: %w", err)
 	}
 
-	resolved, err := environments.NewRepository(workspaceRoot).Load(environmentFileName)
+	environmentRepository, err := environments.NewScopedRepository(workspaceRoot, scope)
 	if err != nil {
 		return environmentContext{}, err
+	}
+	resolved, err := environmentRepository.Load(environmentFileName)
+	if err != nil {
+		return environmentContext{}, err
+	}
+
+	// Global environments keep their historical account names; collection
+	// environments are prefixed by their scope so they never share values.
+	accountPrefix := environmentFileName
+	if scope != "" {
+		accountPrefix = scope + ":" + environmentFileName
 	}
 
 	for _, name := range resolved.SecretNames() {
@@ -126,7 +137,7 @@ func (repository *Repository) loadContext(workspaceRoot string, environmentFileN
 
 	return environmentContext{
 		service:         keychainServicePrefix + configuration.ID,
-		environmentName: environmentFileName,
+		environmentName: accountPrefix,
 		names:           resolved.SecretNames(),
 	}, nil
 }

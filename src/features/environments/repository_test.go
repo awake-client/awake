@@ -234,3 +234,29 @@ func TestDeleteRemovesSharedAndLocalFiles(t *testing.T) {
 		t.Fatal("expected an invalid file name to be rejected")
 	}
 }
+
+func TestSaveKeepsTheEnvironmentColor(t *testing.T) {
+	workspaceRoot := t.TempDir()
+	repository := NewRepository(workspaceRoot)
+
+	if err := repository.Save("production", Environment{Name: "Production", Color: "red"}); err != nil {
+		t.Fatalf("save: %v", err)
+	}
+	summaries, err := repository.List()
+	if err != nil || len(summaries) != 1 || summaries[0].Color != "red" {
+		t.Fatalf("expected the color in the summary, got %+v, %v", summaries, err)
+	}
+	if err := repository.Save("production", Environment{Name: "Production"}); err != nil {
+		t.Fatalf("save without color: %v", err)
+	}
+	content, err := os.ReadFile(repository.SharedPath("production"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(content), "color") {
+		t.Errorf("clearing the color must remove the key:\n%s", content)
+	}
+	if err := repository.Save("production", Environment{Name: "Production", Color: "neon"}); err == nil {
+		t.Error("expected an unknown color to be rejected")
+	}
+}

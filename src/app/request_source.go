@@ -1,11 +1,14 @@
 package app
 
 import (
+	"errors"
+
 	"github.com/clementherve/awake/src/domain"
 	"github.com/clementherve/awake/src/features/collections"
 	"github.com/clementherve/awake/src/features/environments"
 	"github.com/clementherve/awake/src/features/secrets"
 	"github.com/clementherve/awake/src/features/workspace"
+	"github.com/clementherve/awake/src/shared/variables"
 )
 
 // requestSource adapts the storage features to the HTTP client. It lives in
@@ -14,33 +17,101 @@ type requestSource struct {
 	secrets *secrets.Repository
 }
 
+// LoadRequest returns a request ready to be sent: when it inherits its
+// authentication, the authentication of its collection replaces it, or none
+// when the collection defines no authentication.
 func (requestSource) LoadRequest(workspaceRoot string, relativePath string) (domain.Request, error) {
-	return collections.NewRepository(workspaceRoot).LoadRequest(relativePath)
+	repository := collections.NewRepository(workspaceRoot)
+	request, err := repository.LoadRequest(relativePath)
+	if err != nil {
+		return domain.Request{}, err
+	}
+	if request.Authentication == nil || request.Authentication.Type != domain.AuthenticationInherit {
+		return request, nil
+	}
+
+	inherited := &domain.Authentication{Type: domain.AuthenticationNone}
+	if scope := environments.ScopeOfRequest(relativePath); scope != "" {
+		collection, err := repository.LoadCollection(scope)
+		if err != nil && !errors.Is(err, collections.ErrEntryNotFound) {
+			return domain.Request{}, err
+		}
+		if err == nil && collection.Authentication != nil && collection.Authentication.Type != domain.AuthenticationInherit {
+			copied := *collection.Authentication
+			inherited = &copied
+		}
+	}
+	request.Authentication = inherited
+	return request, nil
 }
 
-func (source requestSource) LoadVariableLayers(workspaceRoot string, environmentFileName string) ([]map[string]string, error) {
+// LoadVariableLayers stacks the variables visible to a request, from the
+// weakest to the strongest: the workspace, the variables of its collection,
+// the global environment and then the environment of the same name declared
+// by the collection, each followed by its local overrides and its secrets.
+func (source requestSource) LoadVariableLayers(workspaceRoot string, requestPath string, environmentFileName string) ([]variables.Layer, error) {
 	configuration, err := workspace.NewRepository(workspaceRoot).Load()
 	if err != nil {
 		return nil, err
 	}
 
-	layers := []map[string]string{configuration.Variables}
+	layers := []variables.Layer{{Source: "workspace", Values: configuration.Variables}}
 
-	if environmentFileName != "" {
-		resolved, err := environments.NewRepository(workspaceRoot).Load(environmentFileName)
-		if err != nil {
+	scope := environments.ScopeOfRequest(requestPath)
+	if scope != "" {
+		collection, err := collections.NewRepository(workspaceRoot).LoadCollection(scope)
+		if err != nil && !errors.Is(err, collections.ErrEntryNotFound) {
 			return nil, err
 		}
-		layers = append(layers, resolved.Layers()...)
-
-		if source.secrets != nil {
-			secretValues, err := source.secrets.Values(workspaceRoot, environmentFileName)
-			if err != nil {
-				return nil, err
-			}
-			layers = append(layers, secretValues)
+		if err == nil && len(collection.Variables) > 0 {
+			layers = append(layers, variables.Layer{Source: "collection", Values: collection.Variables})
 		}
 	}
 
+	if environmentFileName == "" {
+		return layers, nil
+	}
+
+	scopes := []string{""}
+	if scope != "" {
+		scopes = append(scopes, scope)
+	}
+
+	found := false
+	for _, environmentScope := range scopes {
+		repository, err := environments.NewScopedRepository(workspaceRoot, environmentScope)
+		if err != nil {
+			return nil, err
+		}
+		resolved, err := repository.Load(environmentFileName)
+		if errors.Is(err, environments.ErrEnvironmentNotFound) {
+			continue
+		}
+		if err != nil {
+			return nil, err
+		}
+		found = true
+
+		label := "environment"
+		if environmentScope != "" {
+			label = "collection environment"
+		}
+		layers = append(layers, variables.Layer{Source: label, Values: resolved.Shared.Variables})
+		if resolved.Local != nil {
+			layers = append(layers, variables.Layer{Source: label + " (local)", Values: resolved.Local.Variables})
+		}
+
+		if source.secrets != nil {
+			secretValues, err := source.secrets.Values(workspaceRoot, environmentScope, environmentFileName)
+			if err != nil {
+				return nil, err
+			}
+			layers = append(layers, variables.Layer{Source: "secret", Values: secretValues, Secret: true})
+		}
+	}
+
+	if !found {
+		return nil, environments.ErrEnvironmentNotFound
+	}
 	return layers, nil
 }

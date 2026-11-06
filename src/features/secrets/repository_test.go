@@ -37,11 +37,11 @@ func TestServiceStoresAndReportsSecrets(t *testing.T) {
 	keychain := newFakeKeychain()
 	repository := NewRepository(keychain)
 
-	if err := repository.Set(workspaceRoot, "development", "apiToken", "secret-value"); err != nil {
+	if err := repository.Set(workspaceRoot, "", "development", "apiToken", "secret-value"); err != nil {
 		t.Fatalf("set secret: %v", err)
 	}
 
-	states, err := repository.States(workspaceRoot, "development")
+	states, err := repository.States(workspaceRoot, "", "development")
 	if err != nil {
 		t.Fatalf("secret states: %v", err)
 	}
@@ -55,7 +55,7 @@ func TestServiceStoresAndReportsSecrets(t *testing.T) {
 		t.Errorf("unexpected second secret: %+v", states[1])
 	}
 
-	values, err := repository.Values(workspaceRoot, "development")
+	values, err := repository.Values(workspaceRoot, "", "development")
 	if err != nil {
 		t.Fatalf("secret values: %v", err)
 	}
@@ -66,10 +66,10 @@ func TestServiceStoresAndReportsSecrets(t *testing.T) {
 		t.Errorf("expected missing secrets to be omitted: %v", values)
 	}
 
-	if err := repository.Delete(workspaceRoot, "development", "apiToken"); err != nil {
+	if err := repository.Delete(workspaceRoot, "", "development", "apiToken"); err != nil {
 		t.Fatalf("delete secret: %v", err)
 	}
-	states, err = repository.States(workspaceRoot, "development")
+	states, err = repository.States(workspaceRoot, "", "development")
 	if err != nil {
 		t.Fatalf("secret states after delete: %v", err)
 	}
@@ -82,7 +82,7 @@ func TestServiceRejectsUndeclaredSecret(t *testing.T) {
 	workspaceRoot := createTestWorkspace(t)
 	repository := NewRepository(newFakeKeychain())
 
-	err := repository.Set(workspaceRoot, "development", "unknown", "value")
+	err := repository.Set(workspaceRoot, "", "development", "unknown", "value")
 	if !errors.Is(err, ErrSecretNotDeclared) {
 		t.Fatalf("expected ErrSecretNotDeclared, got %v", err)
 	}
@@ -97,7 +97,7 @@ func TestKeychainServiceUsesWorkspaceIdentifier(t *testing.T) {
 
 	keychain := newFakeKeychain()
 	repository := NewRepository(keychain)
-	if err := repository.Set(workspaceRoot, "development", "apiToken", "value"); err != nil {
+	if err := repository.Set(workspaceRoot, "", "development", "apiToken", "value"); err != nil {
 		t.Fatalf("set secret: %v", err)
 	}
 
@@ -115,18 +115,18 @@ func TestKeychainSeparatesEnvironments(t *testing.T) {
 	}
 
 	repository := NewRepository(newFakeKeychain())
-	if err := repository.Set(workspaceRoot, "development", "apiToken", "development-value"); err != nil {
+	if err := repository.Set(workspaceRoot, "", "development", "apiToken", "development-value"); err != nil {
 		t.Fatalf("set development secret: %v", err)
 	}
-	if err := repository.Set(workspaceRoot, "production", "apiToken", "production-value"); err != nil {
+	if err := repository.Set(workspaceRoot, "", "production", "apiToken", "production-value"); err != nil {
 		t.Fatalf("set production secret: %v", err)
 	}
 
-	development, err := repository.Values(workspaceRoot, "development")
+	development, err := repository.Values(workspaceRoot, "", "development")
 	if err != nil {
 		t.Fatalf("development values: %v", err)
 	}
-	production, err := repository.Values(workspaceRoot, "production")
+	production, err := repository.Values(workspaceRoot, "", "production")
 	if err != nil {
 		t.Fatalf("production values: %v", err)
 	}
@@ -157,4 +157,40 @@ func createTestWorkspace(t *testing.T) string {
 	}
 
 	return workspaceRoot
+}
+
+func TestKeychainSeparatesCollectionScopes(t *testing.T) {
+	workspaceRoot := createTestWorkspace(t)
+	directory := filepath.Join(workspaceRoot, "collections", "billing", "environments")
+	if err := os.MkdirAll(directory, 0o755); err != nil {
+		t.Fatalf("create collection environments: %v", err)
+	}
+	content := []byte("name: Development\nsecretVariables:\n  - apiToken\n")
+	if err := os.WriteFile(filepath.Join(directory, "development.yaml"), content, 0o644); err != nil {
+		t.Fatalf("write collection environment: %v", err)
+	}
+
+	repository := NewRepository(newFakeKeychain())
+	if err := repository.Set(workspaceRoot, "", "development", "apiToken", "global-value"); err != nil {
+		t.Fatalf("set global secret: %v", err)
+	}
+	if err := repository.Set(workspaceRoot, "collections/billing", "development", "apiToken", "billing-value"); err != nil {
+		t.Fatalf("set collection secret: %v", err)
+	}
+
+	global, err := repository.Values(workspaceRoot, "", "development")
+	if err != nil {
+		t.Fatalf("global values: %v", err)
+	}
+	billing, err := repository.Values(workspaceRoot, "collections/billing", "development")
+	if err != nil {
+		t.Fatalf("collection values: %v", err)
+	}
+	if global["apiToken"] != "global-value" || billing["apiToken"] != "billing-value" {
+		t.Fatalf("scopes must not share secrets: global %v, billing %v", global, billing)
+	}
+
+	if _, err := repository.Values(workspaceRoot, "../outside", "development"); err == nil {
+		t.Fatal("expected an invalid scope to be rejected")
+	}
 }

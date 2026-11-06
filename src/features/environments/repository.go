@@ -14,19 +14,68 @@ import (
 	"github.com/clementherve/awake/src/shared/yamlcodec"
 )
 
-// Repository reads environment files from a workspace.
+// Repository reads the environment files of one scope: the workspace for
+// global environments, or a collection for environments that refine them.
 type Repository struct {
 	workspaceRoot string
+	directory     string
 }
 
-// NewRepository returns a repository rooted at the workspace directory.
+// NewRepository returns the repository of the global environments.
 func NewRepository(workspaceRoot string) *Repository {
-	return &Repository{workspaceRoot: workspaceRoot}
+	return &Repository{
+		workspaceRoot: workspaceRoot,
+		directory:     filepath.Join(workspaceRoot, directoryName),
+	}
 }
 
-// DirectoryPath returns the environments directory of the workspace.
+// NewScopedRepository returns the repository of a scope. An empty scope is
+// the workspace; otherwise the scope is a collection path such as
+// collections/billing or local/scratch, whose environments live in its own
+// environments directory.
+func NewScopedRepository(workspaceRoot string, scope string) (*Repository, error) {
+	if scope == "" {
+		return NewRepository(workspaceRoot), nil
+	}
+	if err := ValidateScope(scope); err != nil {
+		return nil, err
+	}
+	return &Repository{
+		workspaceRoot: workspaceRoot,
+		directory:     filepath.Join(workspaceRoot, filepath.FromSlash(scope), directoryName),
+	}, nil
+}
+
+// ValidateScope accepts a collection path: a root, shared or private, and a
+// collection directory name.
+func ValidateScope(scope string) error {
+	segments := strings.Split(scope, "/")
+	if len(segments) != 2 || (segments[0] != sharedCollectionsRoot && segments[0] != privateCollectionsRoot) {
+		return ErrInvalidScope
+	}
+	name := segments[1]
+	if name == "" || name == "." || name == ".." || strings.ContainsAny(name, `\:`) {
+		return ErrInvalidScope
+	}
+	return nil
+}
+
+// ScopeOfRequest returns the collection a request belongs to, as a scope.
+func ScopeOfRequest(requestPath string) string {
+	segments := strings.Split(requestPath, "/")
+	if len(segments) < 3 {
+		return ""
+	}
+	scope := segments[0] + "/" + segments[1]
+	if ValidateScope(scope) != nil {
+		return ""
+	}
+	return scope
+}
+
+// DirectoryPath returns the environments directory of the scope.
 func (repository *Repository) DirectoryPath() string {
-	return filepath.Join(repository.workspaceRoot, directoryName)
+	return repository.directory
 }
 
 // SharedPath returns the path of a shared environment file.
@@ -71,6 +120,7 @@ func (repository *Repository) List() ([]Summary, error) {
 			Name:              environment.Name,
 			FileName:          baseName,
 			HasLocalOverrides: fileExists(repository.LocalPath(baseName)),
+			Color:             environment.Color,
 		})
 	}
 
@@ -198,6 +248,11 @@ func encodeEnvironment(existing []byte, environment Environment) ([]byte, error)
 	}
 
 	setScalar(mapping, "name", environment.Name)
+	if environment.Color == "" {
+		removeMappingValue(mapping, "color")
+	} else {
+		setScalar(mapping, "color", environment.Color)
+	}
 	setStringMap(mapping, "variables", environment.Variables)
 	setStringSequence(mapping, "secretVariables", environment.SecretVariables)
 

@@ -17,6 +17,7 @@ import (
 	"github.com/coder/websocket"
 
 	"github.com/clementherve/awake/src/domain"
+	"github.com/clementherve/awake/src/shared/variables"
 )
 
 const (
@@ -127,10 +128,11 @@ func (service *Service) OpenStream(workspaceRoot string, requestPath string, env
 		return Stream{}, err
 	}
 
-	layers, err := service.source.LoadVariableLayers(workspaceRoot, environmentFileName)
+	labeledLayers, err := service.source.LoadVariableLayers(workspaceRoot, requestPath, environmentFileName)
 	if err != nil {
 		return Stream{}, err
 	}
+	layers := variables.Maps(labeledLayers)
 
 	layers, preRequestOutcome := service.runPreRequest(&request, layers)
 

@@ -23,7 +23,9 @@ const userAgent = "Awake"
 // internals of the workspace, collections or environments features.
 type Source interface {
 	LoadRequest(workspaceRoot string, relativePath string) (domain.Request, error)
-	LoadVariableLayers(workspaceRoot string, environmentFileName string) ([]map[string]string, error)
+	// LoadVariableLayers returns the variables visible to a request: the
+	// workspace, its collection, then the environment at both levels.
+	LoadVariableLayers(workspaceRoot string, requestPath string, environmentFileName string) ([]variables.Layer, error)
 }
 
 // HistoryRecorder records executed requests. The application layer supplies
@@ -43,6 +45,12 @@ type OAuth2TokenProvider interface {
 		authentication domain.Authentication,
 		layers []map[string]string,
 	) (string, error)
+}
+
+// OAuth2TokenExpirer is implemented by token providers able to discard a
+// token the API rejected, so the client can retry once with a fresh one.
+type OAuth2TokenExpirer interface {
+	ExpireAccessToken(workspaceRoot string, requestPath string, environmentFileName string)
 }
 
 // ScriptRunner runs the JavaScript hooks attached to a request. The
@@ -116,10 +124,11 @@ func (service *Service) Send(workspaceRoot string, requestPath string, environme
 		return Response{}, err
 	}
 
-	layers, err := service.source.LoadVariableLayers(workspaceRoot, environmentFileName)
+	labeledLayers, err := service.source.LoadVariableLayers(workspaceRoot, requestPath, environmentFileName)
 	if err != nil {
 		return Response{}, err
 	}
+	layers := variables.Maps(labeledLayers)
 
 	layers, preRequestOutcome := service.runPreRequest(&request, layers)
 
@@ -132,11 +141,31 @@ func (service *Service) Send(workspaceRoot string, requestPath string, environme
 	if err != nil {
 		return Response{}, err
 	}
+	sent := captureSentRequest(httpRequest, resolvedAuthentication(request.Authentication))
 
 	startedAt := time.Now()
 	httpResponse, err := service.client.Do(httpRequest)
 	if err != nil {
 		return Response{}, fmt.Errorf("send request: %w", err)
+	}
+
+	// A 401 with an OAuth 2 token means the server no longer accepts it,
+	// even if it has not expired yet: refresh it and retry once.
+	if httpResponse.StatusCode == http.StatusUnauthorized && oauth2Token != "" {
+		if expirer, ok := service.oauth2.(OAuth2TokenExpirer); ok {
+			expirer.ExpireAccessToken(workspaceRoot, requestPath, environmentFileName)
+			if freshToken, tokenErr := service.oauth2Token(workspaceRoot, requestPath, environmentFileName, request, layers); tokenErr == nil && freshToken != oauth2Token {
+				if retried, buildErr := buildHTTPRequest(request, layers, freshToken); buildErr == nil {
+					httpResponse.Body.Close()
+					sent = captureSentRequest(retried, resolvedAuthentication(request.Authentication))
+					startedAt = time.Now()
+					httpResponse, err = service.client.Do(retried)
+					if err != nil {
+						return Response{}, fmt.Errorf("send request: %w", err)
+					}
+				}
+			}
+		}
 	}
 	defer httpResponse.Body.Close()
 
@@ -147,7 +176,7 @@ func (service *Service) Send(workspaceRoot string, requestPath string, environme
 
 	response.PreRequestOutcome = preRequestOutcome
 	response.PostResponseOutcome = service.runPostResponse(request, response, layers)
-	response.HistoryWarning = service.recordHistory(workspaceRoot, requestPath, environmentFileName, request, response)
+	response.HistoryWarning = service.recordHistory(workspaceRoot, requestPath, environmentFileName, request, sent, response)
 
 	return response, nil
 }
@@ -228,7 +257,7 @@ func (service *Service) oauth2Token(
 	)
 }
 
-func (service *Service) recordHistory(workspaceRoot string, requestPath string, environmentFileName string, request domain.Request, response Response) string {
+func (service *Service) recordHistory(workspaceRoot string, requestPath string, environmentFileName string, request domain.Request, sent sentRequest, response Response) string {
 	if service.recorder == nil {
 		return ""
 	}
@@ -236,12 +265,13 @@ func (service *Service) recordHistory(workspaceRoot string, requestPath string, 
 	err := service.recorder.Record(workspaceRoot, domain.HistoryEntry{
 		RequestPath:          requestPath,
 		RequestName:          request.Name,
-		Method:               request.Method,
-		URL:                  request.URL,
+		Method:               sent.method,
+		URL:                  sent.url,
 		StatusCode:           response.StatusCode,
 		DurationMilliseconds: response.DurationMilliseconds,
 		SizeBytes:            response.Size,
 		Environment:          environmentFileName,
+		Exchange:             exchangeOf(sent, response),
 	})
 	if err != nil {
 		return err.Error()

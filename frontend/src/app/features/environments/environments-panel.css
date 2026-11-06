@@ -305,3 +305,24 @@ input:focus {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+.scope-field {
+  margin-bottom: 12px;
+}
+
+.scope-hint {
+  margin: -4px 0 12px;
+  font-size: var(--text-sm);
+  line-height: 1.45;
+  color: var(--color-text-subtle);
+}
+
+.color-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 6px;
+  border-radius: 50%;
+  background: var(--entity-color);
+  vertical-align: 1px;
+}

@@ -17,16 +17,16 @@ func NewServiceWithKeychain(keychain Keychain) *Service {
 }
 
 // SecretStates reports which declared secrets of an environment are stored.
-func (service *Service) SecretStates(workspaceRoot string, environmentFileName string) ([]SecretState, error) {
-	return service.repository.States(workspaceRoot, environmentFileName)
+func (service *Service) SecretStates(workspaceRoot string, scope string, environmentFileName string) ([]SecretState, error) {
+	return service.repository.States(workspaceRoot, scope, environmentFileName)
 }
 
 // SetSecret stores or replaces the value of a declared secret.
-func (service *Service) SetSecret(workspaceRoot string, environmentFileName string, name string, value string) error {
-	return service.repository.Set(workspaceRoot, environmentFileName, name, value)
+func (service *Service) SetSecret(workspaceRoot string, scope string, environmentFileName string, name string, value string) error {
+	return service.repository.Set(workspaceRoot, scope, environmentFileName, name, value)
 }
 
 // DeleteSecret removes a declared secret from the keychain.
-func (service *Service) DeleteSecret(workspaceRoot string, environmentFileName string, name string) error {
-	return service.repository.Delete(workspaceRoot, environmentFileName, name)
+func (service *Service) DeleteSecret(workspaceRoot string, scope string, environmentFileName string, name string) error {
+	return service.repository.Delete(workspaceRoot, scope, environmentFileName, name)
 }

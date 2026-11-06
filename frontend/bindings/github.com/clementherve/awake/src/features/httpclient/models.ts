@@ -24,6 +24,17 @@ export interface DynamicVariable {
 }
 
 /**
+ * ResolvedVariable is the value a request sees for one variable, after every
+ * layer has been applied. Secret values are never returned.
+ */
+export interface ResolvedVariable {
+    "Name": string;
+    "Value": string;
+    "Source": string;
+    "Secret": boolean;
+}
+
+/**
  * Response describes an exchange. The body itself stays on disk and is read
  * through chunks, so a large payload never crosses the bridge at once.
  */

@@ -23,8 +23,8 @@ func (source fakeSource) LoadRequest(_ string, _ string) (domain.Request, error)
 	return source.request, source.err
 }
 
-func (source fakeSource) LoadVariableLayers(_ string, _ string) ([]map[string]string, error) {
-	return source.layers, nil
+func (source fakeSource) LoadVariableLayers(_ string, _ string, _ string) ([]variables.Layer, error) {
+	return variables.Unlabeled(source.layers...), nil
 }
 
 func TestSendInterpolatesRequestAndAuthentication(t *testing.T) {
@@ -350,6 +350,64 @@ func TestSendRecordsHistory(t *testing.T) {
 	}
 }
 
+func TestSendRecordsTheExchangeWithoutCredentials(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		writer.Header().Set("Content-Type", "application/json")
+		writer.Header().Set("Set-Cookie", "session=secret")
+		writer.WriteHeader(http.StatusCreated)
+		_, _ = writer.Write([]byte(`{"id":7}`))
+	}))
+	defer server.Close()
+
+	responseStore, err := newStoreAt(t.TempDir())
+	if err != nil {
+		t.Fatalf("create response store: %v", err)
+	}
+
+	recorder := &fakeRecorder{}
+	service := newServiceWithStore(fakeSource{
+		request: domain.Request{
+			Name:    "Create order",
+			Method:  domain.MethodPost,
+			URL:     server.URL + "/orders?customer={{customer}}",
+			Headers: []domain.Header{{Name: "X-Trace", Value: "abc", Enabled: true}},
+			Body:    &domain.Body{Type: domain.BodyJSON, Content: `{"amount":{{amount}}}`},
+			Authentication: &domain.Authentication{
+				Type:  domain.AuthenticationBearer,
+				Token: "{{token}}",
+			},
+		},
+		layers: []map[string]string{{"customer": "42", "amount": "10", "token": "top-secret"}},
+	}, responseStore, recorder)
+
+	response, err := service.Send(t.TempDir(), "collections/shop/create.yaml", "")
+	if err != nil {
+		t.Fatalf("send request: %v", err)
+	}
+	defer service.Close(response.ID)
+
+	entry := recorder.entries[0]
+	if entry.Method != "POST" || entry.URL != server.URL+"/orders?customer=42" {
+		t.Errorf("the history must keep the resolved request line, got %s %s", entry.Method, entry.URL)
+	}
+	exchange := entry.Exchange
+	if exchange == nil {
+		t.Fatal("expected the exchange to be recorded")
+	}
+	if exchange.RequestBody != `{"amount":10}` || exchange.ResponseBody != `{"id":7}` {
+		t.Errorf("unexpected bodies: %q / %q", exchange.RequestBody, exchange.ResponseBody)
+	}
+	if exchange.RequestHeaders["X-Trace"][0] != "abc" {
+		t.Errorf("unexpected request headers: %v", exchange.RequestHeaders)
+	}
+	if got := exchange.RequestHeaders["Authorization"][0]; got != "Bearer •••" {
+		t.Errorf("the token must be redacted, got %q", got)
+	}
+	if got := exchange.ResponseHeaders["Set-Cookie"][0]; got != "•••" {
+		t.Errorf("cookies must be redacted, got %q", got)
+	}
+}
+
 type fakeOAuth2Provider struct {
 	token          string
 	err            error
@@ -568,4 +626,57 @@ func newTestService(t *testing.T, source Source) *Service {
 	}
 
 	return newServiceWithStore(source, responseStore, nil)
+}
+
+type rotatingProvider struct {
+	tokens  []string
+	expired int
+}
+
+func (provider *rotatingProvider) AccessToken(_ string, _ string, _ string, _ domain.Authentication, _ []map[string]string) (string, error) {
+	return provider.tokens[provider.expired], nil
+}
+
+func (provider *rotatingProvider) ExpireAccessToken(_ string, _ string, _ string) {
+	provider.expired++
+}
+
+func TestSendRetriesOnceWithAFreshTokenAfterA401(t *testing.T) {
+	var seen []string
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		seen = append(seen, request.Header.Get("Authorization"))
+		if request.Header.Get("Authorization") != "Bearer fresh" {
+			writer.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		_, _ = writer.Write([]byte("ok"))
+	}))
+	defer server.Close()
+
+	service := newTestService(t, fakeSource{request: domain.Request{
+		Name:   "Me",
+		Method: domain.MethodGet,
+		URL:    server.URL,
+		Authentication: &domain.Authentication{
+			Type:      domain.AuthenticationOAuth2,
+			GrantType: domain.OAuth2GrantClientCredentials,
+			TokenURL:  "https://identity.example.com/token",
+			ClientID:  "client",
+		},
+	}})
+	provider := &rotatingProvider{tokens: []string{"revoked", "fresh"}}
+	SetOAuth2Provider(service, provider)
+
+	response, err := service.Send(t.TempDir(), "collections/a/me.yaml", "")
+	if err != nil {
+		t.Fatalf("send: %v", err)
+	}
+	defer service.Close(response.ID)
+
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("expected the retry to succeed, got %d", response.StatusCode)
+	}
+	if len(seen) != 2 || seen[0] != "Bearer revoked" || seen[1] != "Bearer fresh" {
+		t.Fatalf("expected one retry with the fresh token, got %v", seen)
+	}
 }

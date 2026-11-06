@@ -8,6 +8,11 @@ export interface Environment {
     "Name": string;
     "Variables": { [_ in string]?: string } | null;
     "SecretVariables": string[] | null;
+
+    /**
+     * Color names one of the colors listed in domain.Colors.
+     */
+    "Color": string;
 }
 
 /**
@@ -20,10 +25,22 @@ export interface ResolvedEnvironment {
 }
 
 /**
+ * ScopedSummary is an environment together with the scope defining it.
+ */
+export interface ScopedSummary {
+    "Name": string;
+    "FileName": string;
+    "HasLocalOverrides": boolean;
+    "Color": string;
+    "Scope": string;
+}
+
+/**
  * Summary describes an environment listed in the interface.
  */
 export interface Summary {
     "Name": string;
     "FileName": string;
     "HasLocalOverrides": boolean;
+    "Color": string;
 }

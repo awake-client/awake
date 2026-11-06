@@ -12,6 +12,8 @@ export interface CreationRequest {
   kind: CreationKind;
   /** Directory receiving the new entry; defaults to the current selection. */
   folder?: string;
+  /** For an environment: a collection path, or empty for a global one. */
+  scope?: string;
 }
 
 /** Detail of the {@link COLLECTIONS_CHANGED_EVENT} event. */
@@ -21,6 +23,8 @@ export interface CollectionsChange {
   kind?: CreationKind;
   /** Workspace relative path of the entry just deleted, with its children. */
   removed?: string;
+  /** An entry, and everything inside it, moved from one path to another. */
+  moved?: { from: string; to: string };
 }
 
 /** Opens the creation dialog from anywhere. */

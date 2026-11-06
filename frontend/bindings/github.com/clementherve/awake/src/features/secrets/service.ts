@@ -18,20 +18,20 @@ import * as $models from "./models.js";
 /**
  * DeleteSecret removes a declared secret from the keychain.
  */
-export function DeleteSecret(workspaceRoot: string, environmentFileName: string, name: string): $CancellablePromise<void> {
-    return $Call.ByID(644374385, workspaceRoot, environmentFileName, name);
+export function DeleteSecret(workspaceRoot: string, scope: string, environmentFileName: string, name: string): $CancellablePromise<void> {
+    return $Call.ByID(644374385, workspaceRoot, scope, environmentFileName, name);
 }
 
 /**
  * SecretStates reports which declared secrets of an environment are stored.
  */
-export function SecretStates(workspaceRoot: string, environmentFileName: string): $CancellablePromise<$models.SecretState[] | null> {
-    return $Call.ByID(1514445124, workspaceRoot, environmentFileName);
+export function SecretStates(workspaceRoot: string, scope: string, environmentFileName: string): $CancellablePromise<$models.SecretState[] | null> {
+    return $Call.ByID(1514445124, workspaceRoot, scope, environmentFileName);
 }
 
 /**
  * SetSecret stores or replaces the value of a declared secret.
  */
-export function SetSecret(workspaceRoot: string, environmentFileName: string, name: string, value: string): $CancellablePromise<void> {
-    return $Call.ByID(1712484682, workspaceRoot, environmentFileName, name, value);
+export function SetSecret(workspaceRoot: string, scope: string, environmentFileName: string, name: string, value: string): $CancellablePromise<void> {
+    return $Call.ByID(1712484682, workspaceRoot, scope, environmentFileName, name, value);
 }

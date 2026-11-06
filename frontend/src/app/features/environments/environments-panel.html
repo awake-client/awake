@@ -17,6 +17,22 @@
 
   <div class="environments-layout">
     <aside class="environment-list">
+      <label class="field scope-field">
+        <span class="field-label">Scope</span>
+        <select [ngModel]="scope()" (ngModelChange)="selectScope($event)">
+          <option value="">Global</option>
+          @for (collection of scopes(); track collection.path) {
+            <option [value]="collection.path">{{ collection.name }}</option>
+          }
+        </select>
+      </label>
+      @if (scope()) {
+        <p class="scope-hint">
+          Environments of this collection refine the global ones of the same
+          name. Variables they don't define are inherited.
+        </p>
+      }
+
       <h2>Available</h2>
 
       @if (environments().length === 0) {
@@ -31,10 +47,18 @@
                 [class.active]="environment.FileName === selectedFileName()"
                 (click)="selectEnvironment(environment.FileName)"
               >
-                <span class="environment-name">{{ environment.Name }}</span>
+                <span class="environment-name">
+                  @if (environment.Color) {
+                    <span class="color-dot" [attr.data-color]="environment.Color"></span>
+                  }
+                  {{ environment.Name }}
+                </span>
                 <span class="environment-file">{{ environment.FileName }}</span>
                 @if (environment.HasLocalOverrides) {
                   <span class="local-badge">local</span>
+                }
+                @if (scope() && globalNames().has(environment.FileName)) {
+                  <span class="local-badge">overrides global</span>
                 }
               </button>
             </li>
@@ -64,6 +88,15 @@
             autocomplete="off"
           />
         </label>
+
+        <div class="field">
+          <span class="field-label">Color</span>
+          <app-color-picker [value]="color()" (valueChange)="color.set($event)" />
+          <span class="field-hint">
+            Shown on the environment picker and along the top of the work area,
+            so a production environment is hard to miss.
+          </span>
+        </div>
 
         <article class="editor-section">
           <header class="section-header">

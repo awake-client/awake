@@ -9,5 +9,6 @@ export {
 export type {
     Environment,
     ResolvedEnvironment,
+    ScopedSummary,
     Summary
 } from "./models.js";

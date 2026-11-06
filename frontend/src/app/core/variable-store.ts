@@ -1,11 +1,15 @@
 import { DestroyRef, Injectable, computed, effect, inject, signal } from '@angular/core';
-import * as EnvironmentsService from '@bindings/github.com/clementherve/awake/src/features/environments/service';
 import * as HTTPClientService from '@bindings/github.com/clementherve/awake/src/features/httpclient/service';
 import { EnvironmentStore } from './environment-store';
+import { TabsStore } from './tabs-store';
 import { WorkspaceStore } from './workspace-store';
 
 /** Where a variable value comes from, by increasing precedence. */
-export type VariableSource = 'workspace' | 'environment' | 'local' | 'secret' | 'dynamic';
+/**
+ * Where a variable value comes from: workspace, collection, environment,
+ * collection environment (each possibly "(local)"), secret or dynamic.
+ */
+export type VariableSource = string;
 
 /** A variable that can be referenced as `{{name}}`. */
 export interface VariableInfo {
@@ -26,15 +30,16 @@ export interface VariableReference {
 const REFERENCE_PATTERN = /\{\{\s*(\$?[A-Za-z_][A-Za-z0-9_]*)\s*\}\}/g;
 
 /**
- * Exposes the variables available to requests with the active environment,
- * merged the same way the backend interpolates them: workspace variables,
- * then the shared environment, its local overrides and its secrets. Dynamic
+ * Exposes the variables visible to the request on screen with the active
+ * environment, as resolved by the backend: workspace, collection, global
+ * environment, collection environment, local overrides and secrets. Dynamic
  * variables such as `{{$uuid}}` are listed too.
  */
 @Injectable({ providedIn: 'root' })
 export class VariableStore {
   private readonly workspaceStore = inject(WorkspaceStore);
   private readonly environmentStore = inject(EnvironmentStore);
+  private readonly tabsStore = inject(TabsStore);
 
   private readonly environmentVariables = signal<VariableInfo[]>([]);
   private readonly dynamicVariables = signal<VariableInfo[]>([]);
@@ -42,10 +47,6 @@ export class VariableStore {
   /** Every variable by name, the highest precedence layer winning. */
   readonly variables = computed(() => {
     const merged = new Map<string, VariableInfo>();
-    const workspaceVariables = this.workspaceStore.workspace()?.configuration.Variables ?? {};
-    for (const [name, value] of Object.entries(workspaceVariables)) {
-      merged.set(name, { name, value: value ?? '', source: 'workspace' });
-    }
     for (const variable of this.environmentVariables()) {
       merged.set(variable.name, variable);
     }
@@ -80,14 +81,21 @@ export class VariableStore {
       )
       .catch(() => this.dynamicVariables.set([]));
 
+    // The variables depend on the request on screen: its collection may
+    // refine the selected environment.
     effect(() => {
       const rootPath = this.workspaceStore.rootPath();
       const environment = this.environmentStore.selected();
-      void this.loadEnvironment(rootPath, environment);
+      const requestPath = this.tabsStore.active() ?? '';
+      void this.loadEnvironment(rootPath, requestPath, environment);
     });
 
     const reload = () =>
-      void this.loadEnvironment(this.workspaceStore.rootPath(), this.environmentStore.selected());
+      void this.loadEnvironment(
+        this.workspaceStore.rootPath(),
+        this.tabsStore.active() ?? '',
+        this.environmentStore.selected(),
+      );
     window.addEventListener('awake:environments-changed', reload);
     inject(DestroyRef).onDestroy(() =>
       window.removeEventListener('awake:environments-changed', reload),
@@ -125,29 +133,26 @@ export class VariableStore {
     });
   }
 
-  private async loadEnvironment(rootPath: string | null, fileName: string): Promise<void> {
-    if (!rootPath || !fileName) {
+  private async loadEnvironment(
+    rootPath: string | null,
+    requestPath: string,
+    fileName: string,
+  ): Promise<void> {
+    if (!rootPath) {
       this.environmentVariables.set([]);
       return;
     }
 
     try {
-      const resolved = await EnvironmentsService.Load(rootPath, fileName);
-      const variables: VariableInfo[] = [];
-      for (const [name, value] of Object.entries(resolved.Shared.Variables ?? {})) {
-        variables.push({ name, value: value ?? '', source: 'environment' });
-      }
-      for (const [name, value] of Object.entries(resolved.Local?.Variables ?? {})) {
-        variables.push({ name, value: value ?? '', source: 'local' });
-      }
-      const secrets = [
-        ...(resolved.Shared.SecretVariables ?? []),
-        ...(resolved.Local?.SecretVariables ?? []),
-      ];
-      for (const name of secrets) {
-        variables.push({ name, value: 'secret', source: 'secret' });
-      }
-      this.environmentVariables.set(variables);
+      const resolved =
+        (await HTTPClientService.ResolveVariables(rootPath, requestPath, fileName)) ?? [];
+      this.environmentVariables.set(
+        resolved.map((variable) => ({
+          name: variable.Name,
+          value: variable.Secret ? 'secret' : variable.Value,
+          source: variable.Secret ? 'secret' : variable.Source,
+        })),
+      );
     } catch {
       this.environmentVariables.set([]);
     }

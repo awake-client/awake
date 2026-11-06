@@ -9,6 +9,7 @@ export {
 export type {
     Chunk,
     DynamicVariable,
+    ResolvedVariable,
     Response,
     Stream,
     StreamEvent,

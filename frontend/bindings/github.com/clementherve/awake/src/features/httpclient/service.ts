@@ -68,6 +68,14 @@ export function ReleaseStream(identifier: string): $CancellablePromise<void> {
 }
 
 /**
+ * ResolveVariables lists the variables visible to a request with the given
+ * environment, as the interface shows them while editing.
+ */
+export function ResolveVariables(workspaceRoot: string, requestPath: string, environmentFileName: string): $CancellablePromise<$models.ResolvedVariable[] | null> {
+    return $Call.ByID(2861235029, workspaceRoot, requestPath, environmentFileName);
+}
+
+/**
  * Send executes a request and streams its body to the response store.
  */
 export function Send(workspaceRoot: string, requestPath: string, environmentFileName: string): $CancellablePromise<$models.Response> {
