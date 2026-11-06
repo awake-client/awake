@@ -39,9 +39,12 @@
         (change)="selectEnvironment($event)"
         aria-label="Active environment"
       >
-        <option value="">No environment</option>
+        <option value="" [selected]="!selectedEnvironment()">No environment</option>
         @for (environment of environments(); track environment.FileName) {
-          <option [value]="environment.FileName">
+          <option
+            [value]="environment.FileName"
+            [selected]="environment.FileName === selectedEnvironment()"
+          >
             {{ environment.Name }}{{ environment.HasLocalOverrides ? ' (local)' : '' }}
           </option>
         }
@@ -72,7 +75,19 @@
       @if (modeLabel(); as mode) {
         <span class="mode-badge">{{ mode }}</span>
       }
-      <span class="sidebar-version">v{{ version() || '0.1.0' }}</span>
+      @if (gitSync.state() !== 'off') {
+        <a
+          class="sync-chip"
+          routerLink="/workspace/git"
+          [attr.data-state]="gitSync.state()"
+          [title]="gitSync.message() || gitSync.label()"
+        >
+          <app-icon name="refresh" [size]="12" [class.spinning]="gitSync.state() === 'syncing'" />
+          {{ gitSync.label() }}
+        </a>
+      } @else {
+        <span class="sidebar-version">v{{ version() || '0.1.0' }}</span>
+      }
       <span class="footer-spacer"></span>
       @if (updateError(); as message) {
         <span class="update-error" [title]="message">Update unavailable</span>
@@ -90,9 +105,15 @@
   </aside>
 
   <main class="sheet">
-    <router-outlet />
+    @if (tabs.tabs().length > 0) {
+      <app-request-tabs />
+    }
+    <div class="sheet-content">
+      <router-outlet />
+    </div>
   </main>
 </div>
 
 <app-command-palette />
 <app-new-entry-dialog />
+<app-confirmation-dialog />

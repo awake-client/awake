@@ -16,9 +16,7 @@ export interface OpenedWorkspace {
  */
 @Injectable({ providedIn: 'root' })
 export class WorkspaceStore {
-  private readonly current = signal<OpenedWorkspace | null>(
-    readStoredWorkspace(),
-  );
+  private readonly current = signal<OpenedWorkspace | null>(readStoredWorkspace());
 
   readonly workspace = this.current.asReadonly();
   readonly rootPath = computed(() => this.current()?.rootPath ?? null);

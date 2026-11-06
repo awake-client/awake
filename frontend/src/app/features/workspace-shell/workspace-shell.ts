@@ -4,11 +4,15 @@ import * as EnvironmentsService from '@bindings/github.com/clementherve/awake/sr
 import { Summary } from '@bindings/github.com/clementherve/awake/src/features/environments/models';
 import * as UpdatesService from '@bindings/github.com/clementherve/awake/src/features/updates/service';
 import { EnvironmentStore } from '@core/environment-store';
+import { GitSync } from '@core/git-sync';
+import { TabsStore } from '@core/tabs-store';
 import { WorkspaceStore } from '@core/workspace-store';
 import { CollectionTree } from '@features/collections/collection-tree';
 import { CommandPalette } from '@features/command-palette/command-palette';
 import { NewEntryDialog } from '@features/new-entry/new-entry-dialog';
+import { ConfirmationDialog } from '@shared/confirmation-dialog';
 import { Icon, IconName } from '@shared/icon';
+import { RequestTabs } from './request-tabs';
 
 /** Secondary workspace tools listed under the collection tree. */
 interface SidebarSection {
@@ -37,6 +41,8 @@ const SIDEBAR_SECTIONS: SidebarSection[] = [
     CollectionTree,
     CommandPalette,
     NewEntryDialog,
+    ConfirmationDialog,
+    RequestTabs,
     Icon,
   ],
   templateUrl: './workspace-shell.html',
@@ -49,6 +55,9 @@ export class WorkspaceShell {
   private readonly destroyRef = inject(DestroyRef);
   private readonly commandPalette = viewChild(CommandPalette);
 
+  /** Created with the shell so synchronization runs while a workspace is open. */
+  protected readonly gitSync = inject(GitSync);
+  protected readonly tabs = inject(TabsStore);
   protected readonly sections = SIDEBAR_SECTIONS;
   protected readonly workspace = this.workspaceStore.workspace;
   protected readonly rootPath = computed(() => this.workspaceStore.rootPath() ?? '');
@@ -116,7 +125,10 @@ export class WorkspaceShell {
   }
 
   private async loadEnvironments(rootPath: string): Promise<void> {
-    const previousSelection = this.environmentStore.selected();
+    this.environmentStore.useWorkspace(rootPath);
+    // Keep the current choice, or restore the one remembered for this workspace.
+    const previousSelection =
+      this.environmentStore.selected() || this.environmentStore.remembered(rootPath);
 
     try {
       const summaries = (await EnvironmentsService.List(rootPath)) ?? [];

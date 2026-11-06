@@ -256,6 +256,8 @@
 
 /* The working area is a sheet laid over the window background. */
 .sheet {
+  display: flex;
+  flex-direction: column;
   min-width: 0;
   min-height: 0;
   overflow: hidden;
@@ -276,4 +278,50 @@
   .search-trigger span {
     display: none;
   }
+}
+
+.sync-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  height: 20px;
+  padding: 0 7px;
+  border-radius: 999px;
+  color: var(--color-text-muted);
+  text-decoration: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sync-chip:hover {
+  background: var(--color-hover);
+  color: var(--color-text-strong);
+}
+
+.sync-chip[data-state='synced'] app-icon {
+  color: var(--color-success);
+}
+
+.sync-chip[data-state='conflicts'],
+.sync-chip[data-state='error'] {
+  background: color-mix(in srgb, var(--color-danger) 12%, transparent);
+  color: var(--color-danger);
+}
+
+.spinning {
+  animation: spin 900ms linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.sheet-content {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
 }
