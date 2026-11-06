@@ -22,3 +22,8 @@ func (service *Service) Load(workspaceRoot string, fileName string) (ResolvedEnv
 func (service *Service) Save(workspaceRoot string, fileName string, environment Environment) error {
 	return NewRepository(workspaceRoot).Save(fileName, environment)
 }
+
+// Delete removes a shared environment and its local overrides.
+func (service *Service) Delete(workspaceRoot string, fileName string) error {
+	return NewRepository(workspaceRoot).Delete(fileName)
+}

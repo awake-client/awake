@@ -1,4 +1,4 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, DestroyRef, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import * as EnvironmentsService from '@bindings/github.com/clementherve/awake/src/features/environments/service';
 import {
@@ -7,9 +7,11 @@ import {
 } from '@bindings/github.com/clementherve/awake/src/features/environments/models';
 import * as SecretsService from '@bindings/github.com/clementherve/awake/src/features/secrets/service';
 import { SecretState } from '@bindings/github.com/clementherve/awake/src/features/secrets/models';
+import { requestEntryCreation } from '@core/collection-events';
+import { Confirmation } from '@core/confirmation';
+import { EnvironmentStore } from '@core/environment-store';
 import { WorkspaceStore } from '@core/workspace-store';
-
-const FILE_NAME_PATTERN = /^[a-z0-9][a-z0-9_-]*$/;
+import { Icon } from '@shared/icon';
 
 interface VariableRow {
   name: string;
@@ -22,12 +24,14 @@ interface VariableRow {
  */
 @Component({
   selector: 'app-environments-panel',
-  imports: [FormsModule],
+  imports: [FormsModule, Icon],
   templateUrl: './environments-panel.html',
   styleUrl: './environments-panel.css',
 })
 export class EnvironmentsPanel {
   private readonly workspaceStore = inject(WorkspaceStore);
+  private readonly environmentStore = inject(EnvironmentStore);
+  private readonly confirmation = inject(Confirmation);
 
   protected readonly environments = signal<Summary[]>([]);
   protected readonly selectedFileName = signal('');
@@ -37,8 +41,6 @@ export class EnvironmentsPanel {
   protected readonly secretStates = signal<SecretState[]>([]);
   protected readonly secretValues = signal<Record<string, string>>({});
   protected readonly newSecretName = signal('');
-  protected readonly newFileName = signal('');
-  protected readonly newEnvironmentName = signal('');
   protected readonly isLoading = signal(false);
   protected readonly isSaving = signal(false);
   protected readonly message = signal<string | null>(null);
@@ -46,6 +48,21 @@ export class EnvironmentsPanel {
 
   constructor() {
     void this.loadEnvironments();
+
+    // Select the environment just created from the new entry dialog.
+    const environmentsChanged = (event: Event) => {
+      const created = (event as CustomEvent<{ created?: string } | null>).detail?.created;
+      if (created) {
+        void this.loadEnvironments().then(() => {
+          this.selectedFileName.set('');
+          return this.selectEnvironment(created);
+        });
+      }
+    };
+    window.addEventListener('awake:environments-changed', environmentsChanged);
+    inject(DestroyRef).onDestroy(() =>
+      window.removeEventListener('awake:environments-changed', environmentsChanged),
+    );
   }
 
   protected async selectEnvironment(fileName: string): Promise<void> {
@@ -57,46 +74,50 @@ export class EnvironmentsPanel {
     await this.loadEnvironment(fileName);
   }
 
-  protected async createEnvironment(): Promise<void> {
-    const fileName = this.newFileName().trim();
-    const name = this.newEnvironmentName().trim() || fileName;
-    if (!FILE_NAME_PATTERN.test(fileName)) {
-      this.errorMessage.set(
-        'The file name may only contain lowercase letters, digits, dashes and underscores.',
-      );
-      return;
-    }
-    if (name === '') {
-      this.errorMessage.set('An environment needs a name.');
-      return;
-    }
+  protected newEnvironment(): void {
+    requestEntryCreation({ kind: 'environment' });
+  }
 
+  /**
+   * Deletes the environment after confirmation, together with its local
+   * overrides and the secret values stored in the keychain.
+   */
+  protected async deleteEnvironment(): Promise<void> {
     const rootPath = this.workspaceStore.rootPath();
-    if (!rootPath) {
+    const fileName = this.selectedFileName();
+    if (!rootPath || !fileName) {
       return;
     }
 
-    this.isSaving.set(true);
+    const confirmed = await this.confirmation.ask({
+      title: `Delete the environment “${this.name() || fileName}”?`,
+      message: `environments/${fileName}.yaml, its local overrides and its stored secret values will be removed.`,
+      confirmLabel: 'Delete environment',
+      danger: true,
+    });
+    if (!confirmed) {
+      return;
+    }
+
     this.errorMessage.set(null);
     this.message.set(null);
 
     try {
-      await EnvironmentsService.Save(rootPath, fileName, {
-        Name: name,
-        Variables: {},
-        SecretVariables: [],
-      });
-      this.newFileName.set('');
-      this.newEnvironmentName.set('');
+      for (const name of this.secretNames()) {
+        if (this.secretIsSet(name)) {
+          await SecretsService.DeleteSecret(rootPath, fileName, name);
+        }
+      }
+      await EnvironmentsService.Delete(rootPath, fileName);
+      if (this.environmentStore.selected() === fileName) {
+        this.environmentStore.select('');
+      }
+      this.selectedFileName.set('');
       await this.loadEnvironments();
-      this.selectedFileName.set(fileName);
-      await this.loadEnvironment(fileName);
       this.notifyChange();
-      this.message.set('Environment created.');
+      this.message.set('Environment deleted.');
     } catch (error) {
       this.errorMessage.set(describeError(error));
-    } finally {
-      this.isSaving.set(false);
     }
   }
 
@@ -141,9 +162,7 @@ export class EnvironmentsPanel {
   }
 
   protected secretIsSet(name: string): boolean {
-    return this.secretStates().some(
-      (state) => state.Name === name && state.IsSet,
-    );
+    return this.secretStates().some((state) => state.Name === name && state.IsSet);
   }
 
   protected async saveEnvironment(): Promise<void> {
@@ -174,9 +193,7 @@ export class EnvironmentsPanel {
 
     for (const secretName of this.secretNames()) {
       if (Object.hasOwn(variables, secretName)) {
-        this.errorMessage.set(
-          `${secretName} cannot be both a plain variable and a secret.`,
-        );
+        this.errorMessage.set(`${secretName} cannot be both a plain variable and a secret.`);
         return;
       }
     }
@@ -291,9 +308,7 @@ export class EnvironmentsPanel {
     }
 
     try {
-      this.secretStates.set(
-        (await SecretsService.SecretStates(rootPath, fileName)) ?? [],
-      );
+      this.secretStates.set((await SecretsService.SecretStates(rootPath, fileName)) ?? []);
     } catch (error) {
       this.errorMessage.set(describeError(error));
     }

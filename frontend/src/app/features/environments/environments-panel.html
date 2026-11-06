@@ -42,39 +42,10 @@
         </ul>
       }
 
-      <form class="new-environment" (ngSubmit)="createEnvironment()">
-        <h2>New environment</h2>
-        <label class="field">
-          <span class="field-label">File name</span>
-          <input
-            type="text"
-            name="newFileName"
-            [ngModel]="newFileName()"
-            (ngModelChange)="newFileName.set($event)"
-            placeholder="staging"
-            autocomplete="off"
-            spellcheck="false"
-          />
-        </label>
-        <label class="field">
-          <span class="field-label">Display name</span>
-          <input
-            type="text"
-            name="newEnvironmentName"
-            [ngModel]="newEnvironmentName()"
-            (ngModelChange)="newEnvironmentName.set($event)"
-            placeholder="Staging"
-            autocomplete="off"
-          />
-        </label>
-        <button
-          type="submit"
-          class="primary-button"
-          [disabled]="isSaving()"
-        >
-          Create
-        </button>
-      </form>
+      <button type="button" class="btn new-environment" (click)="newEnvironment()">
+        <app-icon name="plus" [size]="14" />
+        New environment
+      </button>
     </aside>
 
     <section class="environment-editor">
@@ -218,6 +189,11 @@
         </article>
 
         <footer class="editor-actions">
+          <button type="button" class="btn btn-danger" (click)="deleteEnvironment()">
+            <app-icon name="trash" [size]="14" />
+            Delete
+          </button>
+          <span class="actions-spacer"></span>
           <button
             type="button"
             class="primary-button"

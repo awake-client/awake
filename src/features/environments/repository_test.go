@@ -205,3 +205,32 @@ func TestSaveRemovesEmptySections(t *testing.T) {
 		t.Errorf("expected the empty variables section to be removed, got:\n%s", content)
 	}
 }
+
+func TestDeleteRemovesSharedAndLocalFiles(t *testing.T) {
+	workspaceRoot := t.TempDir()
+	writeEnvironmentFile(t, workspaceRoot, "staging.yaml", "name: Staging\n")
+	writeEnvironmentFile(t, workspaceRoot, "staging.local.yaml", "variables:\n  token: x\n")
+	writeEnvironmentFile(t, workspaceRoot, "production.yaml", "name: Production\n")
+
+	repository := NewRepository(workspaceRoot)
+	if err := repository.Delete("staging"); err != nil {
+		t.Fatalf("delete environment: %v", err)
+	}
+
+	summaries, err := repository.List()
+	if err != nil {
+		t.Fatalf("list environments: %v", err)
+	}
+	if len(summaries) != 1 || summaries[0].FileName != "production" {
+		t.Fatalf("unexpected environments after delete: %+v", summaries)
+	}
+	if _, err := os.Stat(repository.LocalPath("staging")); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("expected the local overrides to be removed, got %v", err)
+	}
+	if err := repository.Delete("staging"); !errors.Is(err, ErrEnvironmentNotFound) {
+		t.Fatalf("expected ErrEnvironmentNotFound, got %v", err)
+	}
+	if err := repository.Delete("../awake"); err == nil {
+		t.Fatal("expected an invalid file name to be rejected")
+	}
+}

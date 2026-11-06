@@ -15,6 +15,13 @@ import { Call as $Call, CancellablePromise as $CancellablePromise } from "@wails
 import * as $models from "./models.js";
 
 /**
+ * Delete removes a shared environment and its local overrides.
+ */
+export function Delete(workspaceRoot: string, fileName: string): $CancellablePromise<void> {
+    return $Call.ByID(1376967396, workspaceRoot, fileName);
+}
+
+/**
  * List returns the shared environments of a workspace.
  */
 export function List(workspaceRoot: string): $CancellablePromise<$models.Summary[] | null> {

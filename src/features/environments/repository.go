@@ -285,6 +285,25 @@ func removeMappingValue(mapping *yaml.Node, key string) {
 	}
 }
 
+// Delete removes a shared environment and its local overrides.
+func (repository *Repository) Delete(fileName string) error {
+	if err := validateFileName(fileName); err != nil {
+		return err
+	}
+
+	sharedPath := repository.SharedPath(fileName)
+	if !fileExists(sharedPath) {
+		return ErrEnvironmentNotFound
+	}
+	if err := os.Remove(sharedPath); err != nil {
+		return fmt.Errorf("delete environment %s: %w", fileName, err)
+	}
+	if err := os.Remove(repository.LocalPath(fileName)); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("delete local overrides of %s: %w", fileName, err)
+	}
+	return nil
+}
+
 func fileExists(path string) bool {
 	info, err := os.Stat(path)
 	return err == nil && !info.IsDir()

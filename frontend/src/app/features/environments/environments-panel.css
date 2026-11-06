@@ -140,11 +140,8 @@ h2 {
 }
 
 .new-environment {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding-top: 12px;
-  border-top: 1px solid var(--color-border);
+  align-self: flex-start;
+  margin-top: 4px;
 }
 
 .environment-editor {
@@ -244,7 +241,12 @@ input:focus {
 
 .editor-actions {
   display: flex;
-  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+}
+
+.actions-spacer {
+  flex: 1;
 }
 
 .primary-button {
