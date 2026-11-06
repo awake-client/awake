@@ -154,3 +154,67 @@ code {
 .field select {
   padding-right: 28px;
 }
+
+/* Redesigned cards --------------------------------------------------------- */
+
+.card-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.card-header app-icon {
+  color: var(--color-accent);
+}
+
+.card-header h2 {
+  margin: 0;
+}
+
+.format-picker {
+  display: inline-flex;
+  align-self: flex-start;
+  gap: 2px;
+  padding: 3px;
+  border-radius: var(--radius-lg);
+  background: var(--color-active);
+}
+
+.format-picker button {
+  height: 26px;
+  padding: 0 14px;
+  border: none;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.format-picker button.selected {
+  background: var(--color-surface-raised);
+  color: var(--color-text-strong);
+  box-shadow: var(--shadow-card);
+}
+
+.path-field {
+  display: flex;
+  gap: 8px;
+}
+
+.path-field .input {
+  flex: 1;
+  min-width: 0;
+}
+
+.card-action {
+  align-self: flex-start;
+  margin-top: auto;
+}
+
+.interop-message.success {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}

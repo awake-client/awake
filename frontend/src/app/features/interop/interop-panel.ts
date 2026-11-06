@@ -1,8 +1,10 @@
 import { Component, computed, inject, signal } from '@angular/core';
-import { FormsModule } from '@angular/forms';
 import * as InteropService from '@bindings/github.com/clementherve/awake/src/features/interop/service';
 import { Format } from '@bindings/github.com/clementherve/awake/src/features/interop/models';
+import { notifyCollectionsChanged } from '@core/collection-events';
+import { chooseDirectory, chooseFile, chooseSaveFile } from '@core/dialogs';
 import { WorkspaceStore } from '@core/workspace-store';
+import { Icon } from '@shared/icon';
 
 const FORMAT_LABELS: Record<Format, string> = {
   [Format.$zero]: '',
@@ -17,7 +19,7 @@ const FORMAT_LABELS: Record<Format, string> = {
  */
 @Component({
   selector: 'app-interop-panel',
-  imports: [FormsModule],
+  imports: [Icon],
   templateUrl: './interop-panel.html',
   styleUrl: './interop-panel.css',
 })
@@ -70,12 +72,53 @@ export class InteropPanel {
     }
   }
 
-  protected selectImportFormat(event: Event): void {
-    this.importFormat.set((event.target as HTMLSelectElement).value as Format);
+  protected readonly importIsDirectory = computed(() => this.importFormat() === Format.FormatBruno);
+  protected readonly exportIsDirectory = computed(() => this.exportFormat() === Format.FormatBruno);
+
+  protected selectImportFormat(format: Format): void {
+    this.importFormat.set(format);
   }
 
-  protected selectExportFormat(event: Event): void {
-    this.exportFormat.set((event.target as HTMLSelectElement).value as Format);
+  protected inputValue(event: Event): string {
+    return (event.target as HTMLInputElement).value;
+  }
+
+  /** Opens a folder chooser for Bruno, a file chooser for the other formats. */
+  protected async browseImport(): Promise<void> {
+    const path = this.importIsDirectory()
+      ? await chooseDirectory({ title: 'Choose a Bruno collection', buttonText: 'Import' })
+      : await chooseFile({
+          title: `Choose a ${FORMAT_LABELS[this.importFormat()]} document`,
+          buttonText: 'Choose',
+          types: [{ name: 'API documents', pattern: '*.json;*.yaml;*.yml' }],
+        });
+    if (path) {
+      this.importPath.set(path);
+      this.importError.set(null);
+    }
+  }
+
+  /** Opens a folder chooser for Bruno, a save dialog for the other formats. */
+  protected async browseExport(): Promise<void> {
+    const format = this.exportFormat();
+    const path = this.exportIsDirectory()
+      ? await chooseDirectory({
+          title: 'Choose where to write the Bruno collection',
+          buttonText: 'Export here',
+        })
+      : await chooseSaveFile({
+          title: `Save the ${FORMAT_LABELS[format]} export`,
+          buttonText: 'Save',
+          fileName: format === Format.FormatPostman ? 'collection.postman.json' : 'openapi.yaml',
+        });
+    if (path) {
+      this.exportPath.set(path);
+      this.exportError.set(null);
+    }
+  }
+
+  protected selectExportFormat(format: Format): void {
+    this.exportFormat.set(format);
   }
 
   protected async importDocument(): Promise<void> {
@@ -102,6 +145,7 @@ export class InteropPanel {
       );
       this.importWarnings.set(result.Warnings ?? []);
       this.importPath.set('');
+      notifyCollectionsChanged();
     } catch (error) {
       this.importError.set(describeError(error));
     } finally {

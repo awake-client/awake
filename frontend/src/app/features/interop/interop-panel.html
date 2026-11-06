@@ -6,42 +6,57 @@
 
   <div class="interop-grid">
     <article class="interop-card">
-      <h2>Import</h2>
-      <p class="card-hint">
-        Requests are written into <code>collections/</code>. Refresh the collection tree afterwards.
-      </p>
+      <header class="card-header">
+        <app-icon name="download" [size]="16" />
+        <h2>Import</h2>
+      </header>
+      <p class="card-hint">Requests are written into <code>collections/</code>.</p>
 
-      <label class="field">
+      <div class="field">
         <span class="field-label">Format</span>
-        <select
-          name="importFormat"
-          [ngModel]="importFormat()"
-          (ngModelChange)="selectImportFormat($event)"
-        >
+        <div class="format-picker" role="radiogroup" aria-label="Import format">
           @for (format of formats; track format) {
-            <option [value]="format">{{ formatLabels[format] }}</option>
+            <button
+              type="button"
+              role="radio"
+              [class.selected]="importFormat() === format"
+              [attr.aria-checked]="importFormat() === format"
+              (click)="selectImportFormat(format)"
+            >
+              {{ formatLabels[format] }}
+            </button>
           }
-        </select>
-      </label>
+        </div>
+      </div>
 
-      <label class="field">
-        <span class="field-label">Source path</span>
-        <input
-          type="text"
-          name="importPath"
-          [ngModel]="importPath()"
-          (ngModelChange)="importPath.set($event)"
-          [placeholder]="importHint()"
-          autocomplete="off"
-          spellcheck="false"
-        />
-      </label>
+      <div class="field">
+        <span class="field-label">{{ importIsDirectory() ? 'Source folder' : 'Source file' }}</span>
+        <div class="path-field">
+          <input
+            class="input mono"
+            type="text"
+            name="importPath"
+            [value]="importPath()"
+            (input)="importPath.set(inputValue($event))"
+            [placeholder]="importHint()"
+            autocomplete="off"
+            spellcheck="false"
+          />
+          <button type="button" class="btn" (click)="browseImport()">
+            <app-icon [name]="importIsDirectory() ? 'folder-open' : 'file'" [size]="14" />
+            Browse…
+          </button>
+        </div>
+      </div>
 
       @if (importError(); as message) {
         <p class="interop-message error">{{ message }}</p>
       }
       @if (importMessage(); as message) {
-        <p class="interop-message success">{{ message }}</p>
+        <p class="interop-message success">
+          <app-icon name="check" [size]="14" />
+          {{ message }}
+        </p>
       }
       @if (importWarnings().length > 0) {
         <ul class="interop-warnings">
@@ -53,8 +68,8 @@
 
       <button
         type="button"
-        class="primary-button"
-        [disabled]="isImporting()"
+        class="btn btn-primary card-action"
+        [disabled]="isImporting() || importPath().trim() === ''"
         (click)="importDocument()"
       >
         {{ isImporting() ? 'Importing…' : 'Import' }}
@@ -62,43 +77,61 @@
     </article>
 
     <article class="interop-card">
-      <h2>Export</h2>
+      <header class="card-header">
+        <app-icon name="upload" [size]="16" />
+        <h2>Export</h2>
+      </header>
       <p class="card-hint">
-        The export snapshots every request in the workspace. Existing files at the destination are
-        replaced.
+        Snapshots every request of the workspace. Existing files at the destination are replaced.
       </p>
 
-      <label class="field">
+      <div class="field">
         <span class="field-label">Format</span>
-        <select
-          name="exportFormat"
-          [ngModel]="exportFormat()"
-          (ngModelChange)="selectExportFormat($event)"
-        >
+        <div class="format-picker" role="radiogroup" aria-label="Export format">
           @for (format of formats; track format) {
-            <option [value]="format">{{ formatLabels[format] }}</option>
+            <button
+              type="button"
+              role="radio"
+              [class.selected]="exportFormat() === format"
+              [attr.aria-checked]="exportFormat() === format"
+              (click)="selectExportFormat(format)"
+            >
+              {{ formatLabels[format] }}
+            </button>
           }
-        </select>
-      </label>
+        </div>
+      </div>
 
-      <label class="field">
-        <span class="field-label">Destination path</span>
-        <input
-          type="text"
-          name="exportPath"
-          [ngModel]="exportPath()"
-          (ngModelChange)="exportPath.set($event)"
-          [placeholder]="exportHint()"
-          autocomplete="off"
-          spellcheck="false"
-        />
-      </label>
+      <div class="field">
+        <span class="field-label">{{
+          exportIsDirectory() ? 'Destination folder' : 'Destination file'
+        }}</span>
+        <div class="path-field">
+          <input
+            class="input mono"
+            type="text"
+            name="exportPath"
+            [value]="exportPath()"
+            (input)="exportPath.set(inputValue($event))"
+            [placeholder]="exportHint()"
+            autocomplete="off"
+            spellcheck="false"
+          />
+          <button type="button" class="btn" (click)="browseExport()">
+            <app-icon [name]="exportIsDirectory() ? 'folder-open' : 'file'" [size]="14" />
+            Browse…
+          </button>
+        </div>
+      </div>
 
       @if (exportError(); as message) {
         <p class="interop-message error">{{ message }}</p>
       }
       @if (exportMessage(); as message) {
-        <p class="interop-message success">{{ message }}</p>
+        <p class="interop-message success">
+          <app-icon name="check" [size]="14" />
+          {{ message }}
+        </p>
       }
       @if (exportPaths().length > 0) {
         <ul class="interop-paths">
@@ -110,8 +143,8 @@
 
       <button
         type="button"
-        class="primary-button"
-        [disabled]="isExporting()"
+        class="btn btn-primary card-action"
+        [disabled]="isExporting() || exportPath().trim() === ''"
         (click)="exportDocument()"
       >
         {{ isExporting() ? 'Exporting…' : 'Export' }}
