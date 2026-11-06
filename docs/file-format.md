@@ -14,9 +14,13 @@ environments/
 collections/
   platform/
     collection.yaml             collection metadata
+    environments/
+      development.yaml          refines the global environment of that name
+      development.local.yaml    local overrides, git ignored
     users/
+      folder.yaml               folder display name
       list-users.yaml           one file per request
-local/                          private requests, git ignored
+local/                          private collections, same layout, git ignored
 .awake/                         index and cache, git ignored
 ```
 
@@ -85,16 +89,41 @@ secretVariables:
 `environments/development.local.yaml` has the same shape and is git ignored. It
 overrides the shared environment on the local machine.
 
+### Collection environments
+
+A collection can declare its own environments in `<collection>/environments/`,
+with the same format. A collection environment refines the global environment
+of the same name: its variables win, and the variables it does not define are
+inherited from the global one. A collection may also declare an environment
+that has no global counterpart. Selecting an environment selects it at both
+levels. Secret values of a collection environment are stored under
+`<collection path>:<environment name>` so they never mix with global ones.
+
 ## Variables resolution order
 
 From lowest to highest precedence:
 
 1. workspace defaults (`awake.yaml`);
-2. shared environment;
-3. local environment overrides;
-4. collection variables;
-5. request variables;
-6. values provided at send time.
+2. collection variables (`collection.yaml`);
+3. global environment, then its local overrides and secrets;
+4. collection environment of the same name, then its local overrides and
+   secrets;
+5. values set by the pre-request script.
+
+### Dynamic variables
+
+Placeholders starting with `$` are generated each time a request is sent, and
+each occurrence receives its own value:
+
+| Placeholder | Value |
+| --- | --- |
+| `{{$uuid}}` | random UUID v4 |
+| `{{$timestamp}}` | Unix time in seconds |
+| `{{$timestampMs}}` | Unix time in milliseconds |
+| `{{$isoTimestamp}}` | current time in ISO 8601, UTC |
+| `{{$date}}` | current date, `YYYY-MM-DD` |
+| `{{$randomInt}}` | integer between 0 and 1000 |
+| `{{$randomHex}}` | 16 hexadecimal characters |
 
 Secret values are resolved lazily when a request is sent. Referencing an
 undefined variable is an error, not an empty string.
@@ -272,10 +301,8 @@ are never written to the workspace or to request history.
 
 ## Private requests and local overlays
 
-- A request marked private moves to `local/`, mirroring its collection path. It
-  is ignored by git and only visible on the local machine.
-- Marking a request as shared moves it back into `collections/` and stages it
-  for the next commit.
+- A private collection lives in `local/` with the same layout as
+  `collections/`. It is ignored by git and only visible on the local machine.
 - Local environment files override shared values without changing tracked
   files.
 
