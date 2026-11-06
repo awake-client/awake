@@ -1,0 +1,212 @@
+:host {
+  position: relative;
+  display: inline-flex;
+  min-width: 0;
+  --wails-draggable: no-drag;
+}
+
+.switcher {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+  height: 30px;
+  padding: 0 8px 0 6px;
+  border: none;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-text-strong);
+  font-size: var(--text-base);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.switcher:hover,
+.switcher.open {
+  background: var(--color-active);
+}
+
+.switcher app-icon {
+  color: var(--color-text-muted);
+}
+
+.name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The first letter of the workspace in a square of its color. */
+.initial:not([data-color]) {
+  --entity-color: var(--color-accent);
+}
+
+.initial {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  background: var(--entity-color);
+  color: var(--color-on-accent);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  width: 320px;
+  max-height: 70vh;
+  overflow: auto;
+  padding: 6px;
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-raised);
+  box-shadow: var(--shadow-raised);
+}
+
+.menu-title {
+  margin: 4px 8px;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text-subtle);
+}
+
+.workspace {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 8px;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  outline: none;
+}
+
+.workspace:hover,
+.workspace:focus-visible {
+  background: var(--color-active);
+}
+
+.workspace.current {
+  background: var(--color-selection);
+}
+
+.avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-md);
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.avatar[data-color] {
+  background: color-mix(in srgb, var(--entity-color) 18%, transparent);
+  color: var(--entity-color);
+}
+
+.text {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.workspace-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-text-strong);
+  font-weight: 500;
+}
+
+.busy {
+  margin-left: 4px;
+  font-size: var(--text-xs);
+  font-weight: 400;
+  color: var(--color-text-muted);
+}
+
+.path {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  direction: rtl;
+  text-align: left;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--color-text-subtle);
+}
+
+.error {
+  font-size: var(--text-xs);
+  color: var(--color-danger);
+}
+
+.check {
+  color: var(--color-accent);
+}
+
+.forget {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-subtle);
+  opacity: 0;
+  cursor: pointer;
+}
+
+.workspace:hover .forget {
+  opacity: 1;
+}
+
+.forget:hover {
+  background: var(--color-active);
+  color: var(--color-text-strong);
+}
+
+hr {
+  margin: 5px 4px;
+  border: 0;
+  border-top: 1px solid var(--color-border);
+}
+
+.action {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  height: 30px;
+  padding: 0 8px;
+  border: none;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: var(--text-base);
+  text-align: left;
+  cursor: pointer;
+}
+
+.action:hover {
+  background: var(--color-active);
+  color: var(--color-text-strong);
+}

@@ -1,0 +1,72 @@
+<button
+  type="button"
+  class="switcher"
+  [class.open]="isOpen()"
+  aria-haspopup="menu"
+  [attr.aria-expanded]="isOpen()"
+  title="Switch workspace"
+  (click)="toggle()"
+>
+  <span class="initial" aria-hidden="true" [attr.data-color]="color() || null">{{ initial() }}</span>
+  <span class="name">{{ name() }}</span>
+  <app-icon name="chevron-down" [size]="13" />
+</button>
+
+@if (isOpen()) {
+  <div class="menu" role="menu">
+    <p class="menu-title">Workspaces</p>
+    @for (workspace of recent(); track workspace.rootPath) {
+      <div
+        class="workspace"
+        role="menuitemradio"
+        tabindex="0"
+        [class.current]="isCurrent(workspace)"
+        [attr.aria-checked]="isCurrent(workspace)"
+        (click)="switchTo(workspace)"
+        (keydown.enter)="switchTo(workspace)"
+      >
+        <span class="avatar" [attr.data-color]="workspace.color || null">
+          {{ workspace.name.charAt(0) }}
+        </span>
+        <span class="text">
+          <span class="workspace-name">
+            {{ workspace.name }}
+            @if (busyPath() === workspace.rootPath) {
+              <span class="busy">opening…</span>
+            }
+          </span>
+          <span class="path" [title]="workspace.rootPath">{{ workspace.rootPath }}</span>
+          @if (errors()[workspace.rootPath]; as error) {
+            <span class="error">{{ error }}</span>
+          }
+        </span>
+        @if (isCurrent(workspace)) {
+          <app-icon class="check" name="check" [size]="14" />
+        } @else {
+          <button
+            type="button"
+            class="forget"
+            title="Remove from this list"
+            aria-label="Remove from this list"
+            (click)="forget(workspace, $event)"
+          >
+            <app-icon name="close" [size]="12" />
+          </button>
+        }
+      </div>
+    }
+    <hr />
+    <button type="button" class="action" (click)="overview()">
+      <app-icon name="home" [size]="14" />
+      Workspace overview
+    </button>
+    <button type="button" class="action" (click)="openFolder()">
+      <app-icon name="folder-open" [size]="14" />
+      Open workspace…
+    </button>
+    <button type="button" class="action" (click)="createWorkspace()">
+      <app-icon name="plus" [size]="14" />
+      New workspace…
+    </button>
+  </div>
+}

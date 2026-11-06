@@ -1,28 +1,6 @@
 <header class="titlebar">
   <div class="titlebar-start">
-    <a
-      class="workspace-switcher"
-      routerLink="/workspace"
-      routerLinkActive="active"
-      [routerLinkActiveOptions]="{ exact: true }"
-      title="Workspace overview"
-    >
-      <span
-        class="brand-mark"
-        aria-hidden="true"
-        [attr.data-color]="workspace()?.configuration?.Color || null"
-      ></span>
-      <span class="workspace-name">{{ workspace()?.configuration?.Name }}</span>
-    </a>
-    <button
-      type="button"
-      class="icon-btn"
-      title="Switch workspace"
-      aria-label="Switch workspace"
-      (click)="switchWorkspace()"
-    >
-      <app-icon name="switch" [size]="14" />
-    </button>
+    <app-workspace-switcher />
   </div>
 
   <button type="button" class="search-trigger" (click)="openCommandPalette()">
@@ -87,6 +65,7 @@
       @if (updateError(); as message) {
         <span class="update-error" [title]="message">Update unavailable</span>
       }
+      <app-theme-picker />
       <button
         type="button"
         class="icon-btn"

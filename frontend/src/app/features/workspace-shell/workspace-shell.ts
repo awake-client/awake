@@ -15,6 +15,8 @@ import { Icon, IconName } from '@shared/icon';
 import { ResizeHandle } from '@shared/resize-handle';
 import { EnvironmentChoice, EnvironmentPicker } from './environment-picker';
 import { RequestTabs } from './request-tabs';
+import { ThemePicker } from './theme-picker';
+import { WorkspaceSwitcher } from './workspace-switcher';
 
 type EnvironmentOption = EnvironmentChoice;
 
@@ -48,6 +50,8 @@ const SIDEBAR_SECTIONS: SidebarSection[] = [
     ConfirmationDialog,
     RequestTabs,
     EnvironmentPicker,
+    ThemePicker,
+    WorkspaceSwitcher,
     ResizeHandle,
     Icon,
   ],
