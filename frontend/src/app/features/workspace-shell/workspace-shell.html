@@ -7,7 +7,11 @@
       [routerLinkActiveOptions]="{ exact: true }"
       title="Workspace overview"
     >
-      <span class="brand-mark" aria-hidden="true"></span>
+      <span
+        class="brand-mark"
+        aria-hidden="true"
+        [attr.data-color]="workspace()?.configuration?.Color || null"
+      ></span>
       <span class="workspace-name">{{ workspace()?.configuration?.Name }}</span>
     </a>
     <button
@@ -28,34 +32,25 @@
   </button>
 
   <div class="titlebar-end">
-    <label
-      class="environment-picker"
-      [class.active]="selectedEnvironment()"
-      title="Active environment"
-    >
-      <span class="environment-dot" aria-hidden="true"></span>
-      <select
-        [value]="selectedEnvironment()"
-        (change)="selectEnvironment($event)"
-        aria-label="Active environment"
-      >
-        <option value="" [selected]="!selectedEnvironment()">No environment</option>
-        @for (environment of environments(); track environment.FileName) {
-          <option
-            [value]="environment.FileName"
-            [selected]="environment.FileName === selectedEnvironment()"
-          >
-            {{ environment.Name }}{{ environment.HasLocalOverrides ? ' (local)' : '' }}
-          </option>
-        }
-      </select>
-      <app-icon name="chevron-down" [size]="12" />
-    </label>
+    <app-environment-picker
+      [environments]="environments()"
+      [selected]="selectedEnvironment()"
+      (selectedChange)="chooseEnvironment($event)"
+    />
   </div>
 </header>
 
-<div class="workspace-body">
+<div
+  class="workspace-body"
+  [style.grid-template-columns]="layout.sidebarWidth() + 'px minmax(0, 1fr)'"
+>
   <aside class="sidebar">
+    <app-resize-handle
+      orientation="vertical"
+      title="Drag to resize, double click to reset"
+      (resize)="layout.setSidebarWidth($event.x)"
+      (reset)="layout.setSidebarWidth(defaultSidebarWidth)"
+    />
     <app-collection-tree
       class="sidebar-tree"
       [workspaceRoot]="rootPath()"
@@ -104,7 +99,7 @@
     </footer>
   </aside>
 
-  <main class="sheet">
+  <main class="sheet" [attr.data-color]="environmentColor() || null">
     @if (tabs.tabs().length > 0) {
       <app-request-tabs />
     }

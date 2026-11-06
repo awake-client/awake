@@ -1,10 +1,10 @@
 import { Component, DestroyRef, computed, effect, inject, signal, viewChild } from '@angular/core';
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import * as EnvironmentsService from '@bindings/github.com/clementherve/awake/src/features/environments/service';
-import { Summary } from '@bindings/github.com/clementherve/awake/src/features/environments/models';
 import * as UpdatesService from '@bindings/github.com/clementherve/awake/src/features/updates/service';
 import { EnvironmentStore } from '@core/environment-store';
 import { GitSync } from '@core/git-sync';
+import { LayoutStore, SIDEBAR_WIDTH } from '@core/layout-store';
 import { TabsStore } from '@core/tabs-store';
 import { WorkspaceStore } from '@core/workspace-store';
 import { CollectionTree } from '@features/collections/collection-tree';
@@ -12,7 +12,11 @@ import { CommandPalette } from '@features/command-palette/command-palette';
 import { NewEntryDialog } from '@features/new-entry/new-entry-dialog';
 import { ConfirmationDialog } from '@shared/confirmation-dialog';
 import { Icon, IconName } from '@shared/icon';
+import { ResizeHandle } from '@shared/resize-handle';
+import { EnvironmentChoice, EnvironmentPicker } from './environment-picker';
 import { RequestTabs } from './request-tabs';
+
+type EnvironmentOption = EnvironmentChoice;
 
 /** Secondary workspace tools listed under the collection tree. */
 interface SidebarSection {
@@ -43,6 +47,8 @@ const SIDEBAR_SECTIONS: SidebarSection[] = [
     NewEntryDialog,
     ConfirmationDialog,
     RequestTabs,
+    EnvironmentPicker,
+    ResizeHandle,
     Icon,
   ],
   templateUrl: './workspace-shell.html',
@@ -58,13 +64,22 @@ export class WorkspaceShell {
   /** Created with the shell so synchronization runs while a workspace is open. */
   protected readonly gitSync = inject(GitSync);
   protected readonly tabs = inject(TabsStore);
+  protected readonly layout = inject(LayoutStore);
+  protected readonly defaultSidebarWidth = SIDEBAR_WIDTH.default;
   protected readonly sections = SIDEBAR_SECTIONS;
   protected readonly workspace = this.workspaceStore.workspace;
   protected readonly rootPath = computed(() => this.workspaceStore.rootPath() ?? '');
-  protected readonly environments = signal<Summary[]>([]);
+  protected readonly environments = signal<EnvironmentOption[]>([]);
   protected readonly selectedEnvironment = this.environmentStore.selected;
   protected readonly version = signal('');
   protected readonly updateError = signal<string | null>(null);
+  /** Color of the active environment, shown along the top of the work area. */
+  protected readonly environmentColor = computed(
+    () =>
+      this.environments().find((environment) => environment.FileName === this.selectedEnvironment())
+        ?.Color ?? '',
+  );
+
   protected readonly modeLabel = computed(() => {
     const mode = this.workspace()?.configuration.Mode;
     if (!mode) {
@@ -106,8 +121,8 @@ export class WorkspaceShell {
     void this.commandPalette()?.open();
   }
 
-  protected selectEnvironment(event: Event): void {
-    this.environmentStore.select((event.target as HTMLSelectElement).value);
+  protected chooseEnvironment(fileName: string): void {
+    this.environmentStore.select(fileName);
   }
 
   protected switchWorkspace(): void {
@@ -131,7 +146,22 @@ export class WorkspaceShell {
       this.environmentStore.selected() || this.environmentStore.remembered(rootPath);
 
     try {
-      const summaries = (await EnvironmentsService.List(rootPath)) ?? [];
+      const options = new Map<string, EnvironmentOption>();
+      for (const scoped of (await EnvironmentsService.ListAll(rootPath)) ?? []) {
+        const existing = options.get(scoped.FileName);
+        if (!existing || (existing.CollectionOnly && scoped.Scope === '')) {
+          options.set(scoped.FileName, {
+            FileName: scoped.FileName,
+            Name: scoped.Name,
+            HasLocalOverrides: scoped.HasLocalOverrides || !!existing?.HasLocalOverrides,
+            CollectionOnly: scoped.Scope !== '',
+            Color: scoped.Color || existing?.Color || '',
+          });
+        } else if (scoped.HasLocalOverrides) {
+          existing.HasLocalOverrides = true;
+        }
+      }
+      const summaries = [...options.values()];
       this.environments.set(summaries);
 
       if (

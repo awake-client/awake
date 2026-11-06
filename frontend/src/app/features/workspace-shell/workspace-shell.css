@@ -120,52 +120,6 @@
   color: var(--color-text-muted);
 }
 
-.environment-picker {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  height: 28px;
-  padding: 0 9px;
-  border-radius: 999px;
-  background: var(--color-active);
-  color: var(--color-text-muted);
-  cursor: pointer;
-}
-
-.environment-picker:hover {
-  color: var(--color-text-strong);
-}
-
-.environment-picker.active {
-  background: color-mix(in srgb, var(--color-success) 13%, transparent);
-  color: var(--color-success);
-}
-
-.environment-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--color-text-subtle);
-}
-
-.environment-picker.active .environment-dot {
-  background: var(--color-success);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-success) 22%, transparent);
-}
-
-/* The picker draws its own chevron icon, so the select stays bare. */
-.environment-picker select {
-  height: auto;
-  max-width: 170px;
-  padding: 0;
-  border: none;
-  background-color: transparent;
-  background-image: none;
-  color: inherit;
-  font-size: var(--text-sm);
-  font-weight: 500;
-}
-
 /* Body --------------------------------------------------------------------- */
 
 .workspace-body {
@@ -177,10 +131,19 @@
 }
 
 .sidebar {
+  position: relative;
   display: flex;
   flex-direction: column;
   min-height: 0;
   overflow: hidden;
+}
+
+.sidebar app-resize-handle {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  margin: 0;
 }
 
 .sidebar-tree {
@@ -324,4 +287,28 @@
   flex: 1;
   min-height: 0;
   overflow: hidden;
+}
+
+/* A workspace color tints the brand mark. */
+.brand-mark[data-color] {
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--entity-color) 70%, #ffffff) 0%,
+    var(--entity-color) 100%
+  );
+}
+
+/* The active environment color runs along the top of the work area. */
+.sheet {
+  position: relative;
+}
+
+.sheet[data-color]::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  z-index: 10;
+  height: 2px;
+  background: var(--entity-color);
+  pointer-events: none;
 }
