@@ -83,6 +83,14 @@
     [style.padding-left.px]="8 + row.depth * 14"
     (click)="activate(row)"
     (dblclick)="pin(row)"
+    [attr.draggable]="canDrag(row)"
+    [class.dragging]="dragged()?.entry?.Path === row.entry.Path"
+    [class.drop-target]="!isRequest(row) && dropTarget() === row.entry.Path"
+    [class.drop-inside]="isInDropTarget(row)"
+    (dragstart)="startDrag($event, row)"
+    (dragover)="dragOver($event, row)"
+    (drop)="drop($event)"
+    (dragend)="endDrag()"
     (keydown.enter)="activate(row)"
     (keydown.space)="activate(row)"
     (keydown.delete)="deleteEntry(row)"
@@ -110,7 +118,12 @@
           [class.expanded]="row.expanded"
         />
         @if (row.depth === 0) {
-          <app-icon class="folder-icon" [name]="isPrivate(row) ? 'lock' : 'box'" [size]="14" />
+          <app-icon
+            class="folder-icon"
+            [attr.data-color]="row.entry.Color || null"
+            [name]="isPrivate(row) ? 'lock' : 'box'"
+            [size]="14"
+          />
         } @else {
           <app-icon
             class="folder-icon"
@@ -170,6 +183,22 @@
       <button type="button" role="menuitem" class="menu-item" (click)="createFromRowMenu('folder')">
         <app-icon name="folder-plus" [size]="14" />
         New folder
+      </button>
+      <hr class="menu-separator" />
+    }
+    @if (menu.row.depth === 0) {
+      <button type="button" role="menuitem" class="menu-item" (click)="openSettings()">
+        <app-icon name="settings" [size]="14" />
+        Collection settings
+      </button>
+      <button
+        type="button"
+        role="menuitem"
+        class="menu-item"
+        (click)="createEnvironmentFromRowMenu()"
+      >
+        <app-icon name="globe" [size]="14" />
+        New environment
       </button>
       <hr class="menu-separator" />
     }

@@ -189,10 +189,10 @@ func TestCreateFolderInsideCollection(t *testing.T) {
 	if err := repository.CreateCollection("collections/billing", domain.Collection{Name: "Billing"}); err != nil {
 		t.Fatalf("create collection: %v", err)
 	}
-	if err := repository.CreateFolder("collections/billing/invoices"); err != nil {
+	if err := repository.CreateFolder("collections/billing/invoices", "Unpaid invoices"); err != nil {
 		t.Fatalf("create folder: %v", err)
 	}
-	if err := repository.CreateFolder("collections/billing/invoices/drafts"); err != nil {
+	if err := repository.CreateFolder("collections/billing/invoices/drafts", ""); err != nil {
 		t.Fatalf("create nested folder: %v", err)
 	}
 
@@ -200,7 +200,7 @@ func TestCreateFolderInsideCollection(t *testing.T) {
 	if err != nil {
 		t.Fatalf("list collection: %v", err)
 	}
-	if len(entries) != 1 || entries[0].Kind != KindDirectory || entries[0].Name != "invoices" || !entries[0].HasChildren {
+	if len(entries) != 1 || entries[0].Kind != KindDirectory || entries[0].Name != "Unpaid invoices" || !entries[0].HasChildren {
 		t.Fatalf("unexpected entries: %+v", entries)
 	}
 
@@ -209,13 +209,13 @@ func TestCreateFolderInsideCollection(t *testing.T) {
 		t.Fatalf("list nested folder: %v", err)
 	}
 	if len(nested) != 0 {
-		t.Fatalf("the keep file must stay hidden, got %+v", nested)
+		t.Fatalf("the folder metadata must stay hidden, got %+v", nested)
 	}
-	if _, err := os.Stat(filepath.Join(workspaceRoot, "collections", "billing", "invoices", "drafts", ".gitkeep")); err != nil {
-		t.Fatalf("expected a keep file: %v", err)
+	if _, err := os.Stat(filepath.Join(workspaceRoot, "collections", "billing", "invoices", "drafts", "folder.yaml")); err != nil {
+		t.Fatalf("expected a folder metadata file: %v", err)
 	}
 
-	if err := repository.CreateFolder("collections/billing/invoices"); !errors.Is(err, ErrEntryExists) {
+	if err := repository.CreateFolder("collections/billing/invoices", ""); !errors.Is(err, ErrEntryExists) {
 		t.Fatalf("expected ErrEntryExists, got %v", err)
 	}
 }
@@ -231,7 +231,7 @@ func TestCreateFolderRejectsInvalidLocations(t *testing.T) {
 		"collections/billing/a.yaml": ErrInvalidPath,
 	}
 	for relativePath, expected := range cases {
-		if err := repository.CreateFolder(relativePath); !errors.Is(err, expected) {
+		if err := repository.CreateFolder(relativePath, ""); !errors.Is(err, expected) {
 			t.Errorf("CreateFolder(%q): expected %v, got %v", relativePath, expected, err)
 		}
 	}
@@ -296,7 +296,7 @@ func TestPrivateCollectionsLiveUnderLocal(t *testing.T) {
 	if err := repository.CreateCollection("local/scratch", domain.Collection{Name: "Scratch"}); err != nil {
 		t.Fatalf("create private collection: %v", err)
 	}
-	if err := repository.CreateFolder("local/scratch/drafts"); err != nil {
+	if err := repository.CreateFolder("local/scratch/drafts", ""); err != nil {
 		t.Fatalf("create private folder: %v", err)
 	}
 	request := domain.Request{Name: "Ping", Method: "GET", URL: "https://example.com/ping"}
@@ -336,6 +336,120 @@ func TestPrivateCollectionsLiveUnderLocal(t *testing.T) {
 	}
 	if _, err := repository.List("local/../awake.yaml"); !errors.Is(err, ErrInvalidPath) {
 		t.Fatalf("expected traversal out of local to be rejected, got %v", err)
+	}
+}
+
+func TestCollectionEnvironmentsStayOutOfTheTree(t *testing.T) {
+	workspaceRoot := t.TempDir()
+	repository := NewRepository(workspaceRoot)
+	writeTestFile(t, workspaceRoot, "collections/billing/collection.yaml", "name: Billing\n")
+	writeTestFile(t, workspaceRoot, "collections/billing/environments/staging.yaml", "name: Staging\n")
+	writeTestFile(t, workspaceRoot, "collections/empty/collection.yaml", "name: Empty\n")
+	writeTestFile(t, workspaceRoot, "collections/empty/environments/staging.yaml", "name: Staging\n")
+	writeTestFile(t, workspaceRoot, "collections/billing/list.yaml", "name: List\nmethod: GET\nurl: https://example.com\n")
+
+	entries, err := repository.List("collections/billing")
+	if err != nil {
+		t.Fatalf("list collection: %v", err)
+	}
+	if len(entries) != 1 || entries[0].Name != "List" {
+		t.Fatalf("expected only the request, got %+v", entries)
+	}
+
+	roots, err := repository.List("")
+	if err != nil {
+		t.Fatalf("list roots: %v", err)
+	}
+	for _, root := range roots {
+		if root.Path == "collections/empty" && root.HasChildren {
+			t.Errorf("a collection holding only environments has no children: %+v", root)
+		}
+	}
+
+	results, err := repository.SearchRequests("staging", 10)
+	if err != nil {
+		t.Fatalf("search: %v", err)
+	}
+	if len(results) != 0 {
+		t.Fatalf("environment files must not be found as requests: %+v", results)
+	}
+
+	if err := repository.CreateFolder("collections/billing/environments", ""); !errors.Is(err, ErrReservedName) {
+		t.Fatalf("expected the environments folder name to be reserved, got %v", err)
+	}
+	if err := repository.CreateFolder("collections/billing/sub", ""); err != nil {
+		t.Fatalf("create folder: %v", err)
+	}
+	if err := repository.CreateFolder("collections/billing/sub/environments", ""); err != nil {
+		t.Fatalf("a nested folder may use the name: %v", err)
+	}
+}
+
+func TestMoveRequestsAndFolders(t *testing.T) {
+	workspaceRoot := t.TempDir()
+	repository := NewRepository(workspaceRoot)
+	request := "name: Ping\nmethod: GET\nurl: https://example.com\n"
+	writeTestFile(t, workspaceRoot, "collections/billing/collection.yaml", "name: Billing\n")
+	writeTestFile(t, workspaceRoot, "collections/billing/ping.yaml", request)
+	writeTestFile(t, workspaceRoot, "collections/billing/invoices/list.yaml", request)
+	writeTestFile(t, workspaceRoot, "collections/billing/archive/old.yaml", request)
+	writeTestFile(t, workspaceRoot, "local/scratch/collection.yaml", "name: Scratch\n")
+
+	moved, err := repository.Move("collections/billing/ping.yaml", "collections/billing/invoices")
+	if err != nil || moved != "collections/billing/invoices/ping.yaml" {
+		t.Fatalf("move request into a folder: %q, %v", moved, err)
+	}
+	moved, err = repository.Move("collections/billing/invoices/ping.yaml", "collections/billing")
+	if err != nil || moved != "collections/billing/ping.yaml" {
+		t.Fatalf("move request up: %q, %v", moved, err)
+	}
+	moved, err = repository.Move("collections/billing/archive", "collections/billing/invoices")
+	if err != nil || moved != "collections/billing/invoices/archive" {
+		t.Fatalf("move folder into a folder: %q, %v", moved, err)
+	}
+	if _, err := repository.LoadRequest("collections/billing/invoices/archive/old.yaml"); err != nil {
+		t.Fatalf("the moved folder keeps its requests: %v", err)
+	}
+	moved, err = repository.Move("collections/billing/ping.yaml", "local/scratch")
+	if err != nil || moved != "local/scratch/ping.yaml" {
+		t.Fatalf("make a request private: %q, %v", moved, err)
+	}
+	if same, err := repository.Move("local/scratch/ping.yaml", "local/scratch"); err != nil || same != "local/scratch/ping.yaml" {
+		t.Fatalf("moving into the same folder is a no-op: %q, %v", same, err)
+	}
+
+	writeTestFile(t, workspaceRoot, "collections/billing/list.yaml", request)
+	cases := []struct {
+		source   string
+		target   string
+		expected error
+	}{
+		{"collections/billing/invoices", "collections/billing/invoices/archive", ErrInvalidMove},
+		{"collections/billing", "local/scratch", ErrInvalidPath},
+		{"collections/billing/list.yaml", "collections", ErrInvalidPath},
+		{"collections/billing/list.yaml", "collections/billing/invoices", ErrEntryExists},
+		{"collections/billing/missing.yaml", "local/scratch", ErrEntryNotFound},
+		{"collections/billing/list.yaml", "../outside", ErrInvalidPath},
+	}
+	for _, testCase := range cases {
+		if _, err := repository.Move(testCase.source, testCase.target); !errors.Is(err, testCase.expected) {
+			t.Errorf("Move(%q, %q): expected %v, got %v", testCase.source, testCase.target, testCase.expected, err)
+		}
+	}
+}
+
+func TestCollectionsExposeTheirColor(t *testing.T) {
+	workspaceRoot := t.TempDir()
+	repository := NewRepository(workspaceRoot)
+	if err := repository.CreateCollection("collections/billing", domain.Collection{Name: "Billing", Color: "violet"}); err != nil {
+		t.Fatalf("create collection: %v", err)
+	}
+	entries, err := repository.List("")
+	if err != nil || len(entries) != 1 || entries[0].Color != "violet" {
+		t.Fatalf("expected the collection color, got %+v, %v", entries, err)
+	}
+	if err := repository.UpdateCollection("collections/billing", domain.Collection{Name: "Billing", Color: "plaid"}); err == nil {
+		t.Fatal("expected an unknown color to be rejected")
 	}
 }
 

@@ -68,6 +68,9 @@ export class TabsStore {
       if (change?.removed) {
         this.forgetUnder(change.removed);
       }
+      if (change?.moved) {
+        this.relocate(change.moved.from, change.moved.to);
+      }
     };
     window.addEventListener(COLLECTIONS_CHANGED_EVENT, collectionsChanged);
     inject(DestroyRef).onDestroy(() =>
@@ -205,6 +208,30 @@ export class TabsStore {
       tabs.map((tab) => (tab.path === path ? { ...tab, ...changes } : tab)),
     );
     this.persist();
+  }
+
+  /**
+   * Follows a request or a folder that moved: its tabs and their unsaved
+   * edits keep working under the new path.
+   */
+  private relocate(from: string, to: string): void {
+    const rename = (path: string) =>
+      path === from ? to : path.startsWith(`${from}/`) ? to + path.slice(from.length) : path;
+
+    for (const [path, state] of [...this.stashes.entries()]) {
+      const renamed = rename(path);
+      if (renamed !== path) {
+        this.stashes.delete(path);
+        this.stashes.set(renamed, state);
+      }
+    }
+    this.tabs.update((tabs) => tabs.map((tab) => ({ ...tab, path: rename(tab.path) })));
+    this.persist();
+
+    const active = this.active();
+    if (active && rename(active) !== active) {
+      this.open(rename(active));
+    }
   }
 
   /** Closes the tabs of a deleted request or of the requests of a folder. */

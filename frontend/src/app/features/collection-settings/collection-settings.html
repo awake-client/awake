@@ -1,0 +1,159 @@
+<section class="settings">
+  <header class="settings-header">
+    <div class="title">
+      <p class="eyebrow">
+        <app-icon [name]="isPrivate() ? 'lock' : 'box'" [size]="12" />
+        {{ isPrivate() ? 'Private collection' : 'Collection' }}
+      </p>
+      <h1>{{ name() || 'Untitled collection' }}</h1>
+      <p class="path">{{ collectionPath() }}/collection.yaml</p>
+    </div>
+    <div class="actions">
+      @if (isDirty()) {
+        <span class="dirty">Unsaved</span>
+      }
+      @if (statusMessage(); as message) {
+        <span class="saved">{{ message }}</span>
+      }
+      <button
+        type="button"
+        class="btn btn-primary"
+        [disabled]="!isDirty() || isSaving()"
+        title="Save (⌘S)"
+        (click)="save()"
+      >
+        <app-icon name="save" [size]="14" />
+        {{ isSaving() ? 'Saving…' : 'Save' }}
+      </button>
+    </div>
+  </header>
+
+  <nav class="tabs" role="tablist">
+    <button
+      type="button"
+      role="tab"
+      [class.active]="tab() === 'overview'"
+      (click)="tab.set('overview')"
+    >
+      Overview
+    </button>
+    <button
+      type="button"
+      role="tab"
+      [class.active]="tab() === 'variables'"
+      (click)="tab.set('variables')"
+    >
+      Variables
+      @if (variables().length > 0) {
+        <span class="count">{{ variables().length }}</span>
+      }
+    </button>
+    <button
+      type="button"
+      role="tab"
+      [class.active]="tab() === 'authentication'"
+      (click)="tab.set('authentication')"
+    >
+      Authentication
+    </button>
+  </nav>
+
+  @if (errorMessage(); as message) {
+    <p class="error">{{ message }}</p>
+  }
+
+  @if (!isLoading()) {
+    <div class="panel">
+      @switch (tab()) {
+        @case ('overview') {
+          <label class="field">
+            <span class="field-label">Name</span>
+            <input
+              class="input"
+              type="text"
+              [value]="name()"
+              (input)="name.set(inputValue($event))"
+            />
+          </label>
+          <div class="field">
+            <span class="field-label">Color</span>
+            <app-color-picker [value]="color()" (valueChange)="color.set($event)" />
+          </div>
+          <label class="field grow">
+            <span class="field-label">Documentation</span>
+            <textarea
+              class="input documentation"
+              rows="10"
+              [value]="documentation()"
+              (input)="documentation.set(inputValue($event))"
+              placeholder="What this API does, how to get credentials, conventions to follow…"
+            ></textarea>
+          </label>
+          <a
+            class="link"
+            routerLink="/workspace/environments"
+            [queryParams]="{ scope: collectionPath() }"
+          >
+            <app-icon name="globe" [size]="14" />
+            Environments of this collection
+            <app-icon name="chevron-right" [size]="12" />
+          </a>
+        }
+
+        @case ('variables') {
+          <p class="hint">
+            Default values for every request of the collection. An environment variable with the
+            same name takes precedence.
+          </p>
+          <div class="rows">
+            @for (variable of variables(); track $index) {
+              <div class="row">
+                <input
+                  class="input mono"
+                  type="text"
+                  [value]="variable.name"
+                  (input)="updateVariable($index, 'name', inputValue($event))"
+                  placeholder="apiVersion"
+                  spellcheck="false"
+                />
+                <app-variable-input
+                  [value]="variable.value"
+                  (valueChange)="updateVariable($index, 'value', $event)"
+                  placeholder="v2"
+                  ariaLabel="Variable value"
+                />
+                <button
+                  type="button"
+                  class="icon-btn danger"
+                  title="Remove variable"
+                  aria-label="Remove variable"
+                  (click)="removeVariable($index)"
+                >
+                  <app-icon name="trash" [size]="14" />
+                </button>
+              </div>
+            } @empty {
+              <p class="hint">No variable yet.</p>
+            }
+          </div>
+          <button type="button" class="btn btn-sm add" (click)="addVariable()">
+            <app-icon name="plus" [size]="14" />
+            Add variable
+          </button>
+        }
+
+        @case ('authentication') {
+          <p class="hint">
+            Requests set to <strong>Inherit</strong>, the default, use this authentication. A
+            request can still define its own.
+          </p>
+          <app-auth-editor
+            [authentication]="authentication()"
+            [allowInherit]="false"
+            (authenticationChange)="authentication.set($event)"
+          />
+        }
+      }
+    </div>
+  }
+</section>

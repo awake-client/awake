@@ -28,8 +28,8 @@ export function CreateCollection(workspaceRoot: string, relativePath: string, co
 /**
  * CreateFolder creates a folder inside an existing collection or folder.
  */
-export function CreateFolder(workspaceRoot: string, relativePath: string): $CancellablePromise<void> {
-    return $Call.ByID(1910914286, workspaceRoot, relativePath);
+export function CreateFolder(workspaceRoot: string, relativePath: string, name: string): $CancellablePromise<void> {
+    return $Call.ByID(1910914286, workspaceRoot, relativePath, name);
 }
 
 /**
@@ -70,10 +70,25 @@ export function LoadRequest(workspaceRoot: string, relativePath: string): $Cance
 }
 
 /**
+ * Move moves a request or a folder into another collection or folder and
+ * returns its new path.
+ */
+export function Move(workspaceRoot: string, relativePath: string, targetDirectory: string): $CancellablePromise<string> {
+    return $Call.ByID(4074981479, workspaceRoot, relativePath, targetDirectory);
+}
+
+/**
  * SearchRequests returns requests matching every word of the query.
  */
 export function SearchRequests(workspaceRoot: string, query: string, limit: number): $CancellablePromise<$models.Entry[] | null> {
     return $Call.ByID(2739524308, workspaceRoot, query, limit);
+}
+
+/**
+ * UpdateCollection replaces the metadata of an existing collection.
+ */
+export function UpdateCollection(workspaceRoot: string, relativePath: string, collection: domain$0.Collection): $CancellablePromise<void> {
+    return $Call.ByID(43110235, workspaceRoot, relativePath, collection);
 }
 
 /**

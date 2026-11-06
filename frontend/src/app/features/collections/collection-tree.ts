@@ -3,6 +3,7 @@ import { Component, DestroyRef, effect, inject, input, output, signal } from '@a
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { NavigationEnd, Router } from '@angular/router';
 import { filter } from 'rxjs';
+import * as HistoryService from '@bindings/github.com/clementherve/awake/src/features/history/service';
 import * as CollectionsService from '@bindings/github.com/clementherve/awake/src/features/collections/service';
 import {
   Entry,
@@ -81,6 +82,10 @@ export class CollectionTree {
   protected readonly selected = signal<string | null>(null);
   protected readonly isMenuOpen = signal(false);
   protected readonly rowMenu = signal<RowMenu | null>(null);
+  /** Folder that would receive the row being dragged. */
+  protected readonly dropTarget = signal<string | null>(null);
+  protected readonly dragged = signal<TreeRow | null>(null);
+  private expandTimer: number | undefined;
 
   constructor() {
     effect(() => {
@@ -249,6 +254,23 @@ export class CollectionTree {
     }
   }
 
+  /** A collection environment, scoped to the collection of the row. */
+  protected createEnvironmentFromRowMenu(): void {
+    const menu = this.rowMenu();
+    this.rowMenu.set(null);
+    if (menu) {
+      requestEntryCreation({ kind: 'environment', scope: menu.row.entry.Path });
+    }
+  }
+
+  protected openSettings(): void {
+    const menu = this.rowMenu();
+    this.rowMenu.set(null);
+    if (menu) {
+      void this.router.navigate(['/workspace/collection', ...menu.row.entry.Path.split('/')]);
+    }
+  }
+
   protected duplicateFromRowMenu(): void {
     const menu = this.rowMenu();
     this.rowMenu.set(null);
@@ -339,6 +361,106 @@ export class CollectionTree {
       this.selected.set(null);
     }
     notifyCollectionsChanged({ removed });
+  }
+
+  /** Requests and folders can be dragged; collections stay at the root. */
+  protected canDrag(row: TreeRow): boolean {
+    return !row.section && row.depth > 0;
+  }
+
+  protected startDrag(event: DragEvent, row: TreeRow): void {
+    if (!this.canDrag(row)) {
+      event.preventDefault();
+      return;
+    }
+    this.dragged.set(row);
+    this.rowMenu.set(null);
+    if (event.dataTransfer) {
+      event.dataTransfer.effectAllowed = 'move';
+      event.dataTransfer.setData('text/plain', row.entry.Path);
+    }
+  }
+
+  /**
+   * Hovering a folder targets it; hovering a request targets its folder. A
+   * collapsed folder opens after a short pause, so deep moves stay possible.
+   */
+  protected dragOver(event: DragEvent, row: TreeRow): void {
+    const dragged = this.dragged();
+    if (!dragged || row.section) {
+      return;
+    }
+    const target = this.isRequest(row)
+      ? row.entry.Path.slice(0, row.entry.Path.lastIndexOf('/'))
+      : row.entry.Path;
+    const source = dragged.entry.Path;
+    const parent = source.slice(0, source.lastIndexOf('/'));
+    const intoItself =
+      !this.isRequest(dragged) && (target === source || target.startsWith(`${source}/`));
+    if (intoItself || target === parent) {
+      this.dropTarget.set(null);
+      return;
+    }
+
+    event.preventDefault();
+    if (event.dataTransfer) {
+      event.dataTransfer.dropEffect = 'move';
+    }
+    if (this.dropTarget() !== target) {
+      this.dropTarget.set(target);
+      window.clearTimeout(this.expandTimer);
+      if (!this.isRequest(row) && !row.expanded) {
+        this.expandTimer = window.setTimeout(() => {
+          const current = this.rows().find((candidate) => candidate.entry.Path === row.entry.Path);
+          if (current && !current.expanded && this.dragged()) {
+            void this.toggle(current);
+          }
+        }, 600);
+      }
+    }
+  }
+
+  protected async drop(event: DragEvent): Promise<void> {
+    event.preventDefault();
+    const dragged = this.dragged();
+    const target = this.dropTarget();
+    this.endDrag();
+    const workspaceRoot = this.workspaceRoot();
+    if (!dragged || !target || !workspaceRoot) {
+      return;
+    }
+
+    try {
+      const moved = await CollectionsService.Move(workspaceRoot, dragged.entry.Path, target);
+      // The history follows the request; failing to update it must not undo the move.
+      await HistoryService.RenameRequests(workspaceRoot, dragged.entry.Path, moved).catch(
+        () => undefined,
+      );
+      this.errorMessage.set(null);
+      notifyCollectionsChanged({
+        moved: { from: dragged.entry.Path, to: moved },
+        created: moved,
+        kind: this.isRequest(dragged) ? 'request' : 'folder',
+      });
+    } catch (error) {
+      this.errorMessage.set(describeMoveError(error));
+    }
+  }
+
+  /** Requests directly inside the targeted folder are tinted with it. */
+  protected isInDropTarget(row: TreeRow): boolean {
+    const target = this.dropTarget();
+    return (
+      target !== null &&
+      this.isRequest(row) &&
+      row.entry.Path.slice(0, row.entry.Path.lastIndexOf('/')) === target
+    );
+  }
+
+  protected endDrag(): void {
+    window.clearTimeout(this.expandTimer);
+    this.dragged.set(null);
+    this.dropTarget.set(null);
   }
 
   /** A double click keeps the request open in its own tab. */
@@ -485,11 +607,26 @@ function privateSectionRow(): TreeRow {
       Kind: Kind.KindCollection,
       Method: '',
       HasChildren: false,
+      Color: '',
     },
     depth: 0,
     expanded: false,
     section: true,
   };
+}
+
+function describeMoveError(error: unknown): string {
+  const message = describeError(error);
+  if (message.includes('already exists')) {
+    return 'An entry with the same file name already exists there.';
+  }
+  if (message.includes('into itself')) {
+    return 'A folder cannot move into itself.';
+  }
+  if (message.includes('reserved')) {
+    return 'A folder named "environments" cannot sit at the root of a collection.';
+  }
+  return message;
 }
 
 function describeError(error: unknown): string {

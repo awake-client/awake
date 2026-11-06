@@ -6,17 +6,13 @@ export const routes: Routes = [
     path: '',
     pathMatch: 'full',
     loadComponent: () =>
-      import('@features/workspace/workspace-picker').then(
-        (module) => module.WorkspacePicker,
-      ),
+      import('@features/workspace/workspace-picker').then((module) => module.WorkspacePicker),
   },
   {
     path: 'workspace',
     canActivate: [workspaceOpenGuard],
     loadComponent: () =>
-      import('@features/workspace-shell/workspace-shell').then(
-        (module) => module.WorkspaceShell,
-      ),
+      import('@features/workspace-shell/workspace-shell').then((module) => module.WorkspaceShell),
     children: [
       {
         path: '',
@@ -40,21 +36,28 @@ export const routes: Routes = [
       {
         path: 'history',
         loadComponent: () =>
-          import('@features/history/history-panel').then(
-            (module) => module.HistoryPanel,
-          ),
+          import('@features/history/history-panel').then((module) => module.HistoryPanel),
       },
       {
         path: 'git',
-        loadComponent: () =>
-          import('@features/git/git-panel').then((module) => module.GitPanel),
+        loadComponent: () => import('@features/git/git-panel').then((module) => module.GitPanel),
       },
       {
         path: 'interop',
         loadComponent: () =>
-          import('@features/interop/interop-panel').then(
-            (module) => module.InteropPanel,
-          ),
+          import('@features/interop/interop-panel').then((module) => module.InteropPanel),
+      },
+      {
+        path: 'collection',
+        children: [
+          {
+            path: '**',
+            loadComponent: () =>
+              import('@features/collection-settings/collection-settings').then(
+                (module) => module.CollectionSettings,
+              ),
+          },
+        ],
       },
       {
         path: 'environments',

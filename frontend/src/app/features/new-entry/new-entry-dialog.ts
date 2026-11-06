@@ -22,8 +22,10 @@ import {
   CreationRequest,
   notifyCollectionsChanged,
 } from '@core/collection-events';
+import { EnvironmentStore } from '@core/environment-store';
 import { TabsStore } from '@core/tabs-store';
 import { WorkspaceStore } from '@core/workspace-store';
+import { ColorPicker } from '@shared/color-picker';
 import { Icon, IconName } from '@shared/icon';
 import { ParsedRequestInput, isCurlCommand, parseRequestInput } from './request-input';
 
@@ -81,7 +83,7 @@ interface FolderOption {
  */
 @Component({
   selector: 'app-new-entry-dialog',
-  imports: [FormsModule, Icon],
+  imports: [FormsModule, Icon, ColorPicker],
   templateUrl: './new-entry-dialog.html',
   styleUrl: './new-entry-dialog.css',
 })
@@ -89,6 +91,7 @@ export class NewEntryDialog {
   private readonly workspaceStore = inject(WorkspaceStore);
   private readonly router = inject(Router);
   private readonly tabsStore = inject(TabsStore);
+  private readonly environmentStore = inject(EnvironmentStore);
   private readonly dialog = viewChild<ElementRef<HTMLDialogElement>>('dialog');
   private readonly nameField = viewChild<ElementRef<HTMLInputElement>>('nameField');
   private readonly requestField =
@@ -108,6 +111,11 @@ export class NewEntryDialog {
   protected readonly showOptions = signal(false);
   /** Whether a new collection is shared through git or kept private. */
   protected readonly isPrivate = signal(false);
+  /** Color of a new collection or environment. */
+  protected readonly color = signal('');
+  /** Scope of a new environment: empty for global, else a collection path. */
+  protected readonly environmentScope = signal('');
+  protected readonly collectionScopes = signal<FolderOption[]>([]);
   protected readonly errorMessage = signal<string | null>(null);
   protected readonly isSaving = signal(false);
 
@@ -184,8 +192,10 @@ export class NewEntryDialog {
     switch (this.kind()) {
       case 'collection':
         return `${this.collectionRoot()}/${slug}/`;
-      case 'environment':
-        return `environments/${slug}.yaml`;
+      case 'environment': {
+        const scope = this.environmentScope();
+        return `${scope ? `${scope}/` : ''}environments/${slug}.yaml`;
+      }
       case 'folder':
         return `${this.location() || COLLECTIONS_DIRECTORY}/${slug}/`;
       default:
@@ -211,6 +221,8 @@ export class NewEntryDialog {
     this.fileName.set('');
     this.showOptions.set(false);
     this.isPrivate.set(false);
+    this.color.set('');
+    this.environmentScope.set(request.scope ?? '');
     this.errorMessage.set(null);
     this.nameEdited = false;
     this.fileNameEdited.set(false);
@@ -218,7 +230,13 @@ export class NewEntryDialog {
     this.dialog()?.nativeElement.showModal();
     this.focusFirstField();
 
-    if (request.kind === 'request' || request.kind === 'folder') {
+    if (request.kind === 'environment') {
+      await this.loadFolders();
+      this.collectionScopes.set(this.folders().filter((folder) => folder.depth === 0));
+      // Options arrive after the select rendered: apply the scope again.
+      this.environmentScope.set('');
+      queueMicrotask(() => this.environmentScope.set(request.scope ?? ''));
+    } else if (request.kind === 'request' || request.kind === 'folder') {
       await this.loadFolders();
       const preferred = request.folder ?? '';
       const folders = this.folders();
@@ -321,10 +339,16 @@ export class NewEntryDialog {
       const created = await this.create(rootPath, name, slug);
       this.close();
       if (this.kind() === 'environment') {
+        // A new environment is meant to be used: make it the active one.
+        this.environmentStore.select(created);
         window.dispatchEvent(
-          new CustomEvent('awake:environments-changed', { detail: { created } }),
+          new CustomEvent('awake:environments-changed', {
+            detail: { created, scope: this.environmentScope() },
+          }),
         );
-        await this.router.navigate(['/workspace/environments']);
+        await this.router.navigate(['/workspace/environments'], {
+          queryParams: { environment: created, scope: this.environmentScope() || null },
+        });
         return;
       }
       notifyCollectionsChanged({ created, kind: this.kind() });
@@ -348,14 +372,16 @@ export class NewEntryDialog {
   private async create(rootPath: string, name: string, slug: string): Promise<string> {
     switch (this.kind()) {
       case 'environment': {
-        const existing = (await EnvironmentsService.List(rootPath)) ?? [];
+        const scope = this.environmentScope();
+        const existing = (await EnvironmentsService.List(rootPath, scope)) ?? [];
         if (existing.some((environment) => environment.FileName === slug)) {
-          throw new Error('An environment with this name already exists.');
+          throw new Error('An environment with this name already exists here.');
         }
-        await EnvironmentsService.Save(rootPath, slug, {
+        await EnvironmentsService.Save(rootPath, scope, slug, {
           Name: name,
           Variables: {},
           SecretVariables: [],
+          Color: this.color(),
         });
         return slug;
       }
@@ -366,12 +392,13 @@ export class NewEntryDialog {
           Variables: null,
           Authentication: null,
           Documentation: '',
+          Color: this.color(),
         });
         return path;
       }
       case 'folder': {
         const path = `${this.location()}/${slug}`;
-        await CollectionsService.CreateFolder(rootPath, path);
+        await CollectionsService.CreateFolder(rootPath, path, name);
         return path;
       }
       default: {

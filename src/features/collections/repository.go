@@ -24,9 +24,9 @@ const (
 	privateDirectoryName = "local"
 	collectionFileName   = "collection.yaml"
 	fileExtension        = ".yaml"
-	// folderKeepFileName keeps an empty folder in git, which ignores empty
-	// directories.
-	folderKeepFileName = ".gitkeep"
+	// folderFileName stores the display name of a folder. It also keeps an
+	// empty folder in git, which ignores empty directories.
+	folderFileName = "folder.yaml"
 )
 
 var (
@@ -34,6 +34,11 @@ var (
 	ErrEntryNotFound = errors.New("collections: entry not found")
 	// ErrEntryExists is returned when creating an entry that already exists.
 	ErrEntryExists = errors.New("collections: entry already exists")
+	// ErrInvalidMove is returned when a folder would move into itself.
+	ErrInvalidMove = errors.New("collections: a folder cannot move into itself")
+	// ErrReservedName is returned for a folder named like the directory that
+	// holds the environments of a collection.
+	ErrReservedName = errors.New("collections: this name is reserved for collection environments")
 	// ErrInvalidPath is returned when a path escapes the collections directory.
 	ErrInvalidPath = errors.New("collections: invalid path")
 )
@@ -58,6 +63,8 @@ type Entry struct {
 	Kind        Kind
 	Method      string
 	HasChildren bool
+	// Color of a collection, from its collection.yaml.
+	Color string
 }
 
 // Repository reads the collection tree from a workspace.
@@ -68,6 +75,17 @@ type Repository struct {
 // NewRepository returns a repository rooted at the workspace directory.
 func NewRepository(workspaceRoot string) *Repository {
 	return &Repository{workspaceRoot: workspaceRoot}
+}
+
+// environmentsDirectoryName holds the environments of a collection. It is not
+// part of the request tree.
+const environmentsDirectoryName = "environments"
+
+// isCollectionPath reports whether a cleaned path is a collection directory,
+// such as collections/billing.
+func isCollectionPath(cleaned string) bool {
+	segments := strings.Split(cleaned, "/")
+	return len(segments) == 2 && isRoot(segments[0])
 }
 
 // isRoot reports whether a cleaned path is one of the two collection roots.
@@ -100,6 +118,9 @@ func (repository *Repository) List(relativePath string) ([]Entry, error) {
 	for _, entry := range entries {
 		entryPath := joinRelative(relativePath, entry.Name())
 
+		if entry.IsDir() && entry.Name() == environmentsDirectoryName && isCollectionPath(path.Clean(relativePath)) {
+			continue
+		}
 		if entry.IsDir() {
 			kind := KindDirectory
 			if relativePath == "" || isRoot(path.Clean(relativePath)) {
@@ -107,15 +128,19 @@ func (repository *Repository) List(relativePath string) ([]Entry, error) {
 			}
 
 			name := entry.Name()
+			color := ""
 			if kind == KindCollection {
-				collectionName, err := readCollectionName(filepath.Join(directory, entry.Name()), name)
+				collectionName, collectionColor, err := readCollectionName(filepath.Join(directory, entry.Name()), name)
 				if err != nil {
 					return nil, fmt.Errorf("read collection %s: %w", entryPath, err)
 				}
 				name = collectionName
+				color = collectionColor
+			} else {
+				name = readFolderName(filepath.Join(directory, entry.Name()), name)
 			}
 
-			hasChildren, err := hasChildren(filepath.Join(directory, entry.Name()))
+			hasChildren, err := hasChildren(filepath.Join(directory, entry.Name()), kind == KindCollection)
 			if err != nil {
 				return nil, fmt.Errorf("inspect %s: %w", entryPath, err)
 			}
@@ -125,11 +150,12 @@ func (repository *Repository) List(relativePath string) ([]Entry, error) {
 				Name:        name,
 				Kind:        kind,
 				HasChildren: hasChildren,
+				Color:       color,
 			})
 			continue
 		}
 
-		if !strings.HasSuffix(entry.Name(), fileExtension) || entry.Name() == collectionFileName {
+		if !strings.HasSuffix(entry.Name(), fileExtension) || isMetadataFile(entry.Name()) {
 			continue
 		}
 
@@ -172,9 +198,15 @@ func (repository *Repository) SearchRequests(query string, limit int) ([]Entry, 
 			return walkError
 		}
 		if entry.IsDir() {
+			if entry.Name() == environmentsDirectoryName {
+				relativeDirectory, err := filepath.Rel(repository.workspaceRoot, filepath.Dir(filePath))
+				if err == nil && isCollectionPath(filepath.ToSlash(relativeDirectory)) {
+					return filepath.SkipDir
+				}
+			}
 			return nil
 		}
-		if !strings.HasSuffix(entry.Name(), fileExtension) || entry.Name() == collectionFileName {
+		if !strings.HasSuffix(entry.Name(), fileExtension) || isMetadataFile(entry.Name()) {
 			return nil
 		}
 
@@ -351,6 +383,32 @@ func (repository *Repository) UpdateRequest(relativePath string, request domain.
 }
 
 // CreateCollection creates a collection directory with its metadata file.
+// UpdateCollection replaces the metadata of an existing collection: its
+// name, documentation, variables and authentication.
+func (repository *Repository) UpdateCollection(relativePath string, collection domain.Collection) error {
+	cleaned := path.Clean(relativePath)
+	if !isCollectionPath(cleaned) {
+		return ErrInvalidPath
+	}
+	if err := collection.Validate(); err != nil {
+		return err
+	}
+
+	directory, err := repository.resolve(cleaned)
+	if err != nil {
+		return err
+	}
+	if info, err := os.Stat(directory); err != nil || !info.IsDir() {
+		return ErrEntryNotFound
+	}
+
+	content, err := yamlcodec.EncodeValue(collection)
+	if err != nil {
+		return fmt.Errorf("encode collection %s: %w", relativePath, err)
+	}
+	return files.WriteAtomically(filepath.Join(directory, collectionFileName), content)
+}
+
 func (repository *Repository) CreateCollection(relativePath string, collection domain.Collection) error {
 	if relativePath == "" || isRoot(path.Clean(relativePath)) {
 		return ErrInvalidPath
@@ -381,6 +439,73 @@ func (repository *Repository) CreateCollection(relativePath string, collection d
 	}
 
 	return files.WriteAtomically(configurationPath, content)
+}
+
+// Move moves a request or a folder into another collection or folder, keeping
+// its file name, and returns its new path. Collections themselves stay at the
+// root. Moving between collections/ and local/ shares or privatizes an entry.
+func (repository *Repository) Move(relativePath string, targetDirectory string) (string, error) {
+	source := path.Clean(relativePath)
+	target := path.Clean(targetDirectory)
+	if source == "." || isRoot(source) || isCollectionPath(source) || isRoot(target) || target == "." {
+		return "", ErrInvalidPath
+	}
+
+	sourcePath, err := repository.resolve(source)
+	if err != nil {
+		return "", err
+	}
+	targetPath, err := repository.resolve(target)
+	if err != nil {
+		return "", err
+	}
+
+	sourceInfo, err := os.Stat(sourcePath)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return "", ErrEntryNotFound
+		}
+		return "", fmt.Errorf("inspect %s: %w", relativePath, err)
+	}
+	if !sourceInfo.IsDir() && !isRequestPath(source) {
+		return "", ErrInvalidPath
+	}
+	targetInfo, err := os.Stat(targetPath)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return "", ErrEntryNotFound
+		}
+		return "", fmt.Errorf("inspect %s: %w", targetDirectory, err)
+	}
+	if !targetInfo.IsDir() {
+		return "", ErrInvalidPath
+	}
+
+	if path.Dir(source) == target {
+		return source, nil
+	}
+	if sourceInfo.IsDir() && (target == source || strings.HasPrefix(target, source+"/")) {
+		return "", ErrInvalidMove
+	}
+
+	destination := path.Join(target, path.Base(source))
+	if sourceInfo.IsDir() && path.Base(destination) == environmentsDirectoryName && isCollectionPath(target) {
+		return "", ErrReservedName
+	}
+	destinationPath, err := repository.resolve(destination)
+	if err != nil {
+		return "", err
+	}
+	if _, err := os.Stat(destinationPath); err == nil {
+		return "", ErrEntryExists
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return "", fmt.Errorf("inspect %s: %w", destination, err)
+	}
+
+	if err := os.Rename(sourcePath, destinationPath); err != nil {
+		return "", fmt.Errorf("move %s: %w", relativePath, err)
+	}
+	return destination, nil
 }
 
 // Delete removes a request file, or a folder or collection with everything it
@@ -422,10 +547,13 @@ func (repository *Repository) Delete(relativePath string) error {
 
 // CreateFolder creates a folder inside an existing collection or folder.
 // Collections themselves are created with CreateCollection.
-func (repository *Repository) CreateFolder(relativePath string) error {
+func (repository *Repository) CreateFolder(relativePath string, name string) error {
 	cleaned := path.Clean(relativePath)
 	if strings.Count(cleaned, "/") < 2 || isRequestPath(cleaned) {
 		return ErrInvalidPath
+	}
+	if path.Base(cleaned) == environmentsDirectoryName && isCollectionPath(path.Dir(cleaned)) {
+		return ErrReservedName
 	}
 
 	directory, err := repository.resolve(cleaned)
@@ -453,7 +581,14 @@ func (repository *Repository) CreateFolder(relativePath string) error {
 		return fmt.Errorf("create folder %s: %w", relativePath, err)
 	}
 
-	return files.WriteAtomically(filepath.Join(directory, folderKeepFileName), nil)
+	if strings.TrimSpace(name) == "" {
+		name = path.Base(cleaned)
+	}
+	content, err := yamlcodec.EncodeValue(folderMetadata{Name: strings.TrimSpace(name)})
+	if err != nil {
+		return fmt.Errorf("encode folder %s: %w", relativePath, err)
+	}
+	return files.WriteAtomically(filepath.Join(directory, folderFileName), content)
 }
 
 func (repository *Repository) resolve(relativePath string) (string, error) {
@@ -507,24 +642,50 @@ func entryLess(first Entry, second Entry) bool {
 	return first.Path < second.Path
 }
 
-func readCollectionName(directory string, fallback string) (string, error) {
+// folderMetadata is the content of folder.yaml.
+type folderMetadata struct {
+	Name string `yaml:"name"`
+}
+
+// isMetadataFile reports whether a file describes its directory rather than
+// holding a request.
+func isMetadataFile(name string) bool {
+	return name == collectionFileName || name == folderFileName
+}
+
+// readFolderName returns the display name stored in folder.yaml, or the
+// directory name for folders created outside the application.
+func readFolderName(directory string, fallback string) string {
+	content, err := os.ReadFile(filepath.Join(directory, folderFileName))
+	if err != nil {
+		return fallback
+	}
+	var metadata folderMetadata
+	if err := yaml.Unmarshal(content, &metadata); err != nil || strings.TrimSpace(metadata.Name) == "" {
+		return fallback
+	}
+	return metadata.Name
+}
+
+// readCollectionName returns the display name and the color of a collection.
+func readCollectionName(directory string, fallback string) (string, string, error) {
 	content, err := os.ReadFile(filepath.Join(directory, collectionFileName))
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			return fallback, nil
+			return fallback, "", nil
 		}
-		return "", err
+		return "", "", err
 	}
 
 	var collection domain.Collection
 	if err := yaml.Unmarshal(content, &collection); err != nil {
-		return "", fmt.Errorf("%w: %v", domain.ErrInvalidCollection, err)
+		return "", "", fmt.Errorf("%w: %v", domain.ErrInvalidCollection, err)
 	}
 	if err := collection.Validate(); err != nil {
-		return "", err
+		return "", "", err
 	}
 
-	return collection.Name, nil
+	return collection.Name, collection.Color, nil
 }
 
 func readRequestSummary(filePath string, fallbackName string) (string, string, error) {
@@ -549,17 +710,20 @@ func readRequestSummary(filePath string, fallbackName string) (string, string, e
 	return name, strings.ToUpper(strings.TrimSpace(summary.Method)), nil
 }
 
-func hasChildren(directory string) (bool, error) {
+func hasChildren(directory string, isCollection bool) (bool, error) {
 	entries, err := os.ReadDir(directory)
 	if err != nil {
 		return false, err
 	}
 
 	for _, entry := range entries {
+		if entry.IsDir() && isCollection && entry.Name() == environmentsDirectoryName {
+			continue
+		}
 		if entry.IsDir() {
 			return true, nil
 		}
-		if strings.HasSuffix(entry.Name(), fileExtension) && entry.Name() != collectionFileName {
+		if strings.HasSuffix(entry.Name(), fileExtension) && !isMetadataFile(entry.Name()) {
 			return true, nil
 		}
 	}
@@ -569,7 +733,7 @@ func hasChildren(directory string) (bool, error) {
 
 func isRequestPath(relativePath string) bool {
 	return strings.HasSuffix(relativePath, fileExtension) &&
-		path.Base(relativePath) != collectionFileName
+		!isMetadataFile(path.Base(relativePath))
 }
 
 func matchesQuery(entry Entry, terms []string) bool {

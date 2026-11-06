@@ -127,6 +127,28 @@
         />
       </label>
 
+      @if (kind() === 'environment') {
+        <label class="field">
+          <span class="field-label">Scope</span>
+          <select
+            name="environmentScope"
+            [ngModel]="environmentScope()"
+            (ngModelChange)="environmentScope.set($event)"
+          >
+            <option value="" [selected]="environmentScope() === ''">Global — every collection</option>
+            @for (collection of collectionScopes(); track collection.path) {
+              <option [value]="collection.path" [selected]="environmentScope() === collection.path">
+                {{ collection.label }} only
+              </option>
+            }
+          </select>
+          <span class="field-hint">
+            A collection environment refines the global environment of the same name: its variables
+            win, the others are inherited.
+          </span>
+        </label>
+      }
+
       @if (kind() === 'collection') {
         <div class="field">
           <span class="field-label">Visibility</span>
@@ -180,6 +202,13 @@
           </select>
         </label>
       }
+      @if (kind() === 'collection' || kind() === 'environment') {
+        <div class="field">
+          <span class="field-label">Color</span>
+          <app-color-picker [value]="color()" (valueChange)="color.set($event)" />
+        </div>
+      }
+
 
       <div class="options">
         <button

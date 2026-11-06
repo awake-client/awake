@@ -265,3 +265,27 @@
   letter-spacing: normal;
   text-transform: none;
 }
+
+/* Drag and drop -------------------------------------------------------------- */
+
+.tree-row.dragging {
+  opacity: 0.45;
+}
+
+.tree-row.drop-target {
+  background: var(--color-accent-soft);
+  box-shadow: inset 0 0 0 1px var(--color-accent);
+  color: var(--color-text-strong);
+}
+
+.tree-row.drop-target .folder-icon {
+  color: var(--color-accent);
+}
+
+.tree-row.drop-inside {
+  background: var(--color-accent-soft);
+}
+
+.folder-icon[data-color] {
+  color: var(--entity-color);
+}

@@ -37,19 +37,30 @@ func (service *Service) UpdateRequest(workspaceRoot string, relativePath string,
 	return NewRepository(workspaceRoot).UpdateRequest(relativePath, request)
 }
 
+// UpdateCollection replaces the metadata of an existing collection.
+func (service *Service) UpdateCollection(workspaceRoot string, relativePath string, collection domain.Collection) error {
+	return NewRepository(workspaceRoot).UpdateCollection(relativePath, collection)
+}
+
 // CreateCollection creates a collection directory with its metadata file.
 func (service *Service) CreateCollection(workspaceRoot string, relativePath string, collection domain.Collection) error {
 	return NewRepository(workspaceRoot).CreateCollection(relativePath, collection)
 }
 
 // CreateFolder creates a folder inside an existing collection or folder.
-func (service *Service) CreateFolder(workspaceRoot string, relativePath string) error {
-	return NewRepository(workspaceRoot).CreateFolder(relativePath)
+func (service *Service) CreateFolder(workspaceRoot string, relativePath string, name string) error {
+	return NewRepository(workspaceRoot).CreateFolder(relativePath, name)
 }
 
 // Delete removes a request, or a folder or collection with its content.
 func (service *Service) Delete(workspaceRoot string, relativePath string) error {
 	return NewRepository(workspaceRoot).Delete(relativePath)
+}
+
+// Move moves a request or a folder into another collection or folder and
+// returns its new path.
+func (service *Service) Move(workspaceRoot string, relativePath string, targetDirectory string) (string, error) {
+	return NewRepository(workspaceRoot).Move(relativePath, targetDirectory)
 }
 
 // SearchRequests returns requests matching every word of the query.
