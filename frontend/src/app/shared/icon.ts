@@ -44,6 +44,8 @@ const ICONS = {
   alert: '<circle cx="12" cy="12" r="9"/><path d="M12 8v5"/><path d="M12 16.5v.01"/>',
   terminal: '<path d="m5 8 4 4-4 4"/><path d="M12 17h7"/>',
   code: '<path d="m8 7-5 5 5 5"/><path d="m16 7 5 5-5 5"/>',
+  'layout-columns': '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M13 4v16"/>',
+  'layout-rows': '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 12.5h18"/>',
   'panel-left': '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/>',
   command: '<path d="M9 6a3 3 0 1 0-3 3h12a3 3 0 1 0-3-3v12a3 3 0 1 0 3-3H6a3 3 0 1 0 3 3Z"/>',
 } as const;
