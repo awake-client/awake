@@ -26,6 +26,13 @@ export function CreateCollection(workspaceRoot: string, relativePath: string, co
 }
 
 /**
+ * CreateFolder creates a folder inside an existing collection or folder.
+ */
+export function CreateFolder(workspaceRoot: string, relativePath: string): $CancellablePromise<void> {
+    return $Call.ByID(1910914286, workspaceRoot, relativePath);
+}
+
+/**
  * CreateRequest writes a new request file.
  */
 export function CreateRequest(workspaceRoot: string, relativePath: string, request: domain$0.Request): $CancellablePromise<void> {

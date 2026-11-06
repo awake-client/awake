@@ -182,6 +182,61 @@ func TestCreateCollectionWritesMetadata(t *testing.T) {
 	}
 }
 
+func TestCreateFolderInsideCollection(t *testing.T) {
+	workspaceRoot := t.TempDir()
+	repository := NewRepository(workspaceRoot)
+
+	if err := repository.CreateCollection("collections/billing", domain.Collection{Name: "Billing"}); err != nil {
+		t.Fatalf("create collection: %v", err)
+	}
+	if err := repository.CreateFolder("collections/billing/invoices"); err != nil {
+		t.Fatalf("create folder: %v", err)
+	}
+	if err := repository.CreateFolder("collections/billing/invoices/drafts"); err != nil {
+		t.Fatalf("create nested folder: %v", err)
+	}
+
+	entries, err := repository.List("collections/billing")
+	if err != nil {
+		t.Fatalf("list collection: %v", err)
+	}
+	if len(entries) != 1 || entries[0].Kind != KindDirectory || entries[0].Name != "invoices" || !entries[0].HasChildren {
+		t.Fatalf("unexpected entries: %+v", entries)
+	}
+
+	nested, err := repository.List("collections/billing/invoices/drafts")
+	if err != nil {
+		t.Fatalf("list nested folder: %v", err)
+	}
+	if len(nested) != 0 {
+		t.Fatalf("the keep file must stay hidden, got %+v", nested)
+	}
+	if _, err := os.Stat(filepath.Join(workspaceRoot, "collections", "billing", "invoices", "drafts", ".gitkeep")); err != nil {
+		t.Fatalf("expected a keep file: %v", err)
+	}
+
+	if err := repository.CreateFolder("collections/billing/invoices"); !errors.Is(err, ErrEntryExists) {
+		t.Fatalf("expected ErrEntryExists, got %v", err)
+	}
+}
+
+func TestCreateFolderRejectsInvalidLocations(t *testing.T) {
+	workspaceRoot := t.TempDir()
+	repository := NewRepository(workspaceRoot)
+
+	cases := map[string]error{
+		"collections/billing":        ErrInvalidPath,
+		"collections/../outside/x":   ErrInvalidPath,
+		"collections/missing/folder": ErrEntryNotFound,
+		"collections/billing/a.yaml": ErrInvalidPath,
+	}
+	for relativePath, expected := range cases {
+		if err := repository.CreateFolder(relativePath); !errors.Is(err, expected) {
+			t.Errorf("CreateFolder(%q): expected %v, got %v", relativePath, expected, err)
+		}
+	}
+}
+
 func TestListRejectsPathTraversal(t *testing.T) {
 	repository := NewRepository(t.TempDir())
 

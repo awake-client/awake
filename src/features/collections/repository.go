@@ -21,6 +21,9 @@ const (
 	directoryName      = "collections"
 	collectionFileName = "collection.yaml"
 	fileExtension      = ".yaml"
+	// folderKeepFileName keeps an empty folder in git, which ignores empty
+	// directories.
+	folderKeepFileName = ".gitkeep"
 )
 
 var (
@@ -369,6 +372,42 @@ func (repository *Repository) CreateCollection(relativePath string, collection d
 	}
 
 	return files.WriteAtomically(configurationPath, content)
+}
+
+// CreateFolder creates a folder inside an existing collection or folder.
+// Collections themselves are created with CreateCollection.
+func (repository *Repository) CreateFolder(relativePath string) error {
+	cleaned := path.Clean(relativePath)
+	if strings.Count(cleaned, "/") < 2 || isRequestPath(cleaned) {
+		return ErrInvalidPath
+	}
+
+	directory, err := repository.resolve(cleaned)
+	if err != nil {
+		return err
+	}
+
+	parent := filepath.Dir(directory)
+	if info, err := os.Stat(parent); err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return ErrEntryNotFound
+		}
+		return fmt.Errorf("inspect folder parent %s: %w", relativePath, err)
+	} else if !info.IsDir() {
+		return ErrInvalidPath
+	}
+
+	if _, err := os.Stat(directory); err == nil {
+		return ErrEntryExists
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("inspect folder %s: %w", relativePath, err)
+	}
+
+	if err := os.Mkdir(directory, 0o755); err != nil {
+		return fmt.Errorf("create folder %s: %w", relativePath, err)
+	}
+
+	return files.WriteAtomically(filepath.Join(directory, folderKeepFileName), nil)
 }
 
 func (repository *Repository) resolve(relativePath string) (string, error) {

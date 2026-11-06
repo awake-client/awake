@@ -42,6 +42,11 @@ func (service *Service) CreateCollection(workspaceRoot string, relativePath stri
 	return NewRepository(workspaceRoot).CreateCollection(relativePath, collection)
 }
 
+// CreateFolder creates a folder inside an existing collection or folder.
+func (service *Service) CreateFolder(workspaceRoot string, relativePath string) error {
+	return NewRepository(workspaceRoot).CreateFolder(relativePath)
+}
+
 // SearchRequests returns requests matching every word of the query.
 func (service *Service) SearchRequests(workspaceRoot string, query string, limit int) ([]Entry, error) {
 	return NewRepository(workspaceRoot).SearchRequests(query, limit)
