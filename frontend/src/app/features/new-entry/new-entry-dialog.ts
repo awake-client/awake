@@ -9,6 +9,7 @@ import {
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
+import * as EnvironmentsService from '@bindings/github.com/clementherve/awake/src/features/environments/service';
 import * as CollectionsService from '@bindings/github.com/clementherve/awake/src/features/collections/service';
 import {
   Entry,
@@ -26,6 +27,8 @@ import { Icon, IconName } from '@shared/icon';
 import { ParsedRequestInput, isCurlCommand, parseRequestInput } from './request-input';
 
 const COLLECTIONS_DIRECTORY = 'collections';
+/** Collections kept on this computer only; the workspace ignores it in git. */
+const PRIVATE_DIRECTORY = 'local';
 const REQUEST_FILE_EXTENSION = '.yaml';
 /** Upper bound on folders listed in the location picker. */
 const MAX_FOLDERS = 1000;
@@ -48,6 +51,20 @@ const REQUEST_TYPES: RequestTypeOption[] = [
   { type: 'websocket', label: 'WebSocket', hint: 'Live socket', icon: 'switch' },
   { type: 'curl', label: 'From cURL', hint: 'Paste & go', icon: 'terminal' },
 ];
+
+const KIND_ICONS: Record<CreationKind, IconName> = {
+  request: 'send',
+  folder: 'folder',
+  collection: 'box',
+  environment: 'globe',
+};
+
+const NAME_PLACEHOLDERS: Record<CreationKind, string> = {
+  request: 'Get users',
+  folder: 'Invoices',
+  collection: 'Platform API',
+  environment: 'Staging',
+};
 
 /** A directory that can receive the new entry. */
 interface FolderOption {
@@ -87,6 +104,8 @@ export class NewEntryDialog {
   protected readonly name = signal('');
   protected readonly fileName = signal('');
   protected readonly showOptions = signal(false);
+  /** Whether a new collection is shared through git or kept private. */
+  protected readonly isPrivate = signal(false);
   protected readonly errorMessage = signal<string | null>(null);
   protected readonly isSaving = signal(false);
 
@@ -99,6 +118,8 @@ export class NewEntryDialog {
         return 'New request';
       case 'folder':
         return 'New folder';
+      case 'environment':
+        return 'New environment';
       default:
         return 'New collection';
     }
@@ -107,6 +128,9 @@ export class NewEntryDialog {
   protected readonly parsed = computed<ParsedRequestInput>(() =>
     parseRequestInput(this.requestText()),
   );
+
+  protected readonly kindIcon = computed<IconName>(() => KIND_ICONS[this.kind()]);
+  protected readonly namePlaceholder = computed(() => NAME_PLACEHOLDERS[this.kind()]);
 
   /** One line telling the user what the smart field understood. */
   protected readonly detection = computed(() => {
@@ -157,7 +181,9 @@ export class NewEntryDialog {
     const slug = this.slug() || '…';
     switch (this.kind()) {
       case 'collection':
-        return `${COLLECTIONS_DIRECTORY}/${slug}/`;
+        return `${this.collectionRoot()}/${slug}/`;
+      case 'environment':
+        return `environments/${slug}.yaml`;
       case 'folder':
         return `${this.location() || COLLECTIONS_DIRECTORY}/${slug}/`;
       default:
@@ -182,6 +208,7 @@ export class NewEntryDialog {
     this.name.set('');
     this.fileName.set('');
     this.showOptions.set(false);
+    this.isPrivate.set(false);
     this.errorMessage.set(null);
     this.nameEdited = false;
     this.fileNameEdited.set(false);
@@ -189,7 +216,7 @@ export class NewEntryDialog {
     this.dialog()?.nativeElement.showModal();
     this.focusFirstField();
 
-    if (request.kind !== 'collection') {
+    if (request.kind === 'request' || request.kind === 'folder') {
       await this.loadFolders();
       const preferred = request.folder ?? '';
       const folders = this.folders();
@@ -280,7 +307,7 @@ export class NewEntryDialog {
       this.errorMessage.set('The name needs at least one letter or digit.');
       return;
     }
-    if (this.kind() !== 'collection' && this.location() === '') {
+    if ((this.kind() === 'request' || this.kind() === 'folder') && this.location() === '') {
       this.errorMessage.set('Create a collection first.');
       return;
     }
@@ -291,6 +318,13 @@ export class NewEntryDialog {
     try {
       const created = await this.create(rootPath, name, slug);
       this.close();
+      if (this.kind() === 'environment') {
+        window.dispatchEvent(
+          new CustomEvent('awake:environments-changed', { detail: { created } }),
+        );
+        await this.router.navigate(['/workspace/environments']);
+        return;
+      }
       notifyCollectionsChanged({ created, kind: this.kind() });
       if (this.kind() === 'request') {
         await this.router.navigate(['/workspace/request', ...created.split('/')]);
@@ -310,8 +344,20 @@ export class NewEntryDialog {
 
   private async create(rootPath: string, name: string, slug: string): Promise<string> {
     switch (this.kind()) {
+      case 'environment': {
+        const existing = (await EnvironmentsService.List(rootPath)) ?? [];
+        if (existing.some((environment) => environment.FileName === slug)) {
+          throw new Error('An environment with this name already exists.');
+        }
+        await EnvironmentsService.Save(rootPath, slug, {
+          Name: name,
+          Variables: {},
+          SecretVariables: [],
+        });
+        return slug;
+      }
       case 'collection': {
-        const path = `${COLLECTIONS_DIRECTORY}/${slug}`;
+        const path = `${this.collectionRoot()}/${slug}`;
         await CollectionsService.CreateCollection(rootPath, path, {
           Name: name,
           Variables: null,
@@ -389,6 +435,10 @@ export class NewEntryDialog {
     }
   }
 
+  private collectionRoot(): string {
+    return this.isPrivate() ? PRIVATE_DIRECTORY : COLLECTIONS_DIRECTORY;
+  }
+
   private async loadFolders(): Promise<void> {
     const rootPath = this.workspaceStore.rootPath();
     if (!rootPath) {
@@ -420,6 +470,7 @@ export class NewEntryDialog {
     };
 
     await visit('', '', 0);
+    await visit(PRIVATE_DIRECTORY, 'Private', 0);
     this.folders.set(folders);
   }
 

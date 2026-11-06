@@ -8,10 +8,7 @@
   <form class="panel" (submit)="submit($event)">
     <header class="panel-header">
       <span class="kind-tile" [attr.data-kind]="kind()" aria-hidden="true">
-        <app-icon
-          [name]="kind() === 'request' ? 'send' : kind() === 'folder' ? 'folder' : 'box'"
-          [size]="16"
-        />
+        <app-icon [name]="kindIcon()" [size]="16" />
       </span>
       <h2>{{ title() }}</h2>
       <button
@@ -124,15 +121,49 @@
           name="name"
           [ngModel]="name()"
           (ngModelChange)="updateName($event)"
-          [placeholder]="
-            kind() === 'request' ? 'Get users' : kind() === 'folder' ? 'Invoices' : 'Platform API'
-          "
+          [placeholder]="namePlaceholder()"
           autocomplete="off"
           spellcheck="false"
         />
       </label>
 
-      @if (kind() !== 'collection') {
+      @if (kind() === 'collection') {
+        <div class="field">
+          <span class="field-label">Visibility</span>
+          <div class="visibility" role="radiogroup" aria-label="Visibility">
+            <button
+              type="button"
+              role="radio"
+              class="visibility-option"
+              [class.selected]="!isPrivate()"
+              [attr.aria-checked]="!isPrivate()"
+              (click)="isPrivate.set(false)"
+            >
+              <app-icon name="git" [size]="15" />
+              <span>
+                <strong>Shared</strong>
+                <small>Committed and synced with the team</small>
+              </span>
+            </button>
+            <button
+              type="button"
+              role="radio"
+              class="visibility-option"
+              [class.selected]="isPrivate()"
+              [attr.aria-checked]="isPrivate()"
+              (click)="isPrivate.set(true)"
+            >
+              <app-icon name="lock" [size]="15" />
+              <span>
+                <strong>Private</strong>
+                <small>Stays on this computer, ignored by git</small>
+              </span>
+            </button>
+          </div>
+        </div>
+      }
+
+      @if (kind() === 'request' || kind() === 'folder') {
         <label class="field">
           <span class="field-label">Location</span>
           <select
@@ -163,7 +194,9 @@
         @if (showOptions()) {
           <label class="field">
             <span class="field-label">
-              {{ kind() === 'request' ? 'File name' : 'Directory name' }}
+              {{
+                kind() === 'request' || kind() === 'environment' ? 'File name' : 'Directory name'
+              }}
             </span>
             <div class="file-name">
               <input
@@ -175,7 +208,7 @@
                 spellcheck="false"
                 autocomplete="off"
               />
-              @if (kind() === 'request') {
+              @if (kind() === 'request' || kind() === 'environment') {
                 <span class="file-extension">.yaml</span>
               }
             </div>

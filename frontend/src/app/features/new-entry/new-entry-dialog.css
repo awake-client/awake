@@ -303,3 +303,54 @@ h2 {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+/* Collection visibility ------------------------------------------------------ */
+
+.visibility {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.visibility-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-background);
+  color: var(--color-text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.visibility-option app-icon {
+  margin-top: 1px;
+  color: var(--color-text-muted);
+}
+
+.visibility-option span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.visibility-option strong {
+  font-weight: 600;
+  color: var(--color-text-strong);
+}
+
+.visibility-option small {
+  font-size: var(--text-xs);
+  color: var(--color-text-subtle);
+}
+
+.visibility-option.selected {
+  border-color: var(--color-accent);
+  background: var(--color-accent-soft);
+}
+
+.visibility-option.selected app-icon {
+  color: var(--color-accent);
+}
