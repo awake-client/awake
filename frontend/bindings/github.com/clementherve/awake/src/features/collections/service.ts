@@ -40,6 +40,13 @@ export function CreateRequest(workspaceRoot: string, relativePath: string, reque
 }
 
 /**
+ * Delete removes a request, or a folder or collection with its content.
+ */
+export function Delete(workspaceRoot: string, relativePath: string): $CancellablePromise<void> {
+    return $Call.ByID(3599059989, workspaceRoot, relativePath);
+}
+
+/**
  * List returns the direct children of a directory. An empty path lists the
  * collections of the workspace.
  */

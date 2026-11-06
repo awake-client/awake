@@ -237,6 +237,108 @@ func TestCreateFolderRejectsInvalidLocations(t *testing.T) {
 	}
 }
 
+func TestDeleteRemovesRequestsAndFolders(t *testing.T) {
+	workspaceRoot := t.TempDir()
+	repository := NewRepository(workspaceRoot)
+	writeTestFile(t, workspaceRoot, "collections/billing/collection.yaml", "name: Billing\n")
+	writeTestFile(t, workspaceRoot, "collections/billing/list.yaml", "name: List\nmethod: GET\nurl: https://example.com\n")
+	writeTestFile(t, workspaceRoot, "collections/billing/invoices/get.yaml", "name: Get\nmethod: GET\nurl: https://example.com\n")
+
+	if err := repository.Delete("collections/billing/list.yaml"); err != nil {
+		t.Fatalf("delete request: %v", err)
+	}
+	if err := repository.Delete("collections/billing/invoices"); err != nil {
+		t.Fatalf("delete folder: %v", err)
+	}
+
+	entries, err := repository.List("collections/billing")
+	if err != nil {
+		t.Fatalf("list collection: %v", err)
+	}
+	if len(entries) != 0 {
+		t.Fatalf("expected an empty collection, got %+v", entries)
+	}
+
+	if err := repository.Delete("collections/billing"); err != nil {
+		t.Fatalf("delete collection: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(workspaceRoot, "collections", "billing")); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("expected the collection to be gone, got %v", err)
+	}
+}
+
+func TestDeleteRejectsInvalidTargets(t *testing.T) {
+	workspaceRoot := t.TempDir()
+	repository := NewRepository(workspaceRoot)
+	writeTestFile(t, workspaceRoot, "collections/billing/collection.yaml", "name: Billing\n")
+
+	cases := map[string]error{
+		"collections":                         ErrInvalidPath,
+		"":                                    ErrInvalidPath,
+		"collections/../awake.yaml":           ErrInvalidPath,
+		"collections/billing/collection.yaml": ErrInvalidPath,
+		"collections/missing.yaml":            ErrEntryNotFound,
+	}
+	for relativePath, expected := range cases {
+		if err := repository.Delete(relativePath); !errors.Is(err, expected) {
+			t.Errorf("Delete(%q): expected %v, got %v", relativePath, expected, err)
+		}
+	}
+	if _, err := os.Stat(filepath.Join(workspaceRoot, "collections", "billing", "collection.yaml")); err != nil {
+		t.Fatalf("the collection metadata must survive: %v", err)
+	}
+}
+
+func TestPrivateCollectionsLiveUnderLocal(t *testing.T) {
+	workspaceRoot := t.TempDir()
+	repository := NewRepository(workspaceRoot)
+
+	if err := repository.CreateCollection("local/scratch", domain.Collection{Name: "Scratch"}); err != nil {
+		t.Fatalf("create private collection: %v", err)
+	}
+	if err := repository.CreateFolder("local/scratch/drafts"); err != nil {
+		t.Fatalf("create private folder: %v", err)
+	}
+	request := domain.Request{Name: "Ping", Method: "GET", URL: "https://example.com/ping"}
+	if err := repository.CreateRequest("local/scratch/drafts/ping.yaml", request); err != nil {
+		t.Fatalf("create private request: %v", err)
+	}
+
+	roots, err := repository.List("local")
+	if err != nil {
+		t.Fatalf("list private root: %v", err)
+	}
+	if len(roots) != 1 || roots[0].Kind != KindCollection || roots[0].Name != "Scratch" || roots[0].Path != "local/scratch" {
+		t.Fatalf("unexpected private collections: %+v", roots)
+	}
+
+	shared, err := repository.List("")
+	if err != nil {
+		t.Fatalf("list shared root: %v", err)
+	}
+	if len(shared) != 0 {
+		t.Fatalf("private collections must not appear among shared ones: %+v", shared)
+	}
+
+	results, err := repository.SearchRequests("ping", 10)
+	if err != nil {
+		t.Fatalf("search: %v", err)
+	}
+	if len(results) != 1 || results[0].Path != "local/scratch/drafts/ping.yaml" {
+		t.Fatalf("expected the private request in search results, got %+v", results)
+	}
+
+	if _, err := repository.LoadRequest("local/scratch/drafts/ping.yaml"); err != nil {
+		t.Fatalf("load private request: %v", err)
+	}
+	if err := repository.Delete("local"); !errors.Is(err, ErrInvalidPath) {
+		t.Fatalf("the private root must not be deletable, got %v", err)
+	}
+	if _, err := repository.List("local/../awake.yaml"); !errors.Is(err, ErrInvalidPath) {
+		t.Fatalf("expected traversal out of local to be rejected, got %v", err)
+	}
+}
+
 func TestListRejectsPathTraversal(t *testing.T) {
 	repository := NewRepository(t.TempDir())
 

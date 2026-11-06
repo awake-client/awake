@@ -47,6 +47,11 @@ func (service *Service) CreateFolder(workspaceRoot string, relativePath string) 
 	return NewRepository(workspaceRoot).CreateFolder(relativePath)
 }
 
+// Delete removes a request, or a folder or collection with its content.
+func (service *Service) Delete(workspaceRoot string, relativePath string) error {
+	return NewRepository(workspaceRoot).Delete(relativePath)
+}
+
 // SearchRequests returns requests matching every word of the query.
 func (service *Service) SearchRequests(workspaceRoot string, query string, limit int) ([]Entry, error) {
 	return NewRepository(workspaceRoot).SearchRequests(query, limit)

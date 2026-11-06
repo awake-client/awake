@@ -18,9 +18,12 @@ import (
 )
 
 const (
-	directoryName      = "collections"
-	collectionFileName = "collection.yaml"
-	fileExtension      = ".yaml"
+	directoryName = "collections"
+	// privateDirectoryName holds collections that stay on this computer. The
+	// workspace ignores it in git.
+	privateDirectoryName = "local"
+	collectionFileName   = "collection.yaml"
+	fileExtension        = ".yaml"
 	// folderKeepFileName keeps an empty folder in git, which ignores empty
 	// directories.
 	folderKeepFileName = ".gitkeep"
@@ -67,6 +70,11 @@ func NewRepository(workspaceRoot string) *Repository {
 	return &Repository{workspaceRoot: workspaceRoot}
 }
 
+// isRoot reports whether a cleaned path is one of the two collection roots.
+func isRoot(cleaned string) bool {
+	return cleaned == directoryName || cleaned == privateDirectoryName
+}
+
 // CollectionsPath returns the absolute path of the collections directory.
 func (repository *Repository) CollectionsPath() string {
 	return filepath.Join(repository.workspaceRoot, directoryName)
@@ -94,7 +102,7 @@ func (repository *Repository) List(relativePath string) ([]Entry, error) {
 
 		if entry.IsDir() {
 			kind := KindDirectory
-			if relativePath == "" {
+			if relativePath == "" || isRoot(path.Clean(relativePath)) {
 				kind = KindCollection
 			}
 
@@ -156,7 +164,7 @@ func (repository *Repository) SearchRequests(query string, limit int) ([]Entry, 
 	terms := strings.Fields(strings.ToLower(query))
 	result := make([]Entry, 0, limit)
 
-	err := filepath.WalkDir(repository.CollectionsPath(), func(filePath string, entry os.DirEntry, walkError error) error {
+	walk := func(filePath string, entry os.DirEntry, walkError error) error {
 		if walkError != nil {
 			if errors.Is(walkError, os.ErrNotExist) {
 				return nil
@@ -192,12 +200,13 @@ func (repository *Repository) SearchRequests(query string, limit int) ([]Entry, 
 		}
 
 		return nil
-	})
-	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return []Entry{}, nil
+	}
+
+	for _, root := range []string{directoryName, privateDirectoryName} {
+		err := filepath.WalkDir(filepath.Join(repository.workspaceRoot, root), walk)
+		if err != nil && !errors.Is(err, os.ErrNotExist) {
+			return nil, fmt.Errorf("search requests: %w", err)
 		}
-		return nil, fmt.Errorf("search requests: %w", err)
 	}
 
 	sort.Slice(result, func(first int, second int) bool {
@@ -343,7 +352,7 @@ func (repository *Repository) UpdateRequest(relativePath string, request domain.
 
 // CreateCollection creates a collection directory with its metadata file.
 func (repository *Repository) CreateCollection(relativePath string, collection domain.Collection) error {
-	if relativePath == "" || relativePath == directoryName {
+	if relativePath == "" || isRoot(path.Clean(relativePath)) {
 		return ErrInvalidPath
 	}
 	if err := collection.Validate(); err != nil {
@@ -372,6 +381,43 @@ func (repository *Repository) CreateCollection(relativePath string, collection d
 	}
 
 	return files.WriteAtomically(configurationPath, content)
+}
+
+// Delete removes a request file, or a folder or collection with everything it
+// contains. The collections directory itself cannot be deleted.
+func (repository *Repository) Delete(relativePath string) error {
+	cleaned := path.Clean(relativePath)
+	if cleaned == "." || isRoot(cleaned) {
+		return ErrInvalidPath
+	}
+
+	target, err := repository.resolve(cleaned)
+	if err != nil {
+		return err
+	}
+
+	info, err := os.Stat(target)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return ErrEntryNotFound
+		}
+		return fmt.Errorf("inspect %s: %w", relativePath, err)
+	}
+
+	if !info.IsDir() {
+		if !isRequestPath(cleaned) {
+			return ErrInvalidPath
+		}
+		if err := os.Remove(target); err != nil {
+			return fmt.Errorf("delete request %s: %w", relativePath, err)
+		}
+		return nil
+	}
+
+	if err := os.RemoveAll(target); err != nil {
+		return fmt.Errorf("delete folder %s: %w", relativePath, err)
+	}
+	return nil
 }
 
 // CreateFolder creates a folder inside an existing collection or folder.
@@ -420,12 +466,14 @@ func (repository *Repository) resolve(relativePath string) (string, error) {
 	if cleaned == "." || path.IsAbs(cleaned) || cleaned == ".." || strings.HasPrefix(cleaned, "../") {
 		return "", ErrInvalidPath
 	}
-	if cleaned != directoryName && !strings.HasPrefix(cleaned, directoryName+"/") {
+	root := strings.SplitN(cleaned, "/", 2)[0]
+	if !isRoot(root) {
 		return "", ErrInvalidPath
 	}
 
+	rootPath := filepath.Join(repository.workspaceRoot, root)
 	filePath := filepath.Join(repository.workspaceRoot, filepath.FromSlash(cleaned))
-	relativeToCollections, err := filepath.Rel(collectionsPath, filePath)
+	relativeToCollections, err := filepath.Rel(rootPath, filePath)
 	if err != nil {
 		return "", ErrInvalidPath
 	}

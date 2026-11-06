@@ -12,8 +12,11 @@ import {
   COLLECTIONS_CHANGED_EVENT,
   CollectionsChange,
   CreationKind,
+  notifyCollectionsChanged,
   requestEntryCreation,
 } from '@core/collection-events';
+import { Confirmation } from '@core/confirmation';
+import { TabsStore } from '@core/tabs-store';
 import { Icon } from '@shared/icon';
 
 const ROW_HEIGHT = 28;
@@ -24,11 +27,24 @@ const METHOD_LABELS: Record<string, string> = {
   OPTIONS: 'OPT',
 };
 
+/** The contextual menu of a row, positioned in viewport coordinates. */
+interface RowMenu {
+  row: TreeRow;
+  top: number;
+  left: number;
+}
+
+/** Root of the collections that stay on this computer, ignored by git. */
+const PRIVATE_ROOT = 'local';
+const PRIVATE_SECTION_PATH = '#private';
+
 /** One visible line of the flattened collection tree. */
 interface TreeRow {
   entry: Entry;
   depth: number;
   expanded: boolean;
+  /** Set on the header row that introduces the private collections. */
+  section?: boolean;
 }
 
 /**
@@ -48,6 +64,8 @@ export class CollectionTree {
   private readonly expandedPaths = new Set<string>();
   private readonly destroyRef = inject(DestroyRef);
   private readonly router = inject(Router);
+  private readonly confirmation = inject(Confirmation);
+  private readonly tabsStore = inject(TabsStore);
 
   readonly workspaceRoot = input('');
   readonly requestSelected = output<string>();
@@ -56,9 +74,13 @@ export class CollectionTree {
   protected readonly rows = signal<TreeRow[]>([]);
   protected readonly isLoading = signal(false);
   protected readonly errorMessage = signal<string | null>(null);
-  protected readonly selectedPath = signal<string | null>(null);
-  protected readonly selectedFolder = signal<string | null>(null);
+  /**
+   * The single highlighted row: the open request, or the folder last clicked.
+   * One selection at a time keeps the tree from showing two active rows.
+   */
+  protected readonly selected = signal<string | null>(null);
   protected readonly isMenuOpen = signal(false);
+  protected readonly rowMenu = signal<RowMenu | null>(null);
 
   constructor() {
     effect(() => {
@@ -77,11 +99,13 @@ export class CollectionTree {
       if (!path) {
         return;
       }
-      this.selectedFolder.set(path);
-      this.selectedPath.set(null);
+      this.selected.set(path);
       void this.revealDirectory(path);
     };
-    const closeMenu = () => this.isMenuOpen.set(false);
+    const closeMenu = () => {
+      this.isMenuOpen.set(false);
+      this.rowMenu.set(null);
+    };
 
     // Keep the highlighted request in sync with the page on screen, whether it
     // was opened from the tree, the search palette or the history.
@@ -112,19 +136,25 @@ export class CollectionTree {
     return Array.from({ length: row.depth }, (_, index) => index);
   }
 
+  protected isPrivate(row: TreeRow): boolean {
+    return row.entry.Path.startsWith(`${PRIVATE_ROOT}/`);
+  }
+
   protected isRequest(row: TreeRow): boolean {
     return row.entry.Kind === Kind.KindRequest;
   }
 
   protected async activate(row: TreeRow): Promise<void> {
+    if (row.section) {
+      return;
+    }
     if (this.isRequest(row)) {
-      this.selectedPath.set(row.entry.Path);
-      this.selectedFolder.set(null);
+      this.selected.set(row.entry.Path);
       this.requestSelected.emit(row.entry.Path);
       return;
     }
 
-    this.selectedFolder.set(row.entry.Path);
+    this.selected.set(row.entry.Path);
     await this.toggle(row);
   }
 
@@ -141,12 +171,18 @@ export class CollectionTree {
     );
 
     try {
-      const entries = (await CollectionsService.List(workspaceRoot, '')) ?? [];
+      const [entries, privateEntries] = await Promise.all([
+        CollectionsService.List(workspaceRoot, ''),
+        CollectionsService.List(workspaceRoot, PRIVATE_ROOT),
+      ]);
 
       this.childrenCache.clear();
       this.expandedPaths.clear();
-      this.childrenCache.set('', entries);
-      this.rows.set(this.toRows(entries, 0));
+      const rows = this.toRows(entries ?? [], 0);
+      if ((privateEntries ?? []).length > 0) {
+        rows.push(privateSectionRow(), ...this.toRows(privateEntries ?? [], 0));
+      }
+      this.rows.set(rows);
 
       for (const path of previouslyExpanded) {
         const row = this.rows().find((candidate) => candidate.entry.Path === path);
@@ -182,36 +218,163 @@ export class CollectionTree {
   /** Opens the creation dialog for a folder row without toggling the row. */
   protected createIn(event: Event, kind: CreationKind, row: TreeRow): void {
     event.stopPropagation();
-    this.selectedFolder.set(row.entry.Path);
-    this.selectedPath.set(null);
+    this.selected.set(row.entry.Path);
     requestEntryCreation({ kind, folder: row.entry.Path });
+  }
+
+  /** Opens the row menu under the ⋯ button or at the pointer on right click. */
+  protected openRowMenu(event: MouseEvent, row: TreeRow): void {
+    if (row.section) {
+      return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+    this.isMenuOpen.set(false);
+
+    const target = event.currentTarget as HTMLElement | null;
+    if (event.type === 'click' && target) {
+      const rect = target.getBoundingClientRect();
+      this.rowMenu.set({ row, top: rect.bottom + 4, left: rect.right - 190 });
+    } else {
+      this.rowMenu.set({ row, top: event.clientY, left: event.clientX });
+    }
+  }
+
+  protected createFromRowMenu(kind: CreationKind): void {
+    const menu = this.rowMenu();
+    this.rowMenu.set(null);
+    if (menu) {
+      this.selected.set(menu.row.entry.Path);
+      requestEntryCreation({ kind, folder: menu.row.entry.Path });
+    }
+  }
+
+  protected duplicateFromRowMenu(): void {
+    const menu = this.rowMenu();
+    this.rowMenu.set(null);
+    if (menu) {
+      void this.duplicateRequest(menu.row);
+    }
+  }
+
+  /**
+   * Copies a request next to the original as "<name> copy", picking a free
+   * file name, then opens the copy.
+   */
+  protected async duplicateRequest(row: TreeRow): Promise<void> {
+    const workspaceRoot = this.workspaceRoot();
+    if (!workspaceRoot || !this.isRequest(row)) {
+      return;
+    }
+
+    const path = row.entry.Path;
+    const directory = path.slice(0, path.lastIndexOf('/'));
+    const baseName = path.slice(path.lastIndexOf('/') + 1).replace(/\.yaml$/, '');
+
+    try {
+      const request = await CollectionsService.LoadRequest(workspaceRoot, path);
+      const siblings = (await CollectionsService.List(workspaceRoot, directory)) ?? [];
+      const taken = new Set(siblings.map((entry) => entry.Path));
+      let copyPath = `${directory}/${baseName}-copy.yaml`;
+      for (let index = 2; taken.has(copyPath); index += 1) {
+        copyPath = `${directory}/${baseName}-copy-${index}.yaml`;
+      }
+
+      await CollectionsService.CreateRequest(workspaceRoot, copyPath, {
+        ...request,
+        Name: `${request.Name} copy`,
+      });
+      notifyCollectionsChanged({ created: copyPath, kind: 'request' });
+      this.requestSelected.emit(copyPath);
+    } catch (error) {
+      this.errorMessage.set(describeError(error));
+    }
+  }
+
+  protected deleteFromRowMenu(): void {
+    const menu = this.rowMenu();
+    this.rowMenu.set(null);
+    if (menu) {
+      void this.deleteEntry(menu.row);
+    }
+  }
+
+  /** Asks for confirmation, deletes the entry and leaves its page if open. */
+  protected async deleteEntry(row: TreeRow): Promise<void> {
+    const workspaceRoot = this.workspaceRoot();
+    if (!workspaceRoot || row.section) {
+      return;
+    }
+
+    const kind = this.isRequest(row) ? 'request' : row.depth === 0 ? 'collection' : 'folder';
+    const confirmed = await this.confirmation.ask({
+      title: `Delete the ${kind} “${row.entry.Name}”?`,
+      message:
+        kind === 'request'
+          ? `${row.entry.Path} will be removed from disk.`
+          : `${row.entry.Path} and everything inside it will be removed from disk.${
+              this.isPrivate(row) ? '' : ' Committed files can still be restored with git.'
+            }`,
+      confirmLabel: `Delete ${kind}`,
+      danger: true,
+    });
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      await CollectionsService.Delete(workspaceRoot, row.entry.Path);
+    } catch (error) {
+      this.errorMessage.set(describeError(error));
+      return;
+    }
+
+    const removed = row.entry.Path;
+    const contains = (path: string | null) =>
+      !!path && (path === removed || path.startsWith(`${removed}/`));
+    if (contains(this.openRequestPath())) {
+      await this.router.navigate(['/workspace']);
+    }
+    if (contains(this.selected())) {
+      this.selected.set(null);
+    }
+    notifyCollectionsChanged({ removed });
+  }
+
+  /** A double click keeps the request open in its own tab. */
+  protected pin(row: TreeRow): void {
+    if (this.isRequest(row)) {
+      this.tabsStore.pin(row.entry.Path);
+    }
   }
 
   protected trackByPath(_index: number, row: TreeRow): string {
     return row.entry.Path;
   }
 
-  private syncSelectionWithRoute(): void {
+  /** Path of the request shown by the current page, if any. */
+  private openRequestPath(): string | null {
     const prefix = '/workspace/request/';
     const url = this.router.url.split(/[?#]/)[0];
-    if (url.startsWith(prefix)) {
-      this.selectedPath.set(decodeURIComponent(url.slice(prefix.length)));
-      this.selectedFolder.set(null);
-    } else {
-      this.selectedPath.set(null);
+    return url.startsWith(prefix) ? decodeURIComponent(url.slice(prefix.length)) : null;
+  }
+
+  private syncSelectionWithRoute(): void {
+    const openRequest = this.openRequestPath();
+    if (openRequest) {
+      this.selected.set(openRequest);
+    } else if (this.selected()?.endsWith('.yaml')) {
+      this.selected.set(null);
     }
   }
 
+  /** Folder that receives new entries: the selected folder or the request's. */
   private currentFolder(): string | undefined {
-    const selectedFolder = this.selectedFolder();
-    if (selectedFolder) {
-      return selectedFolder;
+    const selected = this.selected();
+    if (!selected) {
+      return undefined;
     }
-    const selectedPath = this.selectedPath();
-    if (selectedPath && selectedPath.includes('/')) {
-      return selectedPath.slice(0, selectedPath.lastIndexOf('/'));
-    }
-    return undefined;
+    return selected.endsWith('.yaml') ? selected.slice(0, selected.lastIndexOf('/')) : selected;
   }
 
   /** Reloads after a change and reveals the entry that was just created. */
@@ -228,12 +391,10 @@ export class CollectionTree {
     }
     if (change.kind === 'request') {
       await this.revealDirectory(created.slice(0, created.lastIndexOf('/')));
-      this.selectedPath.set(created);
-      this.selectedFolder.set(null);
+      this.selected.set(created);
     } else {
       await this.revealDirectory(created.slice(0, created.lastIndexOf('/')));
-      this.selectedFolder.set(created);
-      this.selectedPath.set(null);
+      this.selected.set(created);
     }
   }
 
@@ -314,6 +475,21 @@ export class CollectionTree {
   private toRows(entries: Entry[], depth: number): TreeRow[] {
     return entries.map((entry) => ({ entry, depth, expanded: false }));
   }
+}
+
+function privateSectionRow(): TreeRow {
+  return {
+    entry: {
+      Path: PRIVATE_SECTION_PATH,
+      Name: 'Private',
+      Kind: Kind.KindCollection,
+      Method: '',
+      HasChildren: false,
+    },
+    depth: 0,
+    expanded: false,
+    section: true,
+  };
 }
 
 function describeError(error: unknown): string {

@@ -73,60 +73,118 @@
   <div
     *cdkVirtualFor="let row of rows(); trackBy: trackByPath"
     class="tree-row"
-    role="treeitem"
-    tabindex="0"
-    [class.selected]="selectedPath() === row.entry.Path || selectedFolder() === row.entry.Path"
+    [class.selected]="selected() === row.entry.Path"
     [class.folder]="!isRequest(row)"
     [class.root]="row.depth === 0"
-    [attr.aria-expanded]="isRequest(row) ? null : row.expanded"
+    [class.section]="row.section"
+    [attr.tabindex]="row.section ? -1 : 0"
+    [attr.role]="row.section ? 'presentation' : 'treeitem'"
+    [attr.aria-expanded]="isRequest(row) || row.section ? null : row.expanded"
     [style.padding-left.px]="8 + row.depth * 14"
     (click)="activate(row)"
+    (dblclick)="pin(row)"
     (keydown.enter)="activate(row)"
     (keydown.space)="activate(row)"
+    (keydown.delete)="deleteEntry(row)"
+    (keydown.meta.backspace)="deleteEntry(row)"
+    (contextmenu)="openRowMenu($event, row)"
+    (keydown.meta.d)="$event.preventDefault(); duplicateRequest(row)"
   >
-    @for (level of indentGuides(row); track level) {
-      <span class="indent-guide" [style.left.px]="15 + level * 14"></span>
-    }
-    @if (isRequest(row)) {
-      <span class="method-chip" [attr.data-method]="row.entry.Method || 'GET'">
-        {{ methodLabel(row.entry.Method) }}
-      </span>
+    @if (row.section) {
+      <app-icon name="lock" [size]="12" />
+      <span class="section-label">Private</span>
+      <span class="section-hint">only on this computer</span>
     } @else {
-      <app-icon class="chevron" name="chevron-right" [size]="14" [class.expanded]="row.expanded" />
-      @if (row.depth === 0) {
-        <app-icon class="folder-icon" name="box" [size]="14" />
+      @for (level of indentGuides(row); track level) {
+        <span class="indent-guide" [style.left.px]="15 + level * 14"></span>
+      }
+      @if (isRequest(row)) {
+        <span class="method-chip" [attr.data-method]="row.entry.Method || 'GET'">
+          {{ methodLabel(row.entry.Method) }}
+        </span>
       } @else {
         <app-icon
-          class="folder-icon"
-          [name]="row.expanded ? 'folder-open' : 'folder'"
+          class="chevron"
+          name="chevron-right"
           [size]="14"
+          [class.expanded]="row.expanded"
         />
+        @if (row.depth === 0) {
+          <app-icon class="folder-icon" [name]="isPrivate(row) ? 'lock' : 'box'" [size]="14" />
+        } @else {
+          <app-icon
+            class="folder-icon"
+            [name]="row.expanded ? 'folder-open' : 'folder'"
+            [size]="14"
+          />
+        }
       }
-    }
 
-    <span class="entry-name">{{ row.entry.Name }}</span>
+      <span class="entry-name">{{ row.entry.Name }}</span>
 
-    @if (!isRequest(row)) {
-      <span class="row-actions">
+      <span class="row-actions" [class.pinned]="rowMenu()?.row?.entry?.Path === row.entry.Path">
+        @if (!isRequest(row)) {
+          <button
+            type="button"
+            class="icon-btn"
+            title="New request here"
+            aria-label="New request here"
+            (click)="createIn($event, 'request', row)"
+          >
+            <app-icon name="plus" [size]="14" />
+          </button>
+        }
         <button
           type="button"
           class="icon-btn"
-          title="New folder here"
-          aria-label="New folder here"
-          (click)="createIn($event, 'folder', row)"
+          title="More actions"
+          aria-label="More actions"
+          aria-haspopup="menu"
+          (click)="openRowMenu($event, row)"
         >
-          <app-icon name="folder-plus" [size]="14" />
-        </button>
-        <button
-          type="button"
-          class="icon-btn"
-          title="New request here"
-          aria-label="New request here"
-          (click)="createIn($event, 'request', row)"
-        >
-          <app-icon name="plus" [size]="14" />
+          <app-icon name="more" [size]="14" />
         </button>
       </span>
     }
   </div>
 </cdk-virtual-scroll-viewport>
+
+@if (rowMenu(); as menu) {
+  <div
+    class="menu row-menu"
+    role="menu"
+    [style.top.px]="menu.top"
+    [style.left.px]="menu.left"
+    (click)="$event.stopPropagation()"
+  >
+    @if (!isRequest(menu.row)) {
+      <button
+        type="button"
+        role="menuitem"
+        class="menu-item"
+        (click)="createFromRowMenu('request')"
+      >
+        <app-icon name="send" [size]="14" />
+        New request
+      </button>
+      <button type="button" role="menuitem" class="menu-item" (click)="createFromRowMenu('folder')">
+        <app-icon name="folder-plus" [size]="14" />
+        New folder
+      </button>
+      <hr class="menu-separator" />
+    }
+    @if (isRequest(menu.row)) {
+      <button type="button" role="menuitem" class="menu-item" (click)="duplicateFromRowMenu()">
+        <app-icon name="layers" [size]="14" />
+        Duplicate
+        <kbd>⌘D</kbd>
+      </button>
+      <hr class="menu-separator" />
+    }
+    <button type="button" role="menuitem" class="menu-item danger" (click)="deleteFromRowMenu()">
+      <app-icon name="trash" [size]="14" />
+      Delete
+      <kbd>⌫</kbd>
+    </button>
+  </div>
+}
