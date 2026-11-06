@@ -1,6 +1,7 @@
 package app
 
 import (
+	"github.com/clementherve/awake/src/features/assistant"
 	"github.com/clementherve/awake/src/features/collections"
 	"github.com/clementherve/awake/src/features/environments"
 	"github.com/clementherve/awake/src/features/git"
@@ -29,6 +30,7 @@ type services struct {
 	Secrets      *secrets.Service
 	Updates      *updates.Service
 	Workspace    *workspace.Service
+	Assistant    *assistant.Service
 }
 
 func newServices() (*services, error) {
@@ -59,5 +61,6 @@ func newServices() (*services, error) {
 		Secrets:      secrets.NewServiceWithKeychain(keychain),
 		Updates:      updates.NewService(),
 		Workspace:    workspace.NewService(),
+		Assistant:    assistant.NewService(),
 	}, nil
 }

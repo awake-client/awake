@@ -53,6 +53,14 @@ frontend. Features communicate through events or through interfaces declared
 by the consumer, never through direct imports of another feature's internals.
 See [docs/conventions.md](docs/conventions.md) for the full rules.
 
+## Claude Code integration
+
+When [Claude Code](https://claude.com/claude-code) is installed, a git conflict
+can be resolved with Claude from the Git panel. Awake runs the `claude`
+command without any tool: Claude only receives the base, local and incoming
+versions of the conflicted file and answers with a merged version, which the
+user reviews and can edit before it is applied.
+
 ## Workspace layout
 
 A workspace is a regular git repository:

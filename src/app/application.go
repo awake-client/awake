@@ -40,6 +40,7 @@ func Run(frontendAssets embed.FS) error {
 			application.NewService(featureServices.Secrets),
 			application.NewService(featureServices.Updates),
 			application.NewService(featureServices.Workspace),
+			application.NewService(featureServices.Assistant),
 		},
 		Assets: application.AssetOptions{
 			Handler: application.AssetFileServerFS(frontendAssets),
