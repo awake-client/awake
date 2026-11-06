@@ -116,7 +116,6 @@
   border: 1px solid var(--color-border-strong);
   border-radius: var(--radius-lg);
   background: var(--color-field);
-  overflow: hidden;
   transition:
     border-color 120ms ease,
     box-shadow 120ms ease;
@@ -127,49 +126,10 @@
   box-shadow: 0 0 0 3px var(--color-accent-soft);
 }
 
-.url-bar select {
-  flex: 0 0 auto;
-  height: auto;
-  border: none;
-  border-radius: 0;
-  background-color: transparent;
-  padding: 0 24px 0 12px;
-  background-position: right 7px center;
-}
-
-.url-bar select:hover,
-.url-bar select:focus {
-  background-color: var(--color-hover);
-}
-
-.protocol-select {
-  color: var(--color-text-muted);
-  font-size: var(--text-sm);
-}
-
-.url-bar .method-select {
-  margin: 6px 0;
-  border-radius: var(--radius-sm);
-  background-color: color-mix(in srgb, var(--method-color) 14%, transparent);
-  color: var(--method-color);
-  font-family: var(--font-mono);
-  font-size: var(--text-sm);
-  font-weight: 700;
-}
-
 .url-input {
   flex: 1;
   min-width: 0;
-  border: none;
-  background: transparent;
-  padding: 0 12px;
-  font-family: var(--font-mono);
-  font-size: var(--text-base);
   color: var(--color-text-strong);
-}
-
-.url-input:focus {
-  outline: none;
 }
 
 .send-button {
@@ -177,7 +137,6 @@
   padding: 0 14px 0 16px;
   border-radius: var(--radius-lg);
 }
-
 
 /* Messages ----------------------------------------------------------------- */
 
@@ -377,4 +336,146 @@
   font-size: var(--text-base);
   color: var(--color-danger);
   max-width: 64ch;
+}
+
+/* Method and protocol picker ------------------------------------------------ */
+
+.kind-picker {
+  position: relative;
+  display: flex;
+  flex: 0 0 auto;
+  padding: 5px 0 5px 5px;
+}
+
+.kind-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  min-width: 78px;
+  padding: 0 8px 0 10px;
+  border: none;
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--method-color) 14%, transparent);
+  color: var(--method-color);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.kind-button:hover {
+  background: color-mix(in srgb, var(--method-color) 22%, transparent);
+}
+
+.kind-button app-icon {
+  opacity: 0.7;
+}
+
+.kind-button[data-protocol='sse'],
+.kind-button[data-protocol='websocket'] {
+  --method-color: var(--color-accent);
+}
+
+.kind-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 268px;
+  padding: 6px;
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-raised);
+  box-shadow: var(--shadow-raised);
+}
+
+.kind-menu-title {
+  margin: 4px 6px 2px;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text-subtle);
+}
+
+.kind-menu-methods {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 4px;
+  margin-bottom: 4px;
+}
+
+.method-option {
+  height: 26px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--method-color) 12%, transparent);
+  color: var(--method-color);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.method-option:hover {
+  background: color-mix(in srgb, var(--method-color) 22%, transparent);
+}
+
+.method-option.current {
+  border-color: var(--method-color);
+}
+
+.stream-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 32px;
+  padding: 0 8px;
+  border: none;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  text-align: left;
+  cursor: pointer;
+}
+
+.stream-option strong {
+  font-weight: 600;
+  color: var(--color-text-strong);
+}
+
+.stream-option:hover,
+.stream-option.current {
+  background: var(--color-active);
+}
+
+.stream-option.current app-icon {
+  color: var(--color-accent);
+}
+
+/* Undefined variables, shown at the end of the URL bar. */
+.variable-warning {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex: 0 0 auto;
+  align-self: center;
+  margin-right: 6px;
+  padding: 0 8px;
+  height: 24px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-danger) 12%, transparent);
+  color: var(--color-danger);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.variable-warning:hover {
+  background: color-mix(in srgb, var(--color-danger) 20%, transparent);
 }

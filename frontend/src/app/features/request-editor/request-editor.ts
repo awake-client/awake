@@ -1,7 +1,7 @@
-import { Component, computed, inject, signal, viewChild } from '@angular/core';
+import { Component, computed, effect, inject, signal, viewChild } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, RouterLink } from '@angular/router';
 import * as CollectionsService from '@bindings/github.com/clementherve/awake/src/features/collections/service';
 import * as HTTPClientService from '@bindings/github.com/clementherve/awake/src/features/httpclient/service';
 import {
@@ -23,28 +23,17 @@ import {
   ScriptOutcome,
 } from '@bindings/github.com/clementherve/awake/src/domain/models';
 import { EnvironmentStore } from '@core/environment-store';
+import { StashedEditorState, TabsStore } from '@core/tabs-store';
+import { VariableStore } from '@core/variable-store';
 import { WorkspaceStore } from '@core/workspace-store';
 import { Icon } from '@shared/icon';
+import { VariableInput } from '@shared/variable-input';
 import { StreamPanel } from './stream-panel/stream-panel';
 
 /** Sections of the request editor. */
-type EditorTab =
-  | 'parameters'
-  | 'headers'
-  | 'authentication'
-  | 'body'
-  | 'scripts'
-  | 'documentation';
+type EditorTab = 'parameters' | 'headers' | 'authentication' | 'body' | 'scripts' | 'documentation';
 
-const HTTP_METHODS = [
-  'GET',
-  'POST',
-  'PUT',
-  'PATCH',
-  'DELETE',
-  'HEAD',
-  'OPTIONS',
-] as const;
+const HTTP_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'] as const;
 
 const TAB_LABELS: Record<EditorTab, string> = {
   parameters: 'Parameters',
@@ -55,29 +44,26 @@ const TAB_LABELS: Record<EditorTab, string> = {
   documentation: 'Documentation',
 };
 
-const PROTOCOL_LABELS: Record<string, string> = {
-  [Protocol.ProtocolHTTP]: 'HTTP',
-  [Protocol.ProtocolSSE]: 'SSE',
-  [Protocol.ProtocolWebSocket]: 'WebSocket',
-};
-
 /**
  * Edits a single request file. Changes stay local until the user saves, which
  * writes the canonical YAML representation back to disk.
  */
 @Component({
   selector: 'app-request-editor',
-  imports: [FormsModule, StreamPanel, Icon],
+  imports: [FormsModule, RouterLink, StreamPanel, Icon, VariableInput],
   templateUrl: './request-editor.html',
   styleUrls: ['./request-editor.css', './request-response.css'],
   host: {
     '(document:keydown)': 'handleShortcut($event)',
+    '(document:click)': 'closeKindMenu()',
   },
 })
 export class RequestEditor {
   private readonly route = inject(ActivatedRoute);
   private readonly environmentStore = inject(EnvironmentStore);
   private readonly workspaceStore = inject(WorkspaceStore);
+  private readonly variableStore = inject(VariableStore);
+  private readonly tabsStore = inject(TabsStore);
   private readonly streamPanel = viewChild<StreamPanel>(StreamPanel);
 
   protected readonly AuthenticationType = AuthenticationType;
@@ -85,12 +71,6 @@ export class RequestEditor {
   protected readonly BodyType = BodyType;
   protected readonly Protocol = Protocol;
   protected readonly httpMethods = HTTP_METHODS;
-  protected readonly protocols = [
-    Protocol.ProtocolHTTP,
-    Protocol.ProtocolSSE,
-    Protocol.ProtocolWebSocket,
-  ];
-  protected readonly protocolLabels = PROTOCOL_LABELS;
   protected readonly tabs = Object.keys(TAB_LABELS) as EditorTab[];
   protected readonly tabLabels = TAB_LABELS;
   protected readonly selectedEnvironment = this.environmentStore.selected;
@@ -116,9 +96,7 @@ export class RequestEditor {
   protected readonly documentation = signal('');
   protected readonly parameters = signal<Parameter[]>([]);
   protected readonly headers = signal<Header[]>([]);
-  protected readonly authentication = signal<Authentication>(
-    defaultAuthentication(),
-  );
+  protected readonly authentication = signal<Authentication>(defaultAuthentication());
   protected readonly body = signal<Body>({ Type: BodyType.BodyNone, Content: '' });
   protected readonly preRequestScript = signal('');
   protected readonly postResponseScript = signal('');
@@ -130,9 +108,7 @@ export class RequestEditor {
   protected readonly response = signal<HTTPResponse | null>(null);
   protected readonly responseBody = signal('');
   protected readonly responseHasMore = signal(false);
-  protected readonly responseTab = signal<'body' | 'headers' | 'scripts'>(
-    'body',
-  );
+  protected readonly responseTab = signal<'body' | 'headers' | 'scripts'>('body');
   protected readonly responseError = signal<string | null>(null);
   protected readonly isSending = signal(false);
   protected readonly isLoadingChunk = signal(false);
@@ -145,15 +121,12 @@ export class RequestEditor {
     Method: this.method(),
     URL: this.url(),
     Protocol: this.protocol(),
-    Parameters: this.parameters().filter(
-      (parameter) => parameter.Name.trim() !== '',
-    ),
+    Parameters: this.parameters().filter((parameter) => parameter.Name.trim() !== ''),
     Headers: this.headers().filter((header) => header.Name.trim() !== ''),
     Authentication: this.authentication(),
     Body: this.body(),
     Scripts:
-      this.preRequestScript().trim() === '' &&
-      this.postResponseScript().trim() === ''
+      this.preRequestScript().trim() === '' && this.postResponseScript().trim() === ''
         ? null
         : {
             PreRequest: this.preRequestScript(),
@@ -162,22 +135,57 @@ export class RequestEditor {
     Documentation: this.documentation(),
   }));
 
-  protected readonly isDirty = computed(
-    () => JSON.stringify(this.draft()) !== this.snapshot(),
-  );
+  protected readonly isDirty = computed(() => JSON.stringify(this.draft()) !== this.snapshot());
 
-  protected readonly isStreaming = computed(
-    () => this.protocol() !== Protocol.ProtocolHTTP,
-  );
+  protected readonly isStreaming = computed(() => this.protocol() !== Protocol.ProtocolHTTP);
 
   protected readonly hasResponseScripts = computed(() => {
     const response = this.response();
     return response ? this.hasScriptOutcome(response) : false;
   });
 
-  protected readonly streamLive = computed(
-    () => this.streamPanel()?.isLive() ?? false,
-  );
+  protected readonly streamLive = computed(() => this.streamPanel()?.isLive() ?? false);
+
+  protected readonly isKindMenuOpen = signal(false);
+
+  /** Label of the method and protocol picker: the method, SSE or WS. */
+  protected readonly kindLabel = computed(() => {
+    switch (this.protocol()) {
+      case Protocol.ProtocolSSE:
+        return 'SSE';
+      case Protocol.ProtocolWebSocket:
+        return 'WS';
+      default:
+        return this.method();
+    }
+  });
+
+  /**
+   * Variables of the URL that the active environment does not define, shown
+   * as a compact warning in the URL bar. The resolved URL is in its tooltip.
+   */
+  protected readonly missingVariables = computed(() => {
+    const references = this.variableStore.references(this.url());
+    const missing = [
+      ...new Set(
+        references.filter((reference) => !reference.variable).map((reference) => reference.name),
+      ),
+    ];
+    if (missing.length === 0) {
+      return null;
+    }
+    const noEnvironment = !this.selectedEnvironment();
+    return {
+      label: noEnvironment
+        ? 'No environment'
+        : missing.length === 1
+          ? `${missing[0]} undefined`
+          : `${missing.length} undefined`,
+      title: noEnvironment
+        ? `Select an environment to resolve ${missing.join(', ')}.`
+        : `Not defined in the active environment: ${missing.join(', ')}. Click to edit environments.`,
+    };
+  });
 
   protected readonly sendLabel = computed(() => {
     if (this.isStreaming()) {
@@ -193,11 +201,25 @@ export class RequestEditor {
         void this.load(path);
       }
     });
+
+    // Keep the tab title, method and unsaved marker in sync with the editor.
+    effect(() => {
+      const path = this.requestPath();
+      if (!path || this.isLoading()) {
+        return;
+      }
+      this.tabsStore.describe(path, {
+        name: this.name() || 'Untitled',
+        method: this.method(),
+        protocol: this.protocol(),
+      });
+      this.tabsStore.markDirty(path, this.isDirty());
+    });
   }
 
   ngOnDestroy(): void {
     void this.streamPanel()?.release();
-    void this.closeResponse();
+    this.stashCurrent();
   }
 
   protected selectTab(tab: EditorTab): void {
@@ -273,9 +295,7 @@ export class RequestEditor {
 
       if (response.Encoding === 'utf-8') {
         this.responseBody.set(response.Preview);
-        this.responseNextOffset = new TextEncoder().encode(
-          response.Preview,
-        ).length;
+        this.responseNextOffset = new TextEncoder().encode(response.Preview).length;
         this.responseHasMore.set(this.responseNextOffset < response.Size);
       } else {
         this.responseBody.set('');
@@ -323,14 +343,11 @@ export class RequestEditor {
 
   protected hasScriptOutcome(response: HTTPResponse): boolean {
     return (
-      hasScriptContent(response.PreRequestOutcome) ||
-      hasScriptContent(response.PostResponseOutcome)
+      hasScriptContent(response.PreRequestOutcome) || hasScriptContent(response.PostResponseOutcome)
     );
   }
 
-  protected scriptOutcomes(
-    response: HTTPResponse,
-  ): { label: string; outcome: ScriptOutcome }[] {
+  protected scriptOutcomes(response: HTTPResponse): { label: string; outcome: ScriptOutcome }[] {
     return [
       { label: 'Before the request', outcome: response.PreRequestOutcome },
       { label: 'After the response', outcome: response.PostResponseOutcome },
@@ -347,9 +364,7 @@ export class RequestEditor {
     return 'success';
   }
 
-  protected headerEntries(
-    response: HTTPResponse,
-  ): { name: string; value: string }[] {
+  protected headerEntries(response: HTTPResponse): { name: string; value: string }[] {
     return Object.entries(response.Headers ?? {}).map(([name, values]) => ({
       name,
       value: (values ?? []).join(', '),
@@ -386,10 +401,7 @@ export class RequestEditor {
   }
 
   protected addParameter(): void {
-    this.parameters.update((parameters) => [
-      ...parameters,
-      { Name: '', Value: '', Enabled: true },
-    ]);
+    this.parameters.update((parameters) => [...parameters, { Name: '', Value: '', Enabled: true }]);
   }
 
   protected updateParameter(
@@ -399,9 +411,7 @@ export class RequestEditor {
   ): void {
     this.parameters.update((parameters) =>
       parameters.map((parameter, position) =>
-        position === index
-          ? ({ ...parameter, [field]: value } as Parameter)
-          : parameter,
+        position === index ? ({ ...parameter, [field]: value } as Parameter) : parameter,
       ),
     );
   }
@@ -413,10 +423,7 @@ export class RequestEditor {
   }
 
   protected addHeader(): void {
-    this.headers.update((headers) => [
-      ...headers,
-      { Name: '', Value: '', Enabled: true },
-    ]);
+    this.headers.update((headers) => [...headers, { Name: '', Value: '', Enabled: true }]);
   }
 
   protected updateHeader(
@@ -426,22 +433,17 @@ export class RequestEditor {
   ): void {
     this.headers.update((headers) =>
       headers.map((header, position) =>
-        position === index
-          ? ({ ...header, [field]: value } as Header)
-          : header,
+        position === index ? ({ ...header, [field]: value } as Header) : header,
       ),
     );
   }
 
   protected removeHeader(index: number): void {
-    this.headers.update((headers) =>
-      headers.filter((_header, position) => position !== index),
-    );
+    this.headers.update((headers) => headers.filter((_header, position) => position !== index));
   }
 
   protected selectAuthenticationType(event: Event): void {
-    const type = (event.target as HTMLSelectElement)
-      .value as AuthenticationType;
+    const type = (event.target as HTMLSelectElement).value as AuthenticationType;
     this.authentication.update((authentication) => {
       if (type !== AuthenticationType.AuthenticationOAuth2) {
         return { ...authentication, Type: type };
@@ -449,9 +451,7 @@ export class RequestEditor {
       return {
         ...authentication,
         Type: type,
-        GrantType:
-          authentication.GrantType ||
-          OAuth2GrantType.OAuth2GrantAuthorizationCode,
+        GrantType: authentication.GrantType || OAuth2GrantType.OAuth2GrantAuthorizationCode,
       };
     });
 
@@ -486,8 +486,7 @@ export class RequestEditor {
   }
 
   protected selectGrantType(event: Event): void {
-    const grantType = (event.target as HTMLSelectElement)
-      .value as OAuth2GrantType;
+    const grantType = (event.target as HTMLSelectElement).value as OAuth2GrantType;
     this.authentication.update((authentication) => ({
       ...authentication,
       GrantType: grantType,
@@ -549,11 +548,7 @@ export class RequestEditor {
     this.oauth2Error.set(null);
 
     try {
-      await OAuth2Service.Clear(
-        rootPath,
-        requestPath,
-        this.environmentStore.selected(),
-      );
+      await OAuth2Service.Clear(rootPath, requestPath, this.environmentStore.selected());
       this.oauth2Status.set(null);
       this.statusMessage.set('OAuth 2 token cleared.');
     } catch (error) {
@@ -571,14 +566,32 @@ export class RequestEditor {
     if (!status.ExpiresAtMilliseconds) {
       return 'Token stored without an expiry.';
     }
-    return `Token stored until ${new Date(
-      status.ExpiresAtMilliseconds,
-    ).toLocaleString()}.`;
+    return `Token stored until ${new Date(status.ExpiresAtMilliseconds).toLocaleString()}.`;
   }
 
   protected selectBodyType(event: Event): void {
     const type = (event.target as HTMLSelectElement).value as BodyType;
     this.body.update((body) => ({ ...body, Type: type }));
+  }
+
+  protected toggleKindMenu(event: Event): void {
+    event.stopPropagation();
+    this.isKindMenuOpen.update((open) => !open);
+  }
+
+  protected closeKindMenu(): void {
+    this.isKindMenuOpen.set(false);
+  }
+
+  protected chooseMethod(method: string): void {
+    this.method.set(method);
+    this.selectProtocol(Protocol.ProtocolHTTP);
+    this.isKindMenuOpen.set(false);
+  }
+
+  protected chooseProtocol(protocol: Protocol): void {
+    this.selectProtocol(protocol);
+    this.isKindMenuOpen.set(false);
   }
 
   protected selectProtocol(value: string): void {
@@ -596,14 +609,62 @@ export class RequestEditor {
     this.body.update((body) => ({ ...body, Content: value }));
   }
 
+  /**
+   * Hands the edits and the last response of the request on screen to the
+   * tabs store, so coming back to its tab restores them.
+   */
+  private stashCurrent(): void {
+    const path = this.requestPath();
+    if (!path || this.isLoading()) {
+      return;
+    }
+    const state: StashedEditorState = {
+      draft: this.draft(),
+      snapshot: this.snapshot(),
+      responseIdentifier: this.response()?.ID,
+      response: this.response(),
+      responseBody: this.responseBody(),
+      responseHasMore: this.responseHasMore(),
+      responseNextOffset: this.responseNextOffset,
+      responseTab: this.responseTab(),
+      responseError: this.responseError(),
+      activeTab: this.activeTab(),
+    };
+    this.tabsStore.stash(path, state);
+    // The store owns the response handle from now on.
+    this.response.set(null);
+  }
+
+  private restore(state: StashedEditorState): void {
+    this.applyRequest(state.draft as Request);
+    this.snapshot.set(state.snapshot);
+    this.response.set((state['response'] as HTTPResponse | null) ?? null);
+    this.responseBody.set((state['responseBody'] as string) ?? '');
+    this.responseHasMore.set(Boolean(state['responseHasMore']));
+    this.responseNextOffset = (state['responseNextOffset'] as number) ?? 0;
+    this.responseTab.set((state['responseTab'] as 'body' | 'headers' | 'scripts') ?? 'body');
+    this.responseError.set((state['responseError'] as string | null) ?? null);
+    this.activeTab.set((state['activeTab'] as EditorTab) ?? 'parameters');
+  }
+
   private async load(path: string): Promise<void> {
     await this.streamPanel()?.release();
+    if (this.requestPath() && this.requestPath() !== path) {
+      this.stashCurrent();
+    }
     await this.closeResponse();
     this.requestPath.set(path);
-    this.isLoading.set(true);
     this.errorMessage.set(null);
     this.statusMessage.set(null);
 
+    const stashed = this.tabsStore.takeStash(path);
+    if (stashed) {
+      this.restore(stashed);
+      this.isLoading.set(false);
+      return;
+    }
+
+    this.isLoading.set(true);
     try {
       const request = await CollectionsService.LoadRequest(
         this.workspaceStore.rootPath() ?? '',
@@ -656,11 +717,7 @@ export class RequestEditor {
 
     try {
       this.oauth2Status.set(
-        await OAuth2Service.Status(
-          rootPath,
-          requestPath,
-          this.environmentStore.selected(),
-        ),
+        await OAuth2Service.Status(rootPath, requestPath, this.environmentStore.selected()),
       );
     } catch {
       this.oauth2Status.set(null);
@@ -736,8 +793,6 @@ function describeError(error: unknown): string {
 function hasScriptContent(outcome: ScriptOutcome | null | undefined): boolean {
   return Boolean(
     outcome &&
-      (outcome.Error ||
-        (outcome.Logs?.length ?? 0) > 0 ||
-        (outcome.Tests?.length ?? 0) > 0),
+    (outcome.Error || (outcome.Logs?.length ?? 0) > 0 || (outcome.Tests?.length ?? 0) > 0),
   );
 }

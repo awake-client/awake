@@ -36,42 +36,80 @@
 
       <div class="url-row">
         <div class="url-bar">
-          <select
-            class="protocol-select"
-            [ngModel]="protocol()"
-            (ngModelChange)="selectProtocol($event)"
-            aria-label="Request protocol"
-          >
-            @for (protocolOption of protocols; track protocolOption) {
-              <option [value]="protocolOption">
-                {{ protocolLabels[protocolOption] }}
-              </option>
+          <div class="kind-picker">
+            <button
+              type="button"
+              class="kind-button"
+              [attr.data-method]="protocol() === Protocol.ProtocolHTTP ? method() : null"
+              [attr.data-protocol]="protocol()"
+              aria-haspopup="menu"
+              [attr.aria-expanded]="isKindMenuOpen()"
+              title="Method and protocol"
+              (click)="toggleKindMenu($event)"
+            >
+              {{ kindLabel() }}
+              <app-icon name="chevron-down" [size]="12" />
+            </button>
+            @if (isKindMenuOpen()) {
+              <div class="kind-menu" role="menu" (click)="$event.stopPropagation()">
+                <p class="kind-menu-title">HTTP</p>
+                <div class="kind-menu-methods">
+                  @for (httpMethod of httpMethods; track httpMethod) {
+                    <button
+                      type="button"
+                      role="menuitemradio"
+                      class="method-option"
+                      [attr.data-method]="httpMethod"
+                      [class.current]="protocol() === Protocol.ProtocolHTTP && method() === httpMethod"
+                      (click)="chooseMethod(httpMethod)"
+                    >
+                      {{ httpMethod }}
+                    </button>
+                  }
+                </div>
+                <p class="kind-menu-title">Streaming</p>
+                <button
+                  type="button"
+                  role="menuitemradio"
+                  class="stream-option"
+                  [class.current]="protocol() === Protocol.ProtocolSSE"
+                  (click)="chooseProtocol(Protocol.ProtocolSSE)"
+                >
+                  <app-icon name="layers" [size]="14" />
+                  <span><strong>Server-sent events</strong> {{ method() }} stream</span>
+                </button>
+                <button
+                  type="button"
+                  role="menuitemradio"
+                  class="stream-option"
+                  [class.current]="protocol() === Protocol.ProtocolWebSocket"
+                  (click)="chooseProtocol(Protocol.ProtocolWebSocket)"
+                >
+                  <app-icon name="switch" [size]="14" />
+                  <span><strong>WebSocket</strong> two-way socket</span>
+                </button>
+              </div>
             }
-          </select>
+          </div>
 
-          <select
-            class="method-select"
-            [attr.data-method]="method()"
-            [ngModel]="method()"
-            (ngModelChange)="method.set($event)"
-            [disabled]="protocol() === Protocol.ProtocolWebSocket"
-            aria-label="HTTP method"
-          >
-            @for (httpMethod of httpMethods; track httpMethod) {
-              <option [value]="httpMethod">{{ httpMethod }}</option>
-            }
-          </select>
-
-          <input
+          <app-variable-input
             class="url-input"
-            type="text"
-            [ngModel]="url()"
-            (ngModelChange)="url.set($event)"
+            [bare]="true"
+            [value]="url()"
+            (valueChange)="url.set($event)"
             placeholder="https://api.example.com/users"
-            spellcheck="false"
-            autocomplete="off"
-            aria-label="Request URL"
+            ariaLabel="Request URL"
           />
+          @if (missingVariables(); as missing) {
+            <a
+              class="variable-warning"
+              routerLink="/workspace/environments"
+              [title]="missing.title"
+            >
+              <app-icon name="alert" [size]="13" />
+              {{ missing.label }}
+            </a>
+          }
         </div>
 
         <button
@@ -138,13 +176,12 @@
                     placeholder="name"
                     spellcheck="false"
                   />
-                  <input
-                    class="input mono entry-value"
-                    type="text"
-                    [ngModel]="parameter.Value"
-                    (ngModelChange)="updateParameter($index, 'Value', $event)"
+                  <app-variable-input
+                    class="entry-value"
+                    [value]="parameter.Value"
+                    (valueChange)="updateParameter($index, 'Value', $event)"
                     placeholder="value"
-                    spellcheck="false"
+                    ariaLabel="Parameter value"
                   />
                   <button
                     type="button"
@@ -185,13 +222,12 @@
                     placeholder="Header-Name"
                     spellcheck="false"
                   />
-                  <input
-                    class="input mono entry-value"
-                    type="text"
-                    [ngModel]="header.Value"
-                    (ngModelChange)="updateHeader($index, 'Value', $event)"
+                  <app-variable-input
+                    class="entry-value"
+                    [value]="header.Value"
+                    (valueChange)="updateHeader($index, 'Value', $event)"
                     placeholder="value"
-                    spellcheck="false"
+                    ariaLabel="Header value"
                   />
                   <button
                     type="button"
