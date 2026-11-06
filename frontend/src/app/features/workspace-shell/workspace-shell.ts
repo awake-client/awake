@@ -1,13 +1,5 @@
-import {
-  Component,
-  DestroyRef,
-  computed,
-  effect,
-  inject,
-  signal,
-  viewChild,
-} from '@angular/core';
-import { Router, RouterLink, RouterOutlet } from '@angular/router';
+import { Component, DestroyRef, computed, effect, inject, signal, viewChild } from '@angular/core';
+import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import * as EnvironmentsService from '@bindings/github.com/clementherve/awake/src/features/environments/service';
 import { Summary } from '@bindings/github.com/clementherve/awake/src/features/environments/models';
 import * as UpdatesService from '@bindings/github.com/clementherve/awake/src/features/updates/service';
@@ -15,6 +7,22 @@ import { EnvironmentStore } from '@core/environment-store';
 import { WorkspaceStore } from '@core/workspace-store';
 import { CollectionTree } from '@features/collections/collection-tree';
 import { CommandPalette } from '@features/command-palette/command-palette';
+import { NewEntryDialog } from '@features/new-entry/new-entry-dialog';
+import { Icon, IconName } from '@shared/icon';
+
+/** Secondary workspace tools listed under the collection tree. */
+interface SidebarSection {
+  route: string;
+  label: string;
+  icon: IconName;
+}
+
+const SIDEBAR_SECTIONS: SidebarSection[] = [
+  { route: '/workspace/environments', label: 'Environments', icon: 'globe' },
+  { route: '/workspace/history', label: 'History', icon: 'history' },
+  { route: '/workspace/git', label: 'Git', icon: 'git' },
+  { route: '/workspace/interop', label: 'Import / Export', icon: 'download' },
+];
 
 /**
  * Application frame for an open workspace: collection tree on the left, the
@@ -22,7 +30,15 @@ import { CommandPalette } from '@features/command-palette/command-palette';
  */
 @Component({
   selector: 'app-workspace-shell',
-  imports: [RouterOutlet, RouterLink, CollectionTree, CommandPalette],
+  imports: [
+    RouterOutlet,
+    RouterLink,
+    RouterLinkActive,
+    CollectionTree,
+    CommandPalette,
+    NewEntryDialog,
+    Icon,
+  ],
   templateUrl: './workspace-shell.html',
   styleUrl: './workspace-shell.css',
 })
@@ -33,10 +49,9 @@ export class WorkspaceShell {
   private readonly destroyRef = inject(DestroyRef);
   private readonly commandPalette = viewChild(CommandPalette);
 
+  protected readonly sections = SIDEBAR_SECTIONS;
   protected readonly workspace = this.workspaceStore.workspace;
-  protected readonly rootPath = computed(
-    () => this.workspaceStore.rootPath() ?? '',
-  );
+  protected readonly rootPath = computed(() => this.workspaceStore.rootPath() ?? '');
   protected readonly environments = signal<Summary[]>([]);
   protected readonly selectedEnvironment = this.environmentStore.selected;
   protected readonly version = signal('');
@@ -47,16 +62,6 @@ export class WorkspaceShell {
       return '';
     }
     return mode.charAt(0).toUpperCase() + mode.slice(1);
-  });
-  protected readonly selectedEnvironmentLabel = computed(() => {
-    const selected = this.selectedEnvironment();
-    if (!selected) {
-      return 'No environment';
-    }
-    const environment = this.environments().find(
-      (summary) => summary.FileName === selected,
-    );
-    return environment?.Name ?? selected;
   });
 
   constructor() {
@@ -76,10 +81,7 @@ export class WorkspaceShell {
 
     window.addEventListener('awake:environments-changed', reloadEnvironments);
     this.destroyRef.onDestroy(() =>
-      window.removeEventListener(
-        'awake:environments-changed',
-        reloadEnvironments,
-      ),
+      window.removeEventListener('awake:environments-changed', reloadEnvironments),
     );
 
     void UpdatesService.CurrentVersion()
@@ -129,8 +131,7 @@ export class WorkspaceShell {
       }
 
       const defaultEnvironment =
-        this.workspaceStore.workspace()?.configuration.DefaultEnvironment ??
-        '';
+        this.workspaceStore.workspace()?.configuration.DefaultEnvironment ?? '';
       if (
         defaultEnvironment &&
         summaries.some((summary) => summary.FileName === defaultEnvironment)

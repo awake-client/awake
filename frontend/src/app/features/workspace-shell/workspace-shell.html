@@ -1,38 +1,43 @@
-<header class="workspace-header">
-  <div class="workspace-identity">
-    <span class="home-icon" aria-hidden="true">⌂</span>
-    <span class="workspace-name">
-      {{ workspace()?.configuration?.Name }}
-    </span>
-    @if (modeLabel(); as mode) {
-      <span class="mode-badge">{{ mode }}</span>
-    }
-  </div>
-
-  <div class="workspace-brand">
-    <span class="brand-mark">A</span>
-    <span>Awake</span>
-  </div>
-
-  <div class="workspace-actions">
+<header class="titlebar">
+  <div class="titlebar-start">
+    <a
+      class="workspace-switcher"
+      routerLink="/workspace"
+      routerLinkActive="active"
+      [routerLinkActiveOptions]="{ exact: true }"
+      title="Workspace overview"
+    >
+      <span class="brand-mark" aria-hidden="true"></span>
+      <span class="workspace-name">{{ workspace()?.configuration?.Name }}</span>
+    </a>
     <button
       type="button"
-      class="ghost-button"
-      title="Search requests (Ctrl/Cmd + P)"
-      (click)="openCommandPalette()"
+      class="icon-btn"
+      title="Switch workspace"
+      aria-label="Switch workspace"
+      (click)="switchWorkspace()"
     >
-      Search
+      <app-icon name="switch" [size]="14" />
     </button>
-    <a class="ghost-button" routerLink="/workspace/history">History</a>
-    <a class="ghost-button" routerLink="/workspace/environments">Environments</a>
-    <a class="ghost-button" routerLink="/workspace/git">Git</a>
-    <a class="ghost-button" routerLink="/workspace/interop">Import</a>
+  </div>
 
-    <label class="environment-picker">
+  <button type="button" class="search-trigger" (click)="openCommandPalette()">
+    <app-icon name="search" [size]="14" />
+    <span>Search requests</span>
+    <kbd>⌘P</kbd>
+  </button>
+
+  <div class="titlebar-end">
+    <label
+      class="environment-picker"
+      [class.active]="selectedEnvironment()"
+      title="Active environment"
+    >
+      <span class="environment-dot" aria-hidden="true"></span>
       <select
         [value]="selectedEnvironment()"
         (change)="selectEnvironment($event)"
-        title="Environment"
+        aria-label="Active environment"
       >
         <option value="">No environment</option>
         @for (environment of environments(); track environment.FileName) {
@@ -41,52 +46,53 @@
           </option>
         }
       </select>
+      <app-icon name="chevron-down" [size]="12" />
     </label>
-
-    <button
-      type="button"
-      class="ghost-button"
-      [title]="'Check for updates' + (version() ? ' (v' + version() + ')' : '')"
-      (click)="checkForUpdates()"
-    >
-      Updates
-    </button>
-    @if (updateError(); as message) {
-      <span class="update-error" [title]="message">Update unavailable</span>
-    }
-
-    <button type="button" class="ghost-button" (click)="switchWorkspace()">
-      Switch workspace
-    </button>
   </div>
 </header>
 
 <div class="workspace-body">
-  <aside class="tree-panel">
+  <aside class="sidebar">
     <app-collection-tree
+      class="sidebar-tree"
       [workspaceRoot]="rootPath()"
       (requestSelected)="openRequest($event)"
     />
+
+    <nav class="sidebar-sections" aria-label="Workspace tools">
+      @for (section of sections; track section.route) {
+        <a class="sidebar-section" [routerLink]="section.route" routerLinkActive="active">
+          <app-icon [name]="section.icon" [size]="15" />
+          <span>{{ section.label }}</span>
+        </a>
+      }
+    </nav>
+
+    <footer class="sidebar-footer">
+      @if (modeLabel(); as mode) {
+        <span class="mode-badge">{{ mode }}</span>
+      }
+      <span class="sidebar-version">v{{ version() || '0.1.0' }}</span>
+      <span class="footer-spacer"></span>
+      @if (updateError(); as message) {
+        <span class="update-error" [title]="message">Update unavailable</span>
+      }
+      <button
+        type="button"
+        class="icon-btn"
+        [title]="'Check for updates' + (version() ? ' (v' + version() + ')' : '')"
+        aria-label="Check for updates"
+        (click)="checkForUpdates()"
+      >
+        <app-icon name="arrow-up-circle" [size]="14" />
+      </button>
+    </footer>
   </aside>
 
-  <section class="editor-panel">
+  <main class="sheet">
     <router-outlet />
-  </section>
+  </main>
 </div>
 
-<footer class="status-bar">
-  <span class="status-item">
-    <span class="status-dot"></span>
-    {{ selectedEnvironmentLabel() }}
-  </span>
-  @if (modeLabel(); as mode) {
-    <span class="status-item">{{ mode }} workspace</span>
-  }
-  <span class="status-spacer"></span>
-  <button type="button" class="status-button" (click)="openCommandPalette()">
-    Search ⌘P
-  </button>
-  <span class="status-item">v{{ version() || '0.1.0' }}</span>
-</footer>
-
 <app-command-palette />
+<app-new-entry-dialog />
