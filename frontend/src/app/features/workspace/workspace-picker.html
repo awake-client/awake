@@ -1,27 +1,31 @@
 <section class="workspace-picker">
   <header>
     <h1>Open a workspace</h1>
-    <p class="hint">
-      Point to a directory containing a workspace, or create a new one.
-    </p>
+    <p class="hint">Point to a directory containing a workspace, or create a new one.</p>
   </header>
 
-  <label class="field">
-    <span class="field-label">Directory</span>
-    <input
-      type="text"
-      [ngModel]="workspacePath()"
-      (ngModelChange)="workspacePath.set($event)"
-      placeholder="/Users/me/api-workspace"
-      spellcheck="false"
-      autocomplete="off"
-    />
-  </label>
+  <div class="field">
+    <label class="field-label" for="workspace-path">Directory</label>
+    <div class="path-field">
+      <input
+        id="workspace-path"
+        type="text"
+        [ngModel]="workspacePath()"
+        (ngModelChange)="workspacePath.set($event)"
+        (keydown.enter)="openWorkspace()"
+        placeholder="/Users/me/api-workspace"
+        spellcheck="false"
+        autocomplete="off"
+      />
+      <button type="button" class="browse-button" [disabled]="isBusy()" (click)="browseWorkspace()">
+        <app-icon name="folder-open" [size]="15" />
+        Browse…
+      </button>
+    </div>
+  </div>
 
   <div class="actions">
-    <button type="button" (click)="openWorkspace()" [disabled]="isBusy()">
-      Open workspace
-    </button>
+    <button type="button" (click)="openWorkspace()" [disabled]="isBusy()">Open workspace</button>
   </div>
 
   <hr />
@@ -38,6 +42,34 @@
       autocomplete="off"
     />
   </label>
+
+  <div class="field">
+    <label class="field-label" for="create-path">Location</label>
+    <div class="path-field">
+      <input
+        id="create-path"
+        type="text"
+        [ngModel]="createPath()"
+        (ngModelChange)="createPath.set($event)"
+        placeholder="/Users/me/platform-api"
+        spellcheck="false"
+        autocomplete="off"
+      />
+      <button
+        type="button"
+        class="browse-button"
+        [disabled]="isBusy()"
+        (click)="browseCreateLocation()"
+      >
+        <app-icon name="folder-open" [size]="15" />
+        Browse…
+      </button>
+    </div>
+    <span class="field-hint">
+      The workspace files are written in this directory. Create an empty folder from the dialog if
+      needed.
+    </span>
+  </div>
 
   <label class="field">
     <span class="field-label">Mode</span>
@@ -59,9 +91,7 @@
 
   <footer class="app-footer">
     <span class="version">Awake {{ version() ? 'v' + version() : '' }}</span>
-    <button type="button" class="link-button" (click)="checkForUpdates()">
-      Check for updates
-    </button>
+    <button type="button" class="link-button" (click)="checkForUpdates()">Check for updates</button>
     @if (updateError(); as message) {
       <span class="update-error" [title]="message">Update unavailable</span>
     }

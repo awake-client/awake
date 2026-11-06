@@ -8,11 +8,13 @@ import {
   CreateOptions,
   Mode,
 } from '@bindings/github.com/clementherve/awake/src/features/workspace/models';
+import { chooseDirectory } from '@core/dialogs';
 import { WorkspaceStore } from '@core/workspace-store';
+import { Icon } from '@shared/icon';
 
 @Component({
   selector: 'app-workspace-picker',
-  imports: [FormsModule],
+  imports: [FormsModule, Icon],
   templateUrl: './workspace-picker.html',
   styleUrl: './workspace-picker.css',
 })
@@ -21,6 +23,7 @@ export class WorkspacePicker {
   private readonly router = inject(Router);
 
   protected readonly workspacePath = signal('');
+  protected readonly createPath = signal('');
   protected readonly workspaceName = signal('');
   protected readonly mode = signal<Mode>(Mode.ModeTeam);
   protected readonly errorMessage = signal<string | null>(null);
@@ -48,13 +51,38 @@ export class WorkspacePicker {
   }
 
   protected async openWorkspace(): Promise<void> {
-    await this.runOperation(async (rootPath) => {
-      return WorkspaceService.Open(rootPath);
+    await this.runOperation(this.workspacePath(), (rootPath) =>
+      WorkspaceService.Open(rootPath),
+    );
+  }
+
+  /** Lets the user pick an existing workspace and opens it right away. */
+  protected async browseWorkspace(): Promise<void> {
+    const directory = await this.pickDirectory({
+      title: 'Open a workspace',
+      buttonText: 'Open',
+      directory: this.workspacePath().trim(),
     });
+    if (directory === null) {
+      return;
+    }
+    this.workspacePath.set(directory);
+    await this.openWorkspace();
+  }
+
+  protected async browseCreateLocation(): Promise<void> {
+    const directory = await this.pickDirectory({
+      title: 'Choose where to create the workspace',
+      buttonText: 'Choose',
+      directory: this.createPath().trim(),
+    });
+    if (directory !== null) {
+      this.createPath.set(directory);
+    }
   }
 
   protected async createWorkspace(): Promise<void> {
-    await this.runOperation(async (rootPath) => {
+    await this.runOperation(this.createPath(), (rootPath) => {
       const options: CreateOptions = {
         Name: this.workspaceName().trim(),
         Mode: this.mode(),
@@ -77,10 +105,23 @@ export class WorkspacePicker {
     }
   }
 
+  private async pickDirectory(
+    options: Parameters<typeof chooseDirectory>[0],
+  ): Promise<string | null> {
+    this.errorMessage.set(null);
+    try {
+      return await chooseDirectory(options);
+    } catch (error) {
+      this.errorMessage.set(describeError(error));
+      return null;
+    }
+  }
+
   private async runOperation(
+    path: string,
     operation: (rootPath: string) => Promise<Configuration>,
   ): Promise<void> {
-    const rootPath = this.workspacePath().trim();
+    const rootPath = path.trim();
     if (rootPath === '') {
       this.errorMessage.set('Choose a workspace directory first.');
       return;
