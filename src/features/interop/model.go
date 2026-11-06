@@ -16,7 +16,8 @@ const (
 	FormatOpenAPI Format = "openapi"
 	// FormatPostman is a Postman collection, version 2.0 or 2.1.
 	FormatPostman Format = "postman"
-	// FormatBruno is a Bruno collection directory of .bru files.
+	// FormatBruno is a Bruno collection directory, in .bru or OpenCollection
+	// YAML form.
 	FormatBruno Format = "bruno"
 )
 

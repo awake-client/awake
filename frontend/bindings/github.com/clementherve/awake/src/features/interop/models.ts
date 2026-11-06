@@ -28,7 +28,8 @@ export enum Format {
     FormatPostman = "postman",
 
     /**
-     * FormatBruno is a Bruno collection directory of .bru files.
+     * FormatBruno is a Bruno collection directory, in .bru or OpenCollection
+     * YAML form.
      */
     FormatBruno = "bruno",
 };

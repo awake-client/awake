@@ -46,7 +46,7 @@ export class InteropPanel {
   protected readonly importHint = computed(() => {
     switch (this.importFormat()) {
       case Format.FormatBruno:
-        return 'Path to a Bruno collection directory.';
+        return 'Path to a Bruno collection directory (.bru or OpenCollection YAML).';
       case Format.FormatPostman:
         return 'Path to a Postman collection JSON file.';
       default:

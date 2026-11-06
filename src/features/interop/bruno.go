@@ -39,10 +39,11 @@ type brunoFolderBuilder struct {
 	order    []string
 }
 
-// ReadBrunoDirectory parses a Bruno collection directory. A directory that
-// contains collection.bru is one collection; otherwise each child directory
-// holding a collection.bru is read as a collection, and a plain directory is
-// read as a single unnamed collection.
+// ReadBrunoDirectory parses a Bruno collection directory, either the original
+// .bru layout or the OpenCollection YAML layout. A directory that contains
+// collection.bru or opencollection.yml is one collection; otherwise each child
+// directory holding one of those files is read as a collection, and a plain
+// directory is read as a single unnamed collection.
 func ReadBrunoDirectory(root string) ([]Collection, error) {
 	collectionRoots, err := brunoCollectionRoots(root)
 	if err != nil {
@@ -83,7 +84,7 @@ func brunoCollectionRoots(root string) ([]string, error) {
 		return nil, fmt.Errorf("bruno: %s is not a directory", root)
 	}
 
-	if fileExists(filepath.Join(root, brunoCollectionFileName)) {
+	if isBrunoCollectionRoot(root) {
 		return []string{root}, nil
 	}
 
@@ -98,7 +99,7 @@ func brunoCollectionRoots(root string) ([]string, error) {
 			continue
 		}
 		candidate := filepath.Join(root, entry.Name())
-		if fileExists(filepath.Join(candidate, brunoCollectionFileName)) {
+		if isBrunoCollectionRoot(candidate) {
 			roots = append(roots, candidate)
 		}
 	}
@@ -111,7 +112,18 @@ func brunoCollectionRoots(root string) ([]string, error) {
 	return roots, nil
 }
 
+func isBrunoCollectionRoot(directory string) bool {
+	return fileExists(filepath.Join(directory, brunoCollectionFileName)) ||
+		fileExists(filepath.Join(directory, brunoYAMLCollectionFileName)) ||
+		fileExists(filepath.Join(directory, "opencollection.yaml"))
+}
+
 func readBrunoCollection(root string) (Collection, error) {
+	if !fileExists(filepath.Join(root, brunoCollectionFileName)) &&
+		isBrunoCollectionRoot(root) {
+		return readBrunoYAMLCollection(root)
+	}
+
 	collection := Collection{
 		Name:      filepath.Base(root),
 		Variables: map[string]string{},
