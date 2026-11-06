@@ -15,6 +15,7 @@ import { EnvironmentStore } from '@core/environment-store';
 import { WorkspaceStore } from '@core/workspace-store';
 import { ColorPicker } from '@shared/color-picker';
 import { Icon } from '@shared/icon';
+import { SecretInput } from '@shared/secret-input';
 
 interface VariableRow {
   name: string;
@@ -27,7 +28,7 @@ interface VariableRow {
  */
 @Component({
   selector: 'app-environments-panel',
-  imports: [FormsModule, Icon, ColorPicker],
+  imports: [FormsModule, Icon, ColorPicker, SecretInput],
   templateUrl: './environments-panel.html',
   styleUrl: './environments-panel.css',
 })

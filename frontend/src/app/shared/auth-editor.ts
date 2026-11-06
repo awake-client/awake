@@ -6,6 +6,7 @@ import {
   OAuth2GrantType,
 } from '@bindings/github.com/clementherve/awake/src/domain/models';
 import { Icon, IconName } from './icon';
+import { SecretInput } from './secret-input';
 import { VariableInput } from './variable-input';
 
 /** Fields of an authentication edited as plain text. */
@@ -69,7 +70,7 @@ export function describeAuthentication(authentication: Authentication | null | u
  */
 @Component({
   selector: 'app-auth-editor',
-  imports: [Icon, VariableInput, RouterLink],
+  imports: [Icon, SecretInput, VariableInput, RouterLink],
   templateUrl: './auth-editor.html',
   styleUrl: './auth-editor.css',
 })

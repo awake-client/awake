@@ -60,13 +60,11 @@
       </label>
       <label class="field">
         <span class="field-label">Password</span>
-        <input
-          class="input mono"
-          type="password"
+        <app-secret-input
           [value]="value().Password"
-          (input)="update('Password', inputValue($event))"
+          (valueChange)="update('Password', $event)"
           placeholder="{{ '{{password}}' }}"
-          autocomplete="new-password"
+          ariaLabel="Password"
         />
       </label>
     </div>
@@ -168,13 +166,11 @@
         </label>
         <label class="field">
           <span class="field-label">Password</span>
-          <input
-            class="input mono"
-            type="password"
+          <app-secret-input
             [value]="value().Password"
-            (input)="update('Password', inputValue($event))"
+            (valueChange)="update('Password', $event)"
             placeholder="{{ '{{password}}' }}"
-            autocomplete="new-password"
+            ariaLabel="Password"
           />
         </label>
       }
@@ -209,13 +205,11 @@
       </label>
       <label class="field">
         <span class="field-label">Client secret</span>
-        <input
-          class="input mono"
-          type="password"
+        <app-secret-input
           [value]="value().ClientSecret"
-          (input)="update('ClientSecret', inputValue($event))"
+          (valueChange)="update('ClientSecret', $event)"
           placeholder="{{ '{{clientSecret}}' }}"
-          autocomplete="new-password"
+          ariaLabel="Client secret"
         />
       </label>
       <label class="field">

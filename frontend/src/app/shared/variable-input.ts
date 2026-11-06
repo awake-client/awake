@@ -39,6 +39,7 @@ const MAX_SUGGESTIONS = 8;
   host: {
     '[class.bare]': 'bare()',
     '[class.mono]': 'mono()',
+    '[class.masked]': 'masked()',
   },
   template: `
     <div class="highlight" aria-hidden="true">
@@ -102,6 +103,8 @@ export class VariableInput {
   /** Drops the border, for fields embedded in a larger control. */
   readonly bare = input(false);
   readonly mono = input(true);
+  /** Hides the characters, for secrets. */
+  readonly masked = input(false);
   readonly valueChange = output<string>();
 
   protected readonly scrollLeft = signal(0);
@@ -138,6 +141,9 @@ export class VariableInput {
 
   /** The resolved text, or which variables are missing. */
   protected readonly tooltip = computed(() => {
+    if (this.masked()) {
+      return '';
+    }
     const references = this.store.references(this.value());
     if (references.length === 0) {
       return '';
