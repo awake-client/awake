@@ -1,142 +1,54 @@
 # Awake
 
-Awake is a git-native API client for macOS, Linux and Windows. Collections,
-requests and environments are plain YAML files stored in a workspace
-directory, so collaboration happens through git instead of a proprietary
-cloud.
+[![continuous integration](https://github.com/awake-client/awake/actions/workflows/continuous-integration.yml/badge.svg)](https://github.com/awake-client/awake/actions/workflows/continuous-integration.yml)
+[![release](https://github.com/awake-client/awake/actions/workflows/release.yml/badge.svg)](https://github.com/awake-client/awake/actions/workflows/release.yml)
+[![latest release](https://img.shields.io/github/v/release/awake-client/awake?sort=semver)](https://github.com/awake-client/awake/releases)
+[![license: GPLv3](https://img.shields.io/badge/license-GPLv3-blue.svg)](LICENSE)
 
-> Status: early development. The repository currently contains the project
-> scaffolding and the foundations described below.
+A git-native API client for macOS, Linux and Windows. Collections, requests and
+environments are plain YAML files in a git repository, so a team collaborates
+through git instead of a cloud account.
 
-## Why
+![The request editor, collection tree and a JSON response in Awake](docs/screenshot.png)
 
-Existing API clients either hide data behind a cloud service, store everything
-in a single opaque file, or make git collaboration an afterthought. Awake
-treats files as the source of truth and git as the collaboration layer, while
-keeping the application fast on large workspaces.
+## Features
 
-## Stack
+- **Files as the source of truth** — one readable YAML file per request, with
+  reviewable diffs and ordinary git history.
+- **HTTP, SSE and WebSocket** — parameters, headers, basic, bearer, API key and
+  OAuth 2 authentication, bodies and request scripts.
+- **Environments** — shared variables with local overrides; secret values stay
+  in the operating system keychain and never in the repository.
+- **Coding agents** — chat with Claude Code or OpenCode to rename requests,
+  extract base URLs or change anything else in the workspace.
+- **Import and export** — Bruno, OpenCollection, OpenAPI and Postman.
+- **Built to stay fast** — virtualized tree, SQLite index, search, command
+  palette, request history, light and dark themes.
 
-| Layer | Technology |
-| --- | --- |
-| Desktop runtime | [Wails](https://wails.io) v3 |
-| Backend | Go |
-| Frontend | Angular 22, standalone components, signals, zoneless |
-| Local index and history | SQLite |
-| File format | YAML, one file per request |
+## Install
 
-## Architecture
-
-The guiding rule is that **files are the source of truth**. SQLite is a
-disposable index that can be rebuilt from disk at any time. It stores the
-collection index, search data, request history and UI state, never the only
-copy of a workspace.
-
-```
-awake/
-  main.go                     Wails entry point
-  src/
-    app/                      application bootstrap and dependency wiring
-    features/                 vertical slices, one package per feature
-    shared/                   cross-cutting primitives without business logic
-  frontend/
-    src/app/
-      core/                   bindings, configuration, theme
-      shared/                 presentational components
-      features/               lazy loaded feature areas
-  docs/                       architecture and conventions
-  build/                      packaging assets
-```
-
-Each feature owns its model, its storage access and the service exposed to the
-frontend. Features communicate through events or through interfaces declared
-by the consumer, never through direct imports of another feature's internals.
-See [docs/conventions.md](docs/conventions.md) for the full rules.
-
-## Coding agent integration
-
-When [Claude Code](https://claude.com/claude-code) is installed, a git conflict
-can be resolved with Claude from the Git panel. Awake runs the `claude`
-command without any tool: Claude only receives the base, local and incoming
-versions of the conflicted file and answers with a merged version, which the
-user reviews and can edit before it is applied.
-
-The Assistant page is a chat over the workspace. Choose Claude Code or
-[OpenCode](https://opencode.ai), describe the change you want, and the agent
-works at the workspace root with its file tools. Every change appears in
-`git diff` and stays reviewable. OpenCode uses its configured model; the model
-selector next to the agent lists the models it knows when the default one
-cannot call tools. A short context prompt tells the agent that
-requests, collections and environments are YAML files, and a prefilled
-`AGENT.md` is installed on first use unless the workspace already has one.
-Typical requests are renaming unclear requests or extracting repeated base
-URLs: a request to `http://localhost:8080/users` can become
-`{{baseUrl}}/users` with a `development` environment holding
-`baseUrl: http://localhost:8080`.
-
-## Workspace layout
-
-A workspace is a regular git repository:
-
-```
-awake.yaml                  workspace configuration
-environments/dev.yaml       shared variables
-environments/dev.local.yaml local overrides, git ignored
-collections/plateforme/     collections and requests
-local/                      private requests, git ignored
-.awake/                     disposable index and cache, git ignored
-```
-
-Secret values never appear in these files. Only their names are stored, with
-the values kept in the operating system keychain: macOS Keychain, Windows
-Credential Manager or the Secret Service implementation on Linux.
+Download the latest build for your platform from
+[Releases](https://github.com/awake-client/awake/releases). Every `v*` tag
+publishes macOS (`arm64`, `amd64`), Linux (`amd64`, `arm64`) and Windows
+(`amd64`) builds.
 
 ## Development
 
-Requirements:
-
-- Go 1.26 or newer
-- Node.js 22 or newer
-- Wails v3 CLI: `go install github.com/wailsapp/wails/v3/cmd/wails3@latest`
-- Git
-
-Platform dependencies:
-
-- macOS: Xcode command line tools.
-- Windows: WebView2 runtime (preinstalled on Windows 11) and NSIS if you
-  package an installer.
-- Linux: GTK 3 and WebKitGTK 4.1 development packages, for example
-  `libgtk-3-dev` and `libwebkit2gtk-4.1-dev` on Debian and Ubuntu.
+Requires Go 1.26+, Node.js 22+ and the
+[Wails v3 CLI](https://v3.wails.io) (`go install github.com/wailsapp/wails/v3/cmd/wails3@latest`).
 
 ```sh
-wails3 task dev       # run the application with hot reload
-wails3 task test      # run the Go test suite
-wails3 task lint      # run the Go linter
-wails3 task build     # build the application for the host platform
-wails3 task build GOOS=windows   # cross-compile for Windows
-wails3 task package   # create the platform package
-```
-
-## Updates
-
-Awake checks the GitHub releases of
-[`awake-client/awake`](https://github.com/awake-client/awake/releases) when
-the user selects **Check for updates** on the workspace picker or **Updates**
-in the workspace header. The Wails updater downloads the artifact for the
-running platform, replaces the application and restarts it. Release builds
-should inject the version:
-
-```sh
-go build -ldflags \
-  "-X github.com/clementherve/awake/src/features/updates.Version=1.2.3" \
-  -o bin/awake
+wails3 task dev     # run with hot reload
+wails3 task test    # Go and Angular test suites
+wails3 task build   # build for the host platform
+wails3 task package # create the platform package
 ```
 
 ## Documentation
 
+- [File format](docs/file-format.md)
 - [Architecture and conventions](docs/conventions.md)
 
 ## License
 
-Awake is free software released under the GNU General Public License,
-version 3 or any later version. See [LICENSE](LICENSE).
+GPL-3.0-or-later. See [LICENSE](LICENSE).
