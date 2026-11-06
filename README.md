@@ -2,7 +2,6 @@
 
 [![continuous integration](https://github.com/awake-client/awake/actions/workflows/continuous-integration.yml/badge.svg)](https://github.com/awake-client/awake/actions/workflows/continuous-integration.yml)
 [![release](https://github.com/awake-client/awake/actions/workflows/release.yml/badge.svg)](https://github.com/awake-client/awake/actions/workflows/release.yml)
-[![latest release](https://img.shields.io/github/v/release/awake-client/awake?sort=semver)](https://github.com/awake-client/awake/releases)
 [![license: GPLv3](https://img.shields.io/badge/license-GPLv3-blue.svg)](LICENSE)
 
 A git-native API client for macOS, Linux and Windows. Collections, requests and
