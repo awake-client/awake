@@ -16,7 +16,7 @@
   justify-content: center;
   align-items: flex-start;
   padding: 14vh 24px 24px;
-  background: color-mix(in srgb, #000000 42%, transparent);
+  background: var(--color-backdrop);
 }
 
 .palette {
@@ -25,10 +25,9 @@
   width: min(640px, 100%);
   max-height: 62vh;
   overflow: hidden;
-  border: 1px solid var(--color-border);
-  border-radius: 10px;
-  background: var(--color-surface);
-  box-shadow: 0 24px 64px color-mix(in srgb, #000000 32%, transparent);
+  border-radius: var(--radius-xl);
+  background: var(--color-surface-raised);
+  box-shadow: var(--shadow-raised);
 }
 
 .palette-input {
@@ -37,7 +36,7 @@
   background: transparent;
   color: var(--color-text);
   padding: 14px 16px;
-  font-size: 0.9375rem;
+  font-size: var(--text-md);
 }
 
 .palette-input:focus {
@@ -51,7 +50,7 @@
 .palette-message {
   margin: 0;
   padding: 18px 16px;
-  font-size: 0.8125rem;
+  font-size: var(--text-base);
   color: var(--color-text-muted);
 }
 
@@ -80,41 +79,13 @@
   background: var(--color-selection);
 }
 
-.method {
-  flex: 0 0 52px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 0.625rem;
-  font-weight: 700;
-  color: var(--color-text-muted);
-}
-
-.method[data-method='GET'] {
-  color: var(--method-get);
-}
-
-.method[data-method='POST'] {
-  color: var(--method-post);
-}
-
-.method[data-method='PUT'] {
-  color: var(--method-put);
-}
-
-.method[data-method='PATCH'] {
-  color: var(--method-patch);
-}
-
-.method[data-method='DELETE'] {
-  color: var(--method-delete);
-}
-
 .result-name {
   flex: 0 1 auto;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 0.8125rem;
+  font-size: var(--text-base);
 }
 
 .result-path {
@@ -124,8 +95,8 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   text-align: right;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 0.6875rem;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
   color: var(--color-text-muted);
 }
 
@@ -134,7 +105,7 @@
   gap: 16px;
   padding: 8px 16px;
   border-top: 1px solid var(--color-border);
-  font-size: 0.6875rem;
+  font-size: var(--text-sm);
   color: var(--color-text-muted);
 }
 
@@ -145,8 +116,8 @@
 }
 
 kbd {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 0.625rem;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
   padding: 1px 5px;
   border: 1px solid var(--color-border);
   border-radius: 4px;

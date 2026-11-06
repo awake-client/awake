@@ -20,14 +20,14 @@
 
 h1 {
   margin: 0;
-  font-size: 1.0625rem;
+  font-size: var(--text-xl);
   font-weight: 600;
   color: var(--color-text-strong);
 }
 
 .history-hint {
   margin: 4px 0 0;
-  font-size: 0.75rem;
+  font-size: var(--text-base);
   color: var(--color-text-muted);
 }
 
@@ -44,7 +44,7 @@ h1 {
   color: var(--color-text-muted);
   border-radius: var(--radius-sm);
   padding: 6px 12px;
-  font-size: 0.75rem;
+  font-size: var(--text-base);
   cursor: pointer;
 }
 
@@ -68,14 +68,14 @@ h1 {
 
 .history-error {
   margin: 0 0 12px;
-  font-size: 0.75rem;
+  font-size: var(--text-base);
   color: var(--color-danger);
 }
 
 .history-empty {
   margin: 0;
   padding: 24px 0;
-  font-size: 0.8125rem;
+  font-size: var(--text-base);
   color: var(--color-text-muted);
 }
 
@@ -111,34 +111,6 @@ h1 {
   background: var(--color-hover);
 }
 
-.method {
-  flex: 0 0 52px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 0.625rem;
-  font-weight: 700;
-  color: var(--color-text-muted);
-}
-
-.method[data-method='GET'] {
-  color: var(--method-get);
-}
-
-.method[data-method='POST'] {
-  color: var(--method-post);
-}
-
-.method[data-method='PUT'] {
-  color: var(--method-put);
-}
-
-.method[data-method='PATCH'] {
-  color: var(--method-patch);
-}
-
-.method[data-method='DELETE'] {
-  color: var(--method-delete);
-}
-
 .history-main {
   display: flex;
   flex-direction: column;
@@ -148,7 +120,7 @@ h1 {
 }
 
 .history-name {
-  font-size: 0.8125rem;
+  font-size: var(--text-base);
   font-weight: 500;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -156,8 +128,8 @@ h1 {
 }
 
 .history-url {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 0.6875rem;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
   color: var(--color-text-muted);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -166,8 +138,8 @@ h1 {
 
 .status {
   flex: 0 0 auto;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 0.6875rem;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
   font-weight: 700;
   padding: 2px 8px;
   border-radius: 999px;
@@ -188,7 +160,7 @@ h1 {
 
 .history-meta {
   flex: 0 0 auto;
-  font-size: 0.6875rem;
+  font-size: var(--text-sm);
   color: var(--color-text-muted);
   font-variant-numeric: tabular-nums;
 }

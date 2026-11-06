@@ -45,7 +45,7 @@
     <div class="history-list">
       @for (entry of entries(); track entry.ID) {
         <button type="button" class="history-row" (click)="open(entry)">
-          <span class="method" [attr.data-method]="entry.Method">
+          <span class="method-chip" [attr.data-method]="entry.Method">
             {{ entry.Method }}
           </span>
 

@@ -22,14 +22,14 @@
 
 h1 {
   margin: 0;
-  font-size: 1.0625rem;
+  font-size: var(--text-xl);
   font-weight: 600;
   color: var(--color-text-strong);
 }
 
 .git-hint {
   margin: 4px 0 0;
-  font-size: 0.75rem;
+  font-size: var(--text-base);
   color: var(--color-text-muted);
 }
 
@@ -41,9 +41,9 @@ h1 {
 .ghost-button,
 .primary-button {
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
   padding: 6px 12px;
-  font-size: 0.75rem;
+  font-size: var(--text-base);
   cursor: pointer;
 }
 
@@ -58,9 +58,9 @@ h1 {
 }
 
 .primary-button {
-  background: var(--color-accent);
-  border-color: var(--color-accent);
-  color: #ffffff;
+  background: var(--color-accent-gradient);
+  border-color: transparent;
+  color: var(--color-on-accent);
   font-weight: 600;
 }
 
@@ -72,12 +72,12 @@ h1 {
 
 .ghost-button.small {
   padding: 3px 8px;
-  font-size: 0.6875rem;
+  font-size: var(--text-sm);
 }
 
 .git-message {
   margin: 0;
-  font-size: 0.75rem;
+  font-size: var(--text-base);
 }
 
 .git-message.error {
@@ -90,7 +90,7 @@ h1 {
 
 .git-empty {
   margin: 0;
-  font-size: 0.8125rem;
+  font-size: var(--text-base);
   color: var(--color-text-muted);
 }
 
@@ -102,7 +102,7 @@ h1 {
   padding: 20px;
   border: 1px dashed var(--color-border);
   border-radius: 8px;
-  font-size: 0.8125rem;
+  font-size: var(--text-base);
   color: var(--color-text-muted);
 }
 
@@ -114,8 +114,8 @@ h1 {
   display: flex;
   align-items: center;
   gap: 10px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 0.75rem;
+  font-family: var(--font-mono);
+  font-size: var(--text-base);
 }
 
 .branch-name {
@@ -133,7 +133,7 @@ h1 {
   border-radius: 8px;
   background: color-mix(in srgb, var(--color-danger) 10%, transparent);
   color: var(--color-danger);
-  font-size: 0.75rem;
+  font-size: var(--text-base);
 }
 
 .change-list {
@@ -153,7 +153,7 @@ h1 {
   padding: 7px 12px;
   border-bottom: 1px solid var(--color-border);
   background: var(--color-surface);
-  font-size: 0.75rem;
+  font-size: var(--text-base);
 }
 
 .change-row:last-child {
@@ -166,7 +166,7 @@ h1 {
 
 .change-status {
   flex: 0 0 28px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-family: var(--font-mono);
   font-weight: 700;
   color: var(--color-text-muted);
 }
@@ -181,7 +181,7 @@ h1 {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-family: var(--font-mono);
 }
 
 .commit-box {
@@ -198,21 +198,18 @@ h1 {
 }
 
 .field-label {
-  font-size: 0.625rem;
+  font-size: var(--text-xs);
   font-weight: 600;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
   color: var(--color-text-muted);
 }
 
 .commit-box input {
-  border: 1px solid transparent;
+  border: 1px solid var(--color-border-strong);
   background: var(--color-field);
   color: var(--color-text);
   border-radius: var(--radius-sm);
-  box-shadow: var(--shadow-input);
   padding: 6px 8px;
-  font-size: 0.8125rem;
+  font-size: var(--text-base);
 }
 
 .commit-box input:focus {
@@ -238,8 +235,8 @@ h1 {
 }
 
 .conflict-path {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 0.75rem;
+  font-family: var(--font-mono);
+  font-size: var(--text-base);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -260,10 +257,8 @@ h1 {
 
 .conflict-column h2 {
   margin: 0;
-  font-size: 0.625rem;
+  font-size: var(--text-xs);
   font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
   color: var(--color-text-muted);
 }
 
@@ -277,8 +272,8 @@ h1 {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
   background: var(--color-background);
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 0.7rem;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
   line-height: 1.5;
   white-space: pre-wrap;
   overflow-wrap: anywhere;

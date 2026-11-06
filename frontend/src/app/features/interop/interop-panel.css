@@ -16,14 +16,14 @@
 
 h1 {
   margin: 0;
-  font-size: 1.0625rem;
+  font-size: var(--text-xl);
   font-weight: 600;
   color: var(--color-text-strong);
 }
 
 .interop-hint {
   margin: 4px 0 0;
-  font-size: 0.75rem;
+  font-size: var(--text-base);
   color: var(--color-text-muted);
 }
 
@@ -52,18 +52,18 @@ h1 {
 
 h2 {
   margin: 0;
-  font-size: 0.9375rem;
+  font-size: var(--text-md);
 }
 
 .card-hint {
   margin: 0;
-  font-size: 0.75rem;
+  font-size: var(--text-base);
   line-height: 1.5;
   color: var(--color-text-muted);
 }
 
 code {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-family: var(--font-mono);
 }
 
 .field {
@@ -73,21 +73,20 @@ code {
 }
 
 .field-label {
-  font-size: 0.625rem;
+  font-size: var(--text-xs);
   font-weight: 600;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
   color: var(--color-text-muted);
 }
 
 .field input,
 .field select {
-  border: 1px solid var(--color-border);
-  background: var(--color-background);
+  height: var(--control-height);
+  border: 1px solid var(--color-border-strong);
+  background-color: var(--color-field);
   color: var(--color-text);
-  border-radius: var(--radius-sm);
-  padding: 7px 9px;
-  font-size: 0.8125rem;
+  border-radius: var(--radius-md);
+  padding: 0 10px;
+  font-size: var(--text-base);
   min-width: 0;
 }
 
@@ -99,7 +98,7 @@ code {
 
 .interop-message {
   margin: 0;
-  font-size: 0.75rem;
+  font-size: var(--text-base);
 }
 
 .interop-message.error {
@@ -120,8 +119,8 @@ code {
   list-style: none;
   max-height: 180px;
   overflow: auto;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 0.6875rem;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
   color: var(--color-text-muted);
 }
 
@@ -137,12 +136,12 @@ code {
 
 .primary-button {
   align-self: flex-start;
-  border: 1px solid var(--color-accent);
-  border-radius: var(--radius-sm);
-  background: var(--color-accent);
-  color: #ffffff;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: var(--color-accent-gradient);
+  color: var(--color-on-accent);
   font-weight: 600;
-  font-size: 0.75rem;
+  font-size: var(--text-base);
   padding: 7px 16px;
   cursor: pointer;
 }
@@ -150,4 +149,8 @@ code {
 .primary-button:disabled {
   opacity: 0.5;
   cursor: default;
+}
+
+.field select {
+  padding-right: 28px;
 }

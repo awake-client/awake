@@ -39,7 +39,7 @@
               (mouseenter)="activeIndex.set(index)"
               (click)="choose(entry)"
             >
-              <span class="method" [attr.data-method]="entry.Method || 'GET'">
+              <span class="method-chip" [attr.data-method]="entry.Method || 'GET'">
                 {{ entry.Method || 'GET' }}
               </span>
               <span class="result-name">{{ entry.Name }}</span>
