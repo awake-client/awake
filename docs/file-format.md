@@ -101,9 +101,12 @@ A collection can declare its own environments in `<collection>/environments/`,
 with the same format. A collection environment refines the global environment
 of the same name: its variables win, and the variables it does not define are
 inherited from the global one. A collection may also declare an environment
-that has no global counterpart. Selecting an environment selects it at both
-levels. Secret values of a collection environment are stored under
-`<collection path>:<environment name>` so they never mix with global ones.
+that has no global counterpart. The environment picker offers the global
+environments and those of the collection of the open request (or of the
+collection whose settings are open), never those of another collection.
+Selecting an environment selects it at both levels. Secret values of a
+collection environment are stored under `<collection path>:<environment name>`
+so they never mix with global ones.
 
 ## Variables resolution order
 

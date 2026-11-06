@@ -65,7 +65,7 @@ export interface EnvironmentChoice {
               <span class="badge">local</span>
             }
             @if (option.CollectionOnly) {
-              <span class="badge">collections</span>
+              <span class="badge">collection</span>
             }
           </button>
         }

@@ -1,5 +1,8 @@
 import { Component, DestroyRef, computed, effect, inject, signal, viewChild } from '@angular/core';
-import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { filter } from 'rxjs';
+import { ScopedSummary } from '@bindings/github.com/clementherve/awake/src/features/environments/models';
 import * as EnvironmentsService from '@bindings/github.com/clementherve/awake/src/features/environments/service';
 import * as UpdatesService from '@bindings/github.com/clementherve/awake/src/features/updates/service';
 import { EnvironmentStore } from '@core/environment-store';
@@ -13,6 +16,7 @@ import { NewEntryDialog } from '@features/new-entry/new-entry-dialog';
 import { ConfirmationDialog } from '@shared/confirmation-dialog';
 import { Icon, IconName } from '@shared/icon';
 import { ResizeHandle } from '@shared/resize-handle';
+import { collectionScopeOf, visibleEnvironments } from './environment-scope';
 import { EnvironmentChoice, EnvironmentPicker } from './environment-picker';
 import { RequestTabs } from './request-tabs';
 import { ThemePicker } from './theme-picker';
@@ -74,7 +78,14 @@ export class WorkspaceShell {
   protected readonly sections = SIDEBAR_SECTIONS;
   protected readonly workspace = this.workspaceStore.workspace;
   protected readonly rootPath = computed(() => this.workspaceStore.rootPath() ?? '');
-  protected readonly environments = signal<EnvironmentOption[]>([]);
+  /** Every environment of the workspace, with its scope. */
+  private readonly scopedEnvironments = signal<ScopedSummary[]>([]);
+  /** Collection whose environments are offered; a request or its settings set it. */
+  private readonly activeScope = signal('');
+  private readonly environmentsLoaded = signal(false);
+  protected readonly environments = computed(() =>
+    visibleEnvironments(this.scopedEnvironments(), this.activeScope()),
+  );
   protected readonly selectedEnvironment = this.environmentStore.selected;
   protected readonly version = signal('');
   protected readonly updateError = signal<string | null>(null);
@@ -98,6 +109,36 @@ export class WorkspaceShell {
       const rootPath = this.rootPath();
       if (rootPath) {
         void this.loadEnvironments(rootPath);
+      }
+    });
+
+    // A request, or the settings of its collection, narrows the environments
+    // offered to the global ones and those of that collection. Other pages
+    // keep the collection of the last request on screen.
+    this.activeScope.set(collectionScopeOf(this.router.url));
+    this.router.events
+      .pipe(
+        filter((event) => event instanceof NavigationEnd),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe(() => {
+        const scope = collectionScopeOf(this.router.url);
+        if (scope && scope !== this.activeScope()) {
+          this.activeScope.set(scope);
+          // Each collection keeps the environment last chosen in it.
+          this.environmentStore.useScope(scope);
+        }
+      });
+
+    // A selection hidden by the new context falls back to the default one.
+    effect(() => {
+      if (!this.environmentsLoaded()) {
+        return;
+      }
+      const options = this.environments();
+      const selected = this.environmentStore.selected();
+      if (selected && !options.some((option) => option.FileName === selected)) {
+        this.environmentStore.select(this.defaultEnvironment(options));
       }
     });
 
@@ -146,52 +187,36 @@ export class WorkspaceShell {
 
   private async loadEnvironments(rootPath: string): Promise<void> {
     this.environmentStore.useWorkspace(rootPath);
-    // Keep the current choice, or restore the one remembered for this workspace.
-    const previousSelection =
-      this.environmentStore.selected() || this.environmentStore.remembered(rootPath);
+    this.environmentStore.useScope(this.activeScope());
+    // Keep the choice remembered for this collection in this workspace.
+    const previousSelection = this.environmentStore.selected();
 
     try {
-      const options = new Map<string, EnvironmentOption>();
-      for (const scoped of (await EnvironmentsService.ListAll(rootPath)) ?? []) {
-        const existing = options.get(scoped.FileName);
-        if (!existing || (existing.CollectionOnly && scoped.Scope === '')) {
-          options.set(scoped.FileName, {
-            FileName: scoped.FileName,
-            Name: scoped.Name,
-            HasLocalOverrides: scoped.HasLocalOverrides || !!existing?.HasLocalOverrides,
-            CollectionOnly: scoped.Scope !== '',
-            Color: scoped.Color || existing?.Color || '',
-          });
-        } else if (scoped.HasLocalOverrides) {
-          existing.HasLocalOverrides = true;
-        }
-      }
-      const summaries = [...options.values()];
-      this.environments.set(summaries);
+      const summaries = (await EnvironmentsService.ListAll(rootPath)) ?? [];
+      this.scopedEnvironments.set(summaries);
+      this.environmentsLoaded.set(true);
 
-      if (
-        previousSelection &&
-        summaries.some((summary) => summary.FileName === previousSelection)
-      ) {
+      const options = visibleEnvironments(summaries, this.activeScope());
+      if (previousSelection && options.some((option) => option.FileName === previousSelection)) {
         this.environmentStore.select(previousSelection);
         return;
       }
 
-      const defaultEnvironment =
-        this.workspaceStore.workspace()?.configuration.DefaultEnvironment ?? '';
-      if (
-        defaultEnvironment &&
-        summaries.some((summary) => summary.FileName === defaultEnvironment)
-      ) {
-        this.environmentStore.select(defaultEnvironment);
-        return;
-      }
-
-      this.environmentStore.select('');
+      this.environmentStore.select(this.defaultEnvironment(options));
     } catch {
-      this.environments.set([]);
+      this.scopedEnvironments.set([]);
+      this.environmentsLoaded.set(true);
       this.environmentStore.select(previousSelection);
     }
+  }
+
+  /** The environment configured as default, when it is offered here. */
+  private defaultEnvironment(options: EnvironmentOption[]): string {
+    const defaultEnvironment =
+      this.workspaceStore.workspace()?.configuration.DefaultEnvironment ?? '';
+    return options.some((option) => option.FileName === defaultEnvironment)
+      ? defaultEnvironment
+      : '';
   }
 }
 
