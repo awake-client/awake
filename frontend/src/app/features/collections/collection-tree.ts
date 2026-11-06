@@ -160,6 +160,20 @@ export class CollectionTree {
     }
 
     this.selected.set(row.entry.Path);
+    // A collection opens its settings and unfolds; a folder just toggles.
+    if (row.depth === 0) {
+      void this.router.navigate(['/workspace/collection', ...row.entry.Path.split('/')]);
+      if (!row.expanded) {
+        await this.toggle(row);
+      }
+      return;
+    }
+    await this.toggle(row);
+  }
+
+  /** The chevron only folds or unfolds, without opening anything. */
+  protected async toggleRow(event: Event, row: TreeRow): Promise<void> {
+    event.stopPropagation();
     await this.toggle(row);
   }
 
@@ -483,7 +497,11 @@ export class CollectionTree {
 
   private syncSelectionWithRoute(): void {
     const openRequest = this.openRequestPath();
-    if (openRequest) {
+    const settingsPrefix = '/workspace/collection/';
+    const url = this.router.url.split(/[?#]/)[0];
+    if (url.startsWith(settingsPrefix)) {
+      this.selected.set(decodeURIComponent(url.slice(settingsPrefix.length)));
+    } else if (openRequest) {
       this.selected.set(openRequest);
     } else if (this.selected()?.endsWith('.yaml')) {
       this.selected.set(null);

@@ -1,4 +1,4 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, DestroyRef, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import * as CollectionsService from '@bindings/github.com/clementherve/awake/src/features/collections/service';
@@ -9,6 +9,7 @@ import {
   OAuth2GrantType,
 } from '@bindings/github.com/clementherve/awake/src/domain/models';
 import { notifyCollectionsChanged } from '@core/collection-events';
+import { VariableStore } from '@core/variable-store';
 import { WorkspaceStore } from '@core/workspace-store';
 import { AuthEditor } from '@shared/auth-editor';
 import { ColorPicker } from '@shared/color-picker';
@@ -39,6 +40,7 @@ interface VariableRow {
 export class CollectionSettings {
   private readonly route = inject(ActivatedRoute);
   private readonly workspaceStore = inject(WorkspaceStore);
+  private readonly variableStore = inject(VariableStore);
 
   protected readonly collectionPath = signal('');
   protected readonly tab = signal<SettingsTab>('overview');
@@ -76,6 +78,7 @@ export class CollectionSettings {
   protected readonly isDirty = computed(() => JSON.stringify(this.draft()) !== this.snapshot());
 
   constructor() {
+    inject(DestroyRef).onDestroy(() => this.variableStore.useCollection(null));
     this.route.url.pipe(takeUntilDestroyed()).subscribe((segments) => {
       const path = segments.map((segment) => segment.path).join('/');
       if (path) {
@@ -148,6 +151,8 @@ export class CollectionSettings {
   private async load(path: string): Promise<void> {
     const rootPath = this.workspaceStore.rootPath();
     this.collectionPath.set(path);
+    // Highlight variables as the requests of this collection will see them.
+    this.variableStore.useCollection(path);
     this.isLoading.set(true);
     this.errorMessage.set(null);
     this.statusMessage.set(null);

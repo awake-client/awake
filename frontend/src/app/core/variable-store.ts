@@ -1,5 +1,6 @@
 import { DestroyRef, Injectable, computed, effect, inject, signal } from '@angular/core';
 import * as HTTPClientService from '@bindings/github.com/clementherve/awake/src/features/httpclient/service';
+import { COLLECTIONS_CHANGED_EVENT } from './collection-events';
 import { EnvironmentStore } from './environment-store';
 import { TabsStore } from './tabs-store';
 import { WorkspaceStore } from './workspace-store';
@@ -42,6 +43,20 @@ export class VariableStore {
   private readonly tabsStore = inject(TabsStore);
 
   private readonly environmentVariables = signal<VariableInfo[]>([]);
+  /** Collection whose settings are on screen, when no request is. */
+  private readonly collectionContext = signal<string | null>(null);
+
+  /**
+   * Path whose collection gives the variables: the request on screen, or a
+   * path inside the collection being configured.
+   */
+  private readonly contextPath = computed(() => {
+    const collection = this.collectionContext();
+    if (collection) {
+      return `${collection}/collection.yaml`;
+    }
+    return this.tabsStore.active() ?? '';
+  });
   private readonly dynamicVariables = signal<VariableInfo[]>([]);
 
   /** Every variable by name, the highest precedence layer winning. */
@@ -81,25 +96,32 @@ export class VariableStore {
       )
       .catch(() => this.dynamicVariables.set([]));
 
-    // The variables depend on the request on screen: its collection may
-    // refine the selected environment.
+    // The variables depend on what is on screen: a request, or the settings
+    // of a collection. Both may refine the selected environment.
     effect(() => {
       const rootPath = this.workspaceStore.rootPath();
       const environment = this.environmentStore.selected();
-      const requestPath = this.tabsStore.active() ?? '';
-      void this.loadEnvironment(rootPath, requestPath, environment);
+      void this.loadEnvironment(rootPath, this.contextPath(), environment);
     });
 
+    // Collection variables and environments change from other screens.
     const reload = () =>
       void this.loadEnvironment(
         this.workspaceStore.rootPath(),
-        this.tabsStore.active() ?? '',
+        this.contextPath(),
         this.environmentStore.selected(),
       );
     window.addEventListener('awake:environments-changed', reload);
-    inject(DestroyRef).onDestroy(() =>
-      window.removeEventListener('awake:environments-changed', reload),
-    );
+    window.addEventListener(COLLECTIONS_CHANGED_EVENT, reload);
+    inject(DestroyRef).onDestroy(() => {
+      window.removeEventListener('awake:environments-changed', reload);
+      window.removeEventListener(COLLECTIONS_CHANGED_EVENT, reload);
+    });
+  }
+
+  /** Resolves variables for a collection while its settings are on screen. */
+  useCollection(collectionPath: string | null): void {
+    this.collectionContext.set(collectionPath);
   }
 
   /** Finds every `{{…}}` reference of a text with its resolved variable. */

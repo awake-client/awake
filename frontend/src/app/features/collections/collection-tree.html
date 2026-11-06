@@ -116,6 +116,7 @@
           name="chevron-right"
           [size]="14"
           [class.expanded]="row.expanded"
+          (click)="toggleRow($event, row)"
         />
         @if (row.depth === 0) {
           <app-icon

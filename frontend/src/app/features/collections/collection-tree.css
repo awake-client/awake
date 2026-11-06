@@ -166,6 +166,9 @@
 }
 
 .chevron {
+  padding: 2px;
+  margin: -2px;
+  border-radius: var(--radius-xs);
   color: var(--color-text-subtle);
   transition: transform 120ms ease;
 }
@@ -288,4 +291,9 @@
 
 .folder-icon[data-color] {
   color: var(--entity-color);
+}
+
+.chevron:hover {
+  background: var(--color-active);
+  color: var(--color-text-strong);
 }
