@@ -15,6 +15,11 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    # Angular pins the TypeScript version it supports, so a TypeScript major
+    # must wait for the matching Angular major.
+    ignore:
+      - dependency-name: typescript
+        update-types: ['version-update:semver-major']
     groups:
       angular:
         patterns: ['@angular/*', '@angular-devkit/*', 'ng-packagr', 'typescript', 'zone.js', 'rxjs']
