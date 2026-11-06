@@ -1,25 +1,17 @@
-import {
-  Component,
-  DestroyRef,
-  computed,
-  effect,
-  inject,
-  signal,
-} from '@angular/core';
-import { FormsModule } from '@angular/forms';
+import { Component, DestroyRef, computed, effect, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import * as CollectionsService from '@bindings/github.com/clementherve/awake/src/features/collections/service';
 import { Entry } from '@bindings/github.com/clementherve/awake/src/features/collections/models';
 import * as EnvironmentsService from '@bindings/github.com/clementherve/awake/src/features/environments/service';
 import { Summary } from '@bindings/github.com/clementherve/awake/src/features/environments/models';
 import { WorkspaceStore } from '@core/workspace-store';
-
-const COLLECTIONS_DIRECTORY = 'collections';
+import { requestEntryCreation } from '@core/collection-events';
+import { Icon } from '@shared/icon';
 
 /** Workspace overview shown in the editor area until a request is selected. */
 @Component({
   selector: 'app-workspace-welcome',
-  imports: [FormsModule, RouterLink],
+  imports: [RouterLink, Icon],
   templateUrl: './workspace-welcome.html',
   styleUrl: './workspace-welcome.css',
 })
@@ -30,9 +22,7 @@ export class WorkspaceWelcome {
   protected readonly workspaceName = computed(
     () => this.workspaceStore.workspace()?.configuration.Name ?? 'Workspace',
   );
-  protected readonly rootPath = computed(
-    () => this.workspaceStore.rootPath() ?? '',
-  );
+  protected readonly rootPath = computed(() => this.workspaceStore.rootPath() ?? '');
 
   protected readonly collections = signal<Entry[]>([]);
   protected readonly environments = signal<Summary[]>([]);
@@ -41,10 +31,6 @@ export class WorkspaceWelcome {
   protected readonly isLoading = signal(false);
   protected readonly errorMessage = signal<string | null>(null);
 
-  protected readonly isCreating = signal(false);
-  protected readonly creationName = signal('');
-  protected readonly creationError = signal<string | null>(null);
-  protected readonly isSaving = signal(false);
 
   constructor() {
     effect(() => {
@@ -97,72 +83,37 @@ export class WorkspaceWelcome {
     }
 
     try {
-      const collection = await CollectionsService.LoadCollection(
-        rootPath,
-        entry.Path,
-      );
+      const collection = await CollectionsService.LoadCollection(rootPath, entry.Path);
       this.selectedDocumentation.set(collection.Documentation ?? '');
     } catch {
       this.selectedDocumentation.set('');
     }
 
-    window.dispatchEvent(
-      new CustomEvent('awake:open-collection', { detail: entry.Path }),
-    );
+    window.dispatchEvent(new CustomEvent('awake:open-collection', { detail: entry.Path }));
   }
 
-  protected toggleCreate(): void {
-    this.isCreating.update((creating) => !creating);
-    this.creationError.set(null);
+  protected newCollection(): void {
+    requestEntryCreation({ kind: 'collection' });
   }
 
-  protected async createCollection(): Promise<void> {
-    const rootPath = this.rootPath();
-    const name = this.creationName().trim();
-    const slug = slugify(name);
-    if (!rootPath || slug === '') {
-      this.creationError.set('The name needs at least one letter or digit.');
-      return;
+  /** Opens the new request dialog in the selected collection. */
+  protected newRequest(): void {
+    requestEntryCreation({
+      kind: 'request',
+      folder: this.selectedCollection()?.Path,
+    });
+  }
+
+  /** Stable hue per collection so each card keeps its color. */
+  protected collectionHue(entry: Entry): number {
+    let hash = 0;
+    for (const character of entry.Path) {
+      hash = (hash * 31 + character.charCodeAt(0)) >>> 0;
     }
-
-    this.isSaving.set(true);
-    this.creationError.set(null);
-
-    try {
-      await CollectionsService.CreateCollection(
-        rootPath,
-        `${COLLECTIONS_DIRECTORY}/${slug}`,
-        {
-          Name: name,
-          Variables: null,
-          Authentication: null,
-          Documentation: '',
-        },
-      );
-      this.creationName.set('');
-      this.isCreating.set(false);
-      await this.load(rootPath);
-      window.dispatchEvent(new CustomEvent('awake:collections-changed'));
-    } catch (error) {
-      this.creationError.set(describeError(error));
-    } finally {
-      this.isSaving.set(false);
-    }
-  }
-
-  protected collectionPath(entry: Entry): string {
-    return `/${entry.Path}`;
+    return hash % 360;
   }
 }
 
-function slugify(value: string): string {
-  return value
-    .normalize('NFKD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
-}
 
 function describeError(error: unknown): string {
   if (error instanceof Error) {
