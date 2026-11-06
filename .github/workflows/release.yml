@@ -14,7 +14,9 @@ concurrency:
 jobs:
   test:
     name: Tests
-    runs-on: ubuntu-latest
+    # src/app links the Wails webview, whose GTK/WebKit headers are not on the
+    # Ubuntu runners; the Go suite runs on macOS, like continuous integration.
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
 
