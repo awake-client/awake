@@ -3,11 +3,11 @@ module github.com/clementherve/awake
 go 1.26.0
 
 require (
-	github.com/coder/websocket v1.8.14
+	github.com/coder/websocket v1.8.15
 	github.com/dop251/goja v0.0.0-20261105002551-2413f2132ac8
 	github.com/wailsapp/wails/v3 v3.1.0
 	github.com/zalando/go-keyring v0.2.8
-	go.yaml.in/yaml/v3 v3.0.4
+	go.yaml.in/yaml/v3 v3.0.6
 	modernc.org/sqlite v1.61.1
 )
 
