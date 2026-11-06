@@ -24,6 +24,7 @@ import {
 } from '@bindings/github.com/clementherve/awake/src/domain/models';
 import { EnvironmentStore } from '@core/environment-store';
 import { WorkspaceStore } from '@core/workspace-store';
+import { Icon } from '@shared/icon';
 import { StreamPanel } from './stream-panel/stream-panel';
 
 /** Sections of the request editor. */
@@ -66,9 +67,9 @@ const PROTOCOL_LABELS: Record<string, string> = {
  */
 @Component({
   selector: 'app-request-editor',
-  imports: [FormsModule, StreamPanel],
+  imports: [FormsModule, StreamPanel, Icon],
   templateUrl: './request-editor.html',
-  styleUrl: './request-editor.css',
+  styleUrls: ['./request-editor.css', './request-response.css'],
   host: {
     '(document:keydown)': 'handleShortcut($event)',
   },
@@ -95,6 +96,14 @@ export class RequestEditor {
   protected readonly selectedEnvironment = this.environmentStore.selected;
 
   protected readonly requestPath = signal('');
+  /** Request path split for the breadcrumb, without the collections root. */
+  protected readonly pathSegments = computed(() => {
+    const segments = this.requestPath().split('/').filter(Boolean);
+    if (segments[0] === 'collections') {
+      segments.shift();
+    }
+    return segments;
+  });
   protected readonly isLoading = signal(true);
   protected readonly isSaving = signal(false);
   protected readonly errorMessage = signal<string | null>(null);

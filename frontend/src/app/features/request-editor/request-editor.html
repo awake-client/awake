@@ -1,521 +1,542 @@
 <section class="request-editor">
   <div class="request-section">
-  <header class="editor-toolbar">
-    <select
-      class="protocol-select"
-      [ngModel]="protocol()"
-      (ngModelChange)="selectProtocol($event)"
-      aria-label="Request protocol"
-    >
-      @for (protocolOption of protocols; track protocolOption) {
-        <option [value]="protocolOption">
-          {{ protocolLabels[protocolOption] }}
-        </option>
-      }
-    </select>
-
-    <select
-      class="method-select"
-      [attr.data-method]="method()"
-      [ngModel]="method()"
-      (ngModelChange)="method.set($event)"
-      [disabled]="protocol() === Protocol.ProtocolWebSocket"
-      aria-label="HTTP method"
-    >
-      @for (httpMethod of httpMethods; track httpMethod) {
-        <option [value]="httpMethod">{{ httpMethod }}</option>
-      }
-    </select>
-
-    <input
-      class="url-input"
-      type="text"
-      [ngModel]="url()"
-      (ngModelChange)="url.set($event)"
-      placeholder="https://api.example.com/users"
-      spellcheck="false"
-      autocomplete="off"
-      aria-label="Request URL"
-    />
-
-    <button
-      type="button"
-      class="send-button"
-      [disabled]="isLoading() || isSending()"
-      (click)="send()"
-      title="Send request (⌘/Ctrl + Enter)"
-    >
-      {{ sendLabel() }}
-    </button>
-
-    <button
-      type="button"
-      class="save-button"
-      [disabled]="!isDirty() || isSaving()"
-      (click)="save()"
-    >
-      {{ isSaving() ? 'Saving…' : 'Save' }}
-    </button>
-  </header>
-
-  <div class="request-title-row">
-    <input
-      class="name-input"
-      type="text"
-      [ngModel]="name()"
-      (ngModelChange)="name.set($event)"
-      placeholder="Request name"
-      aria-label="Request name"
-    />
-    <span class="request-path" [title]="requestPath()">
-      {{ requestPath() }}
-    </span>
-  </div>
-
-  @if (errorMessage(); as message) {
-    <p class="editor-message error">{{ message }}</p>
-  }
-  @if (statusMessage(); as message) {
-    <p class="editor-message success">{{ message }}</p>
-  }
-
-  @if (isLoading()) {
-    <p class="editor-message">Loading request…</p>
-  } @else {
-    <nav class="tabs" role="tablist">
-      @for (tab of tabs; track tab) {
+    <header class="editor-toolbar">
+      <div class="request-meta">
+        <span class="request-path" [title]="requestPath()">
+          @for (segment of pathSegments(); track $index; let last = $last) {
+            <span [class.current]="last">{{ segment }}</span>
+            @if (!last) {
+              <app-icon name="chevron-right" [size]="11" />
+            }
+          }
+        </span>
+        @if (isDirty()) {
+          <span class="dirty-badge" title="Unsaved changes (⌘S to save)"> Unsaved </span>
+        }
         <button
           type="button"
-          role="tab"
-          class="tab"
-          [class.active]="activeTab() === tab"
-          [attr.aria-selected]="activeTab() === tab"
-          (click)="selectTab(tab)"
+          class="btn btn-sm save-button"
+          [disabled]="!isDirty() || isSaving()"
+          (click)="save()"
+          title="Save request (⌘S)"
         >
-          {{ tabLabels[tab] }}
-          @if (tab === 'parameters' && parameters().length > 0) {
-            <span class="tab-count">{{ parameters().length }}</span>
-          }
-          @if (tab === 'headers' && headers().length > 0) {
-            <span class="tab-count">{{ headers().length }}</span>
-          }
+          <app-icon name="save" [size]="13" />
+          {{ isSaving() ? 'Saving…' : 'Save' }}
         </button>
-      }
-    </nav>
+      </div>
 
-    <div class="tab-panel" role="tabpanel">
-      @switch (activeTab()) {
-        @case ('parameters') {
-          <div class="entry-list">
-            @for (parameter of parameters(); track $index) {
-              <div class="entry-row">
-                <input
-                  type="checkbox"
-                  [ngModel]="parameter.Enabled"
-                  (ngModelChange)="updateParameter($index, 'Enabled', $event)"
-                  aria-label="Enable parameter"
-                />
-                <input
-                  class="entry-name"
-                  type="text"
-                  [ngModel]="parameter.Name"
-                  (ngModelChange)="updateParameter($index, 'Name', $event)"
-                  placeholder="name"
-                  spellcheck="false"
-                />
-                <input
-                  class="entry-value"
-                  type="text"
-                  [ngModel]="parameter.Value"
-                  (ngModelChange)="updateParameter($index, 'Value', $event)"
-                  placeholder="value"
-                  spellcheck="false"
-                />
-                <button
-                  type="button"
-                  class="remove-button"
-                  aria-label="Remove parameter"
-                  (click)="removeParameter($index)"
-                >
-                  ×
-                </button>
-              </div>
-            } @empty {
-              <p class="empty-panel">No query parameters.</p>
+      <input
+        class="name-input"
+        type="text"
+        [ngModel]="name()"
+        (ngModelChange)="name.set($event)"
+        placeholder="Request name"
+        aria-label="Request name"
+      />
+
+      <div class="url-row">
+        <div class="url-bar">
+          <select
+            class="protocol-select"
+            [ngModel]="protocol()"
+            (ngModelChange)="selectProtocol($event)"
+            aria-label="Request protocol"
+          >
+            @for (protocolOption of protocols; track protocolOption) {
+              <option [value]="protocolOption">
+                {{ protocolLabels[protocolOption] }}
+              </option>
             }
+          </select>
 
-            <button type="button" class="add-button" (click)="addParameter()">
-              Add parameter
-            </button>
-          </div>
-        }
-
-        @case ('headers') {
-          <div class="entry-list">
-            @for (header of headers(); track $index) {
-              <div class="entry-row">
-                <input
-                  type="checkbox"
-                  [ngModel]="header.Enabled"
-                  (ngModelChange)="updateHeader($index, 'Enabled', $event)"
-                  aria-label="Enable header"
-                />
-                <input
-                  class="entry-name"
-                  type="text"
-                  [ngModel]="header.Name"
-                  (ngModelChange)="updateHeader($index, 'Name', $event)"
-                  placeholder="Header-Name"
-                  spellcheck="false"
-                />
-                <input
-                  class="entry-value"
-                  type="text"
-                  [ngModel]="header.Value"
-                  (ngModelChange)="updateHeader($index, 'Value', $event)"
-                  placeholder="value"
-                  spellcheck="false"
-                />
-                <button
-                  type="button"
-                  class="remove-button"
-                  aria-label="Remove header"
-                  (click)="removeHeader($index)"
-                >
-                  ×
-                </button>
-              </div>
-            } @empty {
-              <p class="empty-panel">No headers.</p>
+          <select
+            class="method-select"
+            [attr.data-method]="method()"
+            [ngModel]="method()"
+            (ngModelChange)="method.set($event)"
+            [disabled]="protocol() === Protocol.ProtocolWebSocket"
+            aria-label="HTTP method"
+          >
+            @for (httpMethod of httpMethods; track httpMethod) {
+              <option [value]="httpMethod">{{ httpMethod }}</option>
             }
+          </select>
 
-            <button type="button" class="add-button" (click)="addHeader()">
-              Add header
-            </button>
-          </div>
+          <input
+            class="url-input"
+            type="text"
+            [ngModel]="url()"
+            (ngModelChange)="url.set($event)"
+            placeholder="https://api.example.com/users"
+            spellcheck="false"
+            autocomplete="off"
+            aria-label="Request URL"
+          />
+        </div>
+
+        <button
+          type="button"
+          class="btn btn-primary send-button"
+          [disabled]="isLoading() || isSending()"
+          (click)="send()"
+          title="Send request (⌘↵)"
+        >
+          <app-icon name="send" [size]="14" />
+          {{ sendLabel() }}
+        </button>
+      </div>
+    </header>
+
+    @if (errorMessage(); as message) {
+      <p class="editor-message error">{{ message }}</p>
+    }
+    @if (statusMessage(); as message) {
+      <p class="editor-message success">{{ message }}</p>
+    }
+
+    @if (isLoading()) {
+      <p class="editor-message">Loading request…</p>
+    } @else {
+      <nav class="tabs" role="tablist">
+        @for (tab of tabs; track tab) {
+          <button
+            type="button"
+            role="tab"
+            class="tab"
+            [class.active]="activeTab() === tab"
+            [attr.aria-selected]="activeTab() === tab"
+            (click)="selectTab(tab)"
+          >
+            {{ tabLabels[tab] }}
+            @if (tab === 'parameters' && parameters().length > 0) {
+              <span class="tab-count">{{ parameters().length }}</span>
+            }
+            @if (tab === 'headers' && headers().length > 0) {
+              <span class="tab-count">{{ headers().length }}</span>
+            }
+          </button>
         }
+      </nav>
 
-        @case ('authentication') {
-          <div class="form-panel">
-            <label class="field">
-              <span class="field-label">Type</span>
-              <select
-                [ngModel]="authentication().Type"
-                (ngModelChange)="selectAuthenticationType($event)"
-              >
-                <option [value]="AuthenticationType.AuthenticationInherit">
-                  Inherit from collection
-                </option>
-                <option [value]="AuthenticationType.AuthenticationNone">None</option>
-                <option [value]="AuthenticationType.AuthenticationBasic">Basic</option>
-                <option [value]="AuthenticationType.AuthenticationBearer">Bearer token</option>
-                <option [value]="AuthenticationType.AuthenticationAPIKey">API key</option>
-                <option [value]="AuthenticationType.AuthenticationOAuth2">OAuth 2</option>
-              </select>
-            </label>
-
-            @switch (authentication().Type) {
-              @case (AuthenticationType.AuthenticationBasic) {
-                <label class="field">
-                  <span class="field-label">Username</span>
+      <div class="tab-panel" role="tabpanel">
+        @switch (activeTab()) {
+          @case ('parameters') {
+            <div class="entry-list">
+              @for (parameter of parameters(); track $index) {
+                <div class="entry-row">
                   <input
+                    type="checkbox"
+                    [ngModel]="parameter.Enabled"
+                    (ngModelChange)="updateParameter($index, 'Enabled', $event)"
+                    aria-label="Enable parameter"
+                  />
+                  <input
+                    class="input mono entry-name"
                     type="text"
-                    [ngModel]="authentication().Username"
-                    (ngModelChange)="updateAuthentication('Username', $event)"
-                    placeholder="{{ '{{username}}' }}"
+                    [ngModel]="parameter.Name"
+                    (ngModelChange)="updateParameter($index, 'Name', $event)"
+                    placeholder="name"
                     spellcheck="false"
                   />
-                </label>
-                <label class="field">
-                  <span class="field-label">Password</span>
                   <input
-                    type="password"
-                    [ngModel]="authentication().Password"
-                    (ngModelChange)="updateAuthentication('Password', $event)"
-                    placeholder="{{ 'Secret name or {{password}}' }}"
-                  />
-                </label>
-              }
-
-              @case (AuthenticationType.AuthenticationBearer) {
-                <label class="field">
-                  <span class="field-label">Token</span>
-                  <input
+                    class="input mono entry-value"
                     type="text"
-                    [ngModel]="authentication().Token"
-                    (ngModelChange)="updateAuthentication('Token', $event)"
-                    placeholder="{{ '{{accessToken}}' }}"
+                    [ngModel]="parameter.Value"
+                    (ngModelChange)="updateParameter($index, 'Value', $event)"
+                    placeholder="value"
                     spellcheck="false"
                   />
-                </label>
-              }
-
-              @case (AuthenticationType.AuthenticationAPIKey) {
-                <label class="field">
-                  <span class="field-label">Key</span>
-                  <input
-                    type="text"
-                    [ngModel]="authentication().Key"
-                    (ngModelChange)="updateAuthentication('Key', $event)"
-                    placeholder="X-API-Key"
-                    spellcheck="false"
-                  />
-                </label>
-                <label class="field">
-                  <span class="field-label">Value</span>
-                  <input
-                    type="text"
-                    [ngModel]="authentication().Value"
-                    (ngModelChange)="updateAuthentication('Value', $event)"
-                    placeholder="{{ '{{apiKey}}' }}"
-                    spellcheck="false"
-                  />
-                </label>
-                <label class="field">
-                  <span class="field-label">Location</span>
-                  <select
-                    [ngModel]="authentication().Location"
-                    (ngModelChange)="updateAuthentication('Location', $event)"
-                  >
-                    <option value="header">Header</option>
-                    <option value="query">Query parameter</option>
-                  </select>
-                </label>
-              }
-
-              @case (AuthenticationType.AuthenticationOAuth2) {
-                <label class="field">
-                  <span class="field-label">Grant type</span>
-                  <select
-                    [ngModel]="authentication().GrantType"
-                    (ngModelChange)="selectGrantType($event)"
-                  >
-                    <option
-                      [value]="OAuth2GrantType.OAuth2GrantAuthorizationCode"
-                    >
-                      Authorization code (PKCE)
-                    </option>
-                    <option
-                      [value]="OAuth2GrantType.OAuth2GrantClientCredentials"
-                    >
-                      Client credentials
-                    </option>
-                  </select>
-                </label>
-
-                @if (
-                  authentication().GrantType ===
-                  OAuth2GrantType.OAuth2GrantAuthorizationCode
-                ) {
-                  <label class="field">
-                    <span class="field-label">Authorization URL</span>
-                    <input
-                      type="text"
-                      [ngModel]="authentication().AuthorizationURL"
-                      (ngModelChange)="updateAuthentication('AuthorizationURL', $event)"
-                      placeholder="https://identity.example.com/authorize"
-                      spellcheck="false"
-                    />
-                  </label>
-                  <label class="field">
-                    <span class="field-label">Redirect URL</span>
-                    <input
-                      type="text"
-                      [ngModel]="authentication().RedirectURL"
-                      (ngModelChange)="updateAuthentication('RedirectURL', $event)"
-                      placeholder="http://127.0.0.1:53682/callback"
-                      spellcheck="false"
-                    />
-                    <span class="field-hint">
-                      Leave empty to listen on a random loopback port. The
-                      redirect must point to this computer.
-                    </span>
-                  </label>
-                }
-
-                <label class="field">
-                  <span class="field-label">Token URL</span>
-                  <input
-                    type="text"
-                    [ngModel]="authentication().TokenURL"
-                    (ngModelChange)="updateAuthentication('TokenURL', $event)"
-                    placeholder="https://identity.example.com/token"
-                    spellcheck="false"
-                  />
-                </label>
-                <label class="field">
-                  <span class="field-label">Client ID</span>
-                  <input
-                    type="text"
-                    [ngModel]="authentication().ClientID"
-                    (ngModelChange)="updateAuthentication('ClientID', $event)"
-                    placeholder="{{ '{{clientId}}' }}"
-                    spellcheck="false"
-                  />
-                </label>
-                <label class="field">
-                  <span class="field-label">Client secret</span>
-                  <input
-                    type="password"
-                    [ngModel]="authentication().ClientSecret"
-                    (ngModelChange)="updateAuthentication('ClientSecret', $event)"
-                    placeholder="{{ '{{clientSecret}}' }}"
-                    autocomplete="new-password"
-                  />
-                  <span class="field-hint">
-                    Reference a secret variable declared in the environment;
-                    the value stays in the keychain.
-                  </span>
-                </label>
-                <label class="field">
-                  <span class="field-label">Scopes</span>
-                  <input
-                    type="text"
-                    [ngModel]="scopesText()"
-                    (ngModelChange)="updateScopes($event)"
-                    placeholder="read write"
-                    spellcheck="false"
-                  />
-                  <span class="field-hint">Separate scopes with spaces.</span>
-                </label>
-                <label class="field">
-                  <span class="field-label">Audience</span>
-                  <input
-                    type="text"
-                    [ngModel]="authentication().Audience"
-                    (ngModelChange)="updateAuthentication('Audience', $event)"
-                    placeholder="https://api.example.com"
-                    spellcheck="false"
-                  />
-                </label>
-
-                <div class="oauth2-actions">
                   <button
                     type="button"
-                    class="add-button"
-                    [disabled]="oauth2Busy()"
-                    (click)="authorizeOAuth2()"
+                    class="icon-btn danger"
+                    aria-label="Remove parameter"
+                    title="Remove parameter"
+                    (click)="removeParameter($index)"
                   >
-                    {{
-                      oauth2Busy()
-                        ? 'Authorizing…'
-                        : authentication().GrantType ===
-                            OAuth2GrantType.OAuth2GrantClientCredentials
-                          ? 'Get token'
-                          : 'Authorize in browser'
-                    }}
-                  </button>
-                  <button
-                    type="button"
-                    class="remove-button"
-                    [disabled]="oauth2Busy()"
-                    (click)="clearOAuth2()"
-                  >
-                    Clear token
+                    <app-icon name="trash" [size]="14" />
                   </button>
                 </div>
+              } @empty {
+                <p class="empty-panel">No query parameters.</p>
+              }
 
-                <p class="panel-note">{{ oauth2Expiry() }}</p>
-                @if (oauth2Error(); as message) {
-                  <p class="oauth2-error">{{ message }}</p>
+              <button type="button" class="add-button" (click)="addParameter()">
+                <app-icon name="plus" [size]="14" />
+                Add parameter
+              </button>
+            </div>
+          }
+
+          @case ('headers') {
+            <div class="entry-list">
+              @for (header of headers(); track $index) {
+                <div class="entry-row">
+                  <input
+                    type="checkbox"
+                    [ngModel]="header.Enabled"
+                    (ngModelChange)="updateHeader($index, 'Enabled', $event)"
+                    aria-label="Enable header"
+                  />
+                  <input
+                    class="input mono entry-name"
+                    type="text"
+                    [ngModel]="header.Name"
+                    (ngModelChange)="updateHeader($index, 'Name', $event)"
+                    placeholder="Header-Name"
+                    spellcheck="false"
+                  />
+                  <input
+                    class="input mono entry-value"
+                    type="text"
+                    [ngModel]="header.Value"
+                    (ngModelChange)="updateHeader($index, 'Value', $event)"
+                    placeholder="value"
+                    spellcheck="false"
+                  />
+                  <button
+                    type="button"
+                    class="icon-btn danger"
+                    aria-label="Remove header"
+                    title="Remove header"
+                    (click)="removeHeader($index)"
+                  >
+                    <app-icon name="trash" [size]="14" />
+                  </button>
+                </div>
+              } @empty {
+                <p class="empty-panel">No headers.</p>
+              }
+
+              <button type="button" class="add-button" (click)="addHeader()">
+                <app-icon name="plus" [size]="14" />
+                Add header
+              </button>
+            </div>
+          }
+
+          @case ('authentication') {
+            <div class="form-panel">
+              <label class="field">
+                <span class="field-label">Type</span>
+                <select
+                  [ngModel]="authentication().Type"
+                  (ngModelChange)="selectAuthenticationType($event)"
+                >
+                  <option [value]="AuthenticationType.AuthenticationInherit">
+                    Inherit from collection
+                  </option>
+                  <option [value]="AuthenticationType.AuthenticationNone">None</option>
+                  <option [value]="AuthenticationType.AuthenticationBasic">Basic</option>
+                  <option [value]="AuthenticationType.AuthenticationBearer">Bearer token</option>
+                  <option [value]="AuthenticationType.AuthenticationAPIKey">API key</option>
+                  <option [value]="AuthenticationType.AuthenticationOAuth2">OAuth 2</option>
+                </select>
+              </label>
+
+              @switch (authentication().Type) {
+                @case (AuthenticationType.AuthenticationBasic) {
+                  <label class="field">
+                    <span class="field-label">Username</span>
+                    <input
+                      class="input"
+                      type="text"
+                      [ngModel]="authentication().Username"
+                      (ngModelChange)="updateAuthentication('Username', $event)"
+                      placeholder="{{ '{{username}}' }}"
+                      spellcheck="false"
+                    />
+                  </label>
+                  <label class="field">
+                    <span class="field-label">Password</span>
+                    <input
+                      class="input"
+                      type="password"
+                      [ngModel]="authentication().Password"
+                      (ngModelChange)="updateAuthentication('Password', $event)"
+                      placeholder="{{ 'Secret name or {{password}}' }}"
+                    />
+                  </label>
+                }
+
+                @case (AuthenticationType.AuthenticationBearer) {
+                  <label class="field">
+                    <span class="field-label">Token</span>
+                    <input
+                      class="input"
+                      type="text"
+                      [ngModel]="authentication().Token"
+                      (ngModelChange)="updateAuthentication('Token', $event)"
+                      placeholder="{{ '{{accessToken}}' }}"
+                      spellcheck="false"
+                    />
+                  </label>
+                }
+
+                @case (AuthenticationType.AuthenticationAPIKey) {
+                  <label class="field">
+                    <span class="field-label">Key</span>
+                    <input
+                      class="input"
+                      type="text"
+                      [ngModel]="authentication().Key"
+                      (ngModelChange)="updateAuthentication('Key', $event)"
+                      placeholder="X-API-Key"
+                      spellcheck="false"
+                    />
+                  </label>
+                  <label class="field">
+                    <span class="field-label">Value</span>
+                    <input
+                      class="input"
+                      type="text"
+                      [ngModel]="authentication().Value"
+                      (ngModelChange)="updateAuthentication('Value', $event)"
+                      placeholder="{{ '{{apiKey}}' }}"
+                      spellcheck="false"
+                    />
+                  </label>
+                  <label class="field">
+                    <span class="field-label">Location</span>
+                    <select
+                      [ngModel]="authentication().Location"
+                      (ngModelChange)="updateAuthentication('Location', $event)"
+                    >
+                      <option value="header">Header</option>
+                      <option value="query">Query parameter</option>
+                    </select>
+                  </label>
+                }
+
+                @case (AuthenticationType.AuthenticationOAuth2) {
+                  <label class="field">
+                    <span class="field-label">Grant type</span>
+                    <select
+                      [ngModel]="authentication().GrantType"
+                      (ngModelChange)="selectGrantType($event)"
+                    >
+                      <option [value]="OAuth2GrantType.OAuth2GrantAuthorizationCode">
+                        Authorization code (PKCE)
+                      </option>
+                      <option [value]="OAuth2GrantType.OAuth2GrantClientCredentials">
+                        Client credentials
+                      </option>
+                    </select>
+                  </label>
+
+                  @if (
+                    authentication().GrantType === OAuth2GrantType.OAuth2GrantAuthorizationCode
+                  ) {
+                    <label class="field">
+                      <span class="field-label">Authorization URL</span>
+                      <input
+                        class="input"
+                        type="text"
+                        [ngModel]="authentication().AuthorizationURL"
+                        (ngModelChange)="updateAuthentication('AuthorizationURL', $event)"
+                        placeholder="https://identity.example.com/authorize"
+                        spellcheck="false"
+                      />
+                    </label>
+                    <label class="field">
+                      <span class="field-label">Redirect URL</span>
+                      <input
+                        class="input"
+                        type="text"
+                        [ngModel]="authentication().RedirectURL"
+                        (ngModelChange)="updateAuthentication('RedirectURL', $event)"
+                        placeholder="http://127.0.0.1:53682/callback"
+                        spellcheck="false"
+                      />
+                      <span class="field-hint">
+                        Leave empty to listen on a random loopback port. The redirect must point to
+                        this computer.
+                      </span>
+                    </label>
+                  }
+
+                  <label class="field">
+                    <span class="field-label">Token URL</span>
+                    <input
+                      class="input"
+                      type="text"
+                      [ngModel]="authentication().TokenURL"
+                      (ngModelChange)="updateAuthentication('TokenURL', $event)"
+                      placeholder="https://identity.example.com/token"
+                      spellcheck="false"
+                    />
+                  </label>
+                  <label class="field">
+                    <span class="field-label">Client ID</span>
+                    <input
+                      class="input"
+                      type="text"
+                      [ngModel]="authentication().ClientID"
+                      (ngModelChange)="updateAuthentication('ClientID', $event)"
+                      placeholder="{{ '{{clientId}}' }}"
+                      spellcheck="false"
+                    />
+                  </label>
+                  <label class="field">
+                    <span class="field-label">Client secret</span>
+                    <input
+                      class="input"
+                      type="password"
+                      [ngModel]="authentication().ClientSecret"
+                      (ngModelChange)="updateAuthentication('ClientSecret', $event)"
+                      placeholder="{{ '{{clientSecret}}' }}"
+                      autocomplete="new-password"
+                    />
+                    <span class="field-hint">
+                      Reference a secret variable declared in the environment; the value stays in
+                      the keychain.
+                    </span>
+                  </label>
+                  <label class="field">
+                    <span class="field-label">Scopes</span>
+                    <input
+                      class="input"
+                      type="text"
+                      [ngModel]="scopesText()"
+                      (ngModelChange)="updateScopes($event)"
+                      placeholder="read write"
+                      spellcheck="false"
+                    />
+                    <span class="field-hint">Separate scopes with spaces.</span>
+                  </label>
+                  <label class="field">
+                    <span class="field-label">Audience</span>
+                    <input
+                      class="input"
+                      type="text"
+                      [ngModel]="authentication().Audience"
+                      (ngModelChange)="updateAuthentication('Audience', $event)"
+                      placeholder="https://api.example.com"
+                      spellcheck="false"
+                    />
+                  </label>
+
+                  <div class="oauth2-actions">
+                    <button
+                      type="button"
+                      class="add-button"
+                      [disabled]="oauth2Busy()"
+                      (click)="authorizeOAuth2()"
+                    >
+                      {{
+                        oauth2Busy()
+                          ? 'Authorizing…'
+                          : authentication().GrantType ===
+                              OAuth2GrantType.OAuth2GrantClientCredentials
+                            ? 'Get token'
+                            : 'Authorize in browser'
+                      }}
+                    </button>
+                    <button
+                      type="button"
+                      class="add-button danger"
+                      [disabled]="oauth2Busy()"
+                      (click)="clearOAuth2()"
+                    >
+                      Clear token
+                    </button>
+                  </div>
+
+                  <p class="panel-note">{{ oauth2Expiry() }}</p>
+                  @if (oauth2Error(); as message) {
+                    <p class="oauth2-error">{{ message }}</p>
+                  }
+                }
+
+                @default {
+                  <p class="panel-note">
+                    This request uses the authentication configured on its collection or no
+                    authentication at all.
+                  </p>
                 }
               }
+            </div>
+          }
 
-              @default {
-                <p class="panel-note">
-                  This request uses the authentication configured on its
-                  collection or no authentication at all.
-                </p>
+          @case ('body') {
+            <div class="form-panel">
+              <label class="field">
+                <span class="field-label">Type</span>
+                <select [ngModel]="body().Type" (ngModelChange)="selectBodyType($event)">
+                  <option [value]="BodyType.BodyNone">None</option>
+                  <option [value]="BodyType.BodyJSON">JSON</option>
+                  <option [value]="BodyType.BodyText">Text</option>
+                  <option [value]="BodyType.BodyXML">XML</option>
+                  <option [value]="BodyType.BodyFormURLEncoded">Form URL encoded</option>
+                  <option [value]="BodyType.BodyMultipart">Multipart</option>
+                  <option [value]="BodyType.BodyBinary">Binary</option>
+                </select>
+              </label>
+
+              @if (body().Type === BodyType.BodyMultipart || body().Type === BodyType.BodyBinary) {
+                <p class="panel-note">Multipart and binary bodies arrive with the HTTP client.</p>
+              } @else if (body().Type !== BodyType.BodyNone) {
+                <label class="field field-grow">
+                  <span class="field-label">Content</span>
+                  <textarea
+                    class="input body-content"
+                    [ngModel]="body().Content"
+                    (ngModelChange)="updateBodyContent($event)"
+                    spellcheck="false"
+                    placeholder="Request body"
+                  ></textarea>
+                </label>
               }
-            }
-          </div>
-        }
+            </div>
+          }
 
-        @case ('body') {
-          <div class="form-panel">
-            <label class="field">
-              <span class="field-label">Type</span>
-              <select
-                [ngModel]="body().Type"
-                (ngModelChange)="selectBodyType($event)"
-              >
-                <option [value]="BodyType.BodyNone">None</option>
-                <option [value]="BodyType.BodyJSON">JSON</option>
-                <option [value]="BodyType.BodyText">Text</option>
-                <option [value]="BodyType.BodyXML">XML</option>
-                <option [value]="BodyType.BodyFormURLEncoded">Form URL encoded</option>
-                <option [value]="BodyType.BodyMultipart">Multipart</option>
-                <option [value]="BodyType.BodyBinary">Binary</option>
-              </select>
-            </label>
-
-            @if (body().Type === BodyType.BodyMultipart || body().Type === BodyType.BodyBinary) {
+          @case ('scripts') {
+            <div class="form-panel">
               <p class="panel-note">
-                Multipart and binary bodies arrive with the HTTP client.
+                JavaScript hooks run inside the application. A failing script does not abort the
+                request; its error is reported with the response. The runtime is interrupted after
+                five seconds.
               </p>
-            } @else if (body().Type !== BodyType.BodyNone) {
+
               <label class="field field-grow">
-                <span class="field-label">Content</span>
+                <span class="field-label">Pre-request script</span>
                 <textarea
-                  class="body-content"
-                  [ngModel]="body().Content"
-                  (ngModelChange)="updateBodyContent($event)"
+                  class="input script-content"
+                  [ngModel]="preRequestScript()"
+                  (ngModelChange)="preRequestScript.set($event)"
                   spellcheck="false"
-                  placeholder="Request body"
+                  placeholder="request.headers['X-Request-Id'] = 'abc-123';"
                 ></textarea>
               </label>
-            }
-          </div>
+
+              <label class="field field-grow">
+                <span class="field-label">Post-response script</span>
+                <textarea
+                  class="input script-content"
+                  [ngModel]="postResponseScript()"
+                  (ngModelChange)="postResponseScript.set($event)"
+                  spellcheck="false"
+                  placeholder="awake.test('successful', response.status === 200);"
+                ></textarea>
+              </label>
+            </div>
+          }
+
+          @case ('documentation') {
+            <div class="form-panel">
+              <label class="field field-grow">
+                <span class="field-label">Documentation</span>
+                <textarea
+                  class="input documentation"
+                  [ngModel]="documentation()"
+                  (ngModelChange)="documentation.set($event)"
+                  placeholder="Describe what this request does, its parameters and expected responses."
+                ></textarea>
+              </label>
+            </div>
+          }
         }
-
-        @case ('scripts') {
-          <div class="form-panel">
-            <p class="panel-note">
-              JavaScript hooks run inside the application. A failing script
-              does not abort the request; its error is reported with the
-              response. The runtime is interrupted after five seconds.
-            </p>
-
-            <label class="field field-grow">
-              <span class="field-label">Pre-request script</span>
-              <textarea
-                class="script-content"
-                [ngModel]="preRequestScript()"
-                (ngModelChange)="preRequestScript.set($event)"
-                spellcheck="false"
-                placeholder="request.headers['X-Request-Id'] = 'abc-123';"
-              ></textarea>
-            </label>
-
-            <label class="field field-grow">
-              <span class="field-label">Post-response script</span>
-              <textarea
-                class="script-content"
-                [ngModel]="postResponseScript()"
-                (ngModelChange)="postResponseScript.set($event)"
-                spellcheck="false"
-                placeholder="awake.test('successful', response.status === 200);"
-              ></textarea>
-            </label>
-          </div>
-        }
-
-        @case ('documentation') {
-          <div class="form-panel">
-            <label class="field field-grow">
-              <span class="field-label">Documentation</span>
-              <textarea
-                class="documentation"
-                [ngModel]="documentation()"
-                (ngModelChange)="documentation.set($event)"
-                placeholder="Describe what this request does, its parameters and expected responses."
-              ></textarea>
-            </label>
-          </div>
-        }
-      }
-    </div>
-  }
+      </div>
+    }
   </div>
 
   @if (isStreaming()) {
@@ -576,9 +597,10 @@
             type="button"
             class="response-close"
             aria-label="Close response"
+            title="Close response"
             (click)="closeResponsePanel()"
           >
-            ×
+            <app-icon name="close" [size]="14" />
           </button>
         }
       </header>
@@ -594,9 +616,7 @@
         @if (responseTab() === 'body') {
           <div class="response-body-container">
             @if (current.Encoding === 'base64') {
-              <p class="empty-panel">
-                Binary response ({{ formatSize(current.Size) }}).
-              </p>
+              <p class="empty-panel">Binary response ({{ formatSize(current.Size) }}).</p>
             } @else {
               <pre class="response-body">{{ responseBody() }}</pre>
             }
@@ -647,9 +667,7 @@
                   </ul>
                 }
                 @if (entry.outcome.Logs?.length) {
-                  <pre class="script-logs">{{
-                    entry.outcome.Logs.join('\n')
-                  }}</pre>
+                  <pre class="script-logs">{{ entry.outcome.Logs.join('\n') }}</pre>
                 }
               </article>
             }
