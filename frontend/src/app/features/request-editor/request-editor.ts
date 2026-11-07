@@ -68,6 +68,9 @@ const HTTP_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'
 /** Largest image the response panel decodes, so a huge payload stays in check. */
 const MAX_IMAGE_BYTES = 16 << 20;
 
+/** Above this size, the body is only loaded once the user asks for it. */
+const LARGE_PAYLOAD_BYTES = 1 << 20;
+
 /** Width the response pane keeps when it sits beside the request. */
 const RESPONSE_MIN_WIDTH = 560;
 
@@ -316,6 +319,19 @@ export class RequestEditor {
   protected readonly imageUrl = signal<string | null>(null);
   protected readonly isLoadingImage = signal(false);
   protected readonly imageError = signal<string | null>(null);
+  /** A large body stays hidden until the user agrees to load it. */
+  protected readonly largeResponseShown = signal(false);
+  protected readonly awaitingLargeResponse = computed(() => {
+    const response = this.response();
+    return (
+      !!response &&
+      response.Encoding === 'utf-8' &&
+      response.Size > LARGE_PAYLOAD_BYTES &&
+      this.responseHasMore() &&
+      !this.largeResponseShown() &&
+      !isImageContentType(response.ContentType)
+    );
+  });
   private imageObjectUrl: string | null = null;
   private imageLoadToken = 0;
 
@@ -639,6 +655,7 @@ export class RequestEditor {
       this.responseTab.set('body');
       this.responseHasMore.set(false);
       this.htmlPreview.set(false);
+      this.largeResponseShown.set(false);
 
       if (response.Encoding === 'utf-8') {
         this.responseBody.set(response.Preview);
@@ -773,6 +790,42 @@ export class RequestEditor {
     } catch (error) {
       this.responseError.set(describeError(error));
     } finally {
+      this.isLoadingChunk.set(false);
+    }
+  }
+
+  /** Loads the whole body after the user agreed to see a large response. */
+  protected async displayLargeResponse(): Promise<void> {
+    this.largeResponseShown.set(true);
+    const response = this.response();
+    if (!response || this.isLoadingChunk() || !this.responseHasMore()) {
+      return;
+    }
+
+    this.isLoadingChunk.set(true);
+    this.responseError.set(null);
+    let body = this.responseBody();
+    let offset = this.responseNextOffset;
+    let hasMore = this.responseHasMore();
+
+    try {
+      while (hasMore) {
+        const chunk = await HTTPClientService.ReadChunk(response.ID, offset, 1 << 20);
+        if (this.response()?.ID !== response.ID) {
+          return;
+        }
+        body += decodeChunk(chunk);
+        offset = chunk.NextOffset;
+        hasMore = chunk.HasMore;
+      }
+    } catch (error) {
+      this.responseError.set(describeError(error));
+    } finally {
+      if (this.response()?.ID === response.ID) {
+        this.responseBody.set(body);
+        this.responseNextOffset = offset;
+        this.responseHasMore.set(hasMore);
+      }
       this.isLoadingChunk.set(false);
     }
   }
@@ -933,6 +986,7 @@ export class RequestEditor {
       this.responseBody.set(exchange.ResponseEncoding === 'base64' ? '' : exchange.ResponseBody);
       this.responseHasMore.set(false);
       this.htmlPreview.set(false);
+      this.largeResponseShown.set(false);
       void this.loadImage(this.response());
       this.lastRunAt.set(entry.ExecutedAt);
     } catch {
@@ -1221,6 +1275,7 @@ export class RequestEditor {
     this.activeTab.set((state['activeTab'] as EditorTab) ?? 'parameters');
     this.lastRunAt.set((state['lastRunAt'] as string | null) ?? null);
     this.htmlPreview.set(false);
+    this.largeResponseShown.set(false);
     void this.loadImage(this.response());
   }
 
@@ -1339,6 +1394,7 @@ export class RequestEditor {
   private async closeResponse(): Promise<void> {
     const response = this.response();
     this.releaseImage();
+    this.largeResponseShown.set(false);
     this.response.set(null);
     this.responseBody.set('');
     this.responseHasMore.set(false);

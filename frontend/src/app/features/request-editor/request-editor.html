@@ -721,7 +721,22 @@
         }
         @if (responseTab() === 'body') {
           <div class="response-body-container">
-            @if (isImageResponse()) {
+            @if (awaitingLargeResponse()) {
+              <div class="large-response">
+                <p>
+                  This response is {{ formatSize(current.Size) }}.
+                  <span>Do you want to display its content?</span>
+                </p>
+                <button
+                  type="button"
+                  class="btn btn-primary"
+                  [disabled]="isLoadingChunk()"
+                  (click)="displayLargeResponse()"
+                >
+                  {{ isLoadingChunk() ? 'Loading…' : 'Display content' }}
+                </button>
+              </div>
+            } @else if (isImageResponse()) {
               <div class="response-image">
                 @if (imageUrl(); as source) {
                   <img [src]="source" alt="Response image" />
@@ -775,7 +790,7 @@
               }
             }
 
-            @if (responseHasMore() && !isImageResponse()) {
+            @if (responseHasMore() && !isImageResponse() && !awaitingLargeResponse()) {
               <button
                 type="button"
                 class="add-button"
