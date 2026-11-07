@@ -35,7 +35,11 @@ import {
   ScriptOutcome,
 } from '@bindings/github.com/clementherve/awake/src/domain/models';
 import { EnvironmentStore } from '@core/environment-store';
-import { COLLECTIONS_CHANGED_EVENT, CollectionsChange } from '@core/collection-events';
+import {
+  COLLECTIONS_CHANGED_EVENT,
+  CollectionsChange,
+  notifyCollectionsChanged,
+} from '@core/collection-events';
 import { LayoutStore, RESPONSE_RATIO } from '@core/layout-store';
 import { StashedEditorState, TabsStore } from '@core/tabs-store';
 import { emptyBody, isFormBody, parseFormContent } from '@shared/form-body';
@@ -505,6 +509,8 @@ export class RequestEditor {
       return false;
     }
 
+    const previousName = this.savedName();
+
     const request: Request = {
       ...draft,
       Name: draft.Name.trim(),
@@ -536,6 +542,11 @@ export class RequestEditor {
       this.snapshot.set(JSON.stringify(this.draft()));
       this.statusMessage.set('Saved');
       void this.refreshOAuth2Status();
+      // The tree labels requests with their name from the file, so a rename
+      // only shows there once it reloads.
+      if (request.Name !== previousName) {
+        notifyCollectionsChanged();
+      }
       return true;
     } catch (error) {
       this.errorMessage.set(describeError(error));
@@ -1092,6 +1103,15 @@ export class RequestEditor {
       this.errorMessage.set(describeError(error));
     } finally {
       this.isLoading.set(false);
+    }
+  }
+
+  /** Name of the last version written to disk, from the saved draft snapshot. */
+  private savedName(): string {
+    try {
+      return (JSON.parse(this.snapshot()) as Request).Name ?? '';
+    } catch {
+      return '';
     }
   }
 
