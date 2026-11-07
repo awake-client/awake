@@ -24,7 +24,7 @@
   --color-accent-strong: #cc521d;
   --color-accent-soft: rgba(229, 98, 42, 0.09);
   --color-accent-border: rgba(229, 98, 42, 0.32);
-  --color-accent-gradient: linear-gradient(135deg, #f6a03c 0%, #e5622a 100%);
+  --color-accent-gradient: linear-gradient(180deg, #e5622a 0%, #d2531f 100%);
   --color-hover: rgba(60, 45, 30, 0.05);
   --color-active: rgba(60, 45, 30, 0.09);
   --color-selection: rgba(229, 98, 42, 0.12);
@@ -67,7 +67,7 @@
   --shadow-sheet: 0 1px 3px rgba(40, 30, 20, 0.06), 0 0 0 1px rgba(40, 30, 20, 0.04);
   --shadow-raised: 0 12px 32px rgba(40, 30, 20, 0.16), 0 0 0 1px rgba(40, 30, 20, 0.07);
   --shadow-input: none;
-  --shadow-accent: 0 2px 10px rgba(229, 98, 42, 0.3);
+  --shadow-accent: 0 1px 4px rgba(229, 98, 42, 0.22);
 }
 
 /* Dark theme: follows the system unless a theme is chosen in the app. */
@@ -89,7 +89,7 @@
     --color-accent-strong: #ffa36f;
     --color-accent-soft: rgba(255, 138, 76, 0.1);
     --color-accent-border: rgba(255, 138, 76, 0.3);
-    --color-accent-gradient: linear-gradient(135deg, #ffb547 0%, #ff7a45 100%);
+    --color-accent-gradient: linear-gradient(180deg, #ff8a4c 0%, #ef6f38 100%);
     --color-hover: rgba(255, 255, 255, 0.045);
     --color-active: rgba(255, 255, 255, 0.08);
     --color-selection: rgba(255, 138, 76, 0.13);
@@ -130,7 +130,7 @@
   --color-accent-strong: #ffa36f;
   --color-accent-soft: rgba(255, 138, 76, 0.1);
   --color-accent-border: rgba(255, 138, 76, 0.3);
-  --color-accent-gradient: linear-gradient(135deg, #ffb547 0%, #ff7a45 100%);
+  --color-accent-gradient: linear-gradient(180deg, #ff8a4c 0%, #ef6f38 100%);
   --color-hover: rgba(255, 255, 255, 0.045);
   --color-active: rgba(255, 255, 255, 0.08);
   --color-selection: rgba(255, 138, 76, 0.13);
