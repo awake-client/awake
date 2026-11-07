@@ -35,6 +35,9 @@ interface SidebarSection {
   icon: IconName;
 }
 
+/** Width the request pane keeps for its response toolbar. */
+const SHEET_MIN_WIDTH = 600;
+
 const SIDEBAR_SECTIONS: SidebarSection[] = [
   { route: '/workspace/assistant', label: 'Assistant', icon: 'sparkles' },
   { route: '/workspace/environments', label: 'Environments', icon: 'globe' },
@@ -49,6 +52,9 @@ const SIDEBAR_SECTIONS: SidebarSection[] = [
  */
 @Component({
   selector: 'app-workspace-shell',
+  host: {
+    '(window:resize)': 'clampSidebar()',
+  },
   imports: [
     RouterOutlet,
     RouterLink,
@@ -113,6 +119,8 @@ export class WorkspaceShell {
   });
 
   constructor() {
+    this.clampSidebar();
+
     effect(() => {
       const rootPath = this.rootPath();
       if (rootPath) {
@@ -168,6 +176,23 @@ export class WorkspaceShell {
     void UpdatesService.CurrentVersion()
       .then((version) => this.version.set(version))
       .catch(() => this.version.set(''));
+  }
+
+  /** Resizes the sidebar without letting it squeeze the request pane. */
+  protected resizeSidebar(x: number): void {
+    this.layout.setSidebarWidth(Math.min(x, this.maxSidebarWidth()));
+  }
+
+  /** Keeps the pane wide enough when the window shrinks. */
+  protected clampSidebar(): void {
+    const maximum = this.maxSidebarWidth();
+    if (this.layout.sidebarWidth() > maximum) {
+      this.layout.setSidebarWidth(maximum);
+    }
+  }
+
+  private maxSidebarWidth(): number {
+    return Math.max(SIDEBAR_WIDTH.minimum, window.innerWidth - SHEET_MIN_WIDTH - 8);
   }
 
   protected openRequest(path: string): void {

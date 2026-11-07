@@ -182,7 +182,8 @@
 .sheet {
   display: flex;
   flex-direction: column;
-  min-width: 0;
+  /* Keeps the response toolbar on a single line. */
+  min-width: 600px;
   min-height: 0;
   overflow: hidden;
   border-radius: var(--radius-lg);

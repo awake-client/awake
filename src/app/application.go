@@ -15,6 +15,8 @@ const (
 	mainWindowTitle  = "Awake"
 	mainWindowWidth  = 1280
 	mainWindowHeight = 800
+	// Keep the sidebar and the request pane, with its response toolbar, usable.
+	mainWindowMinWidth = 900
 )
 
 // Run creates the Wails application and blocks until the last window is
@@ -58,6 +60,7 @@ func Run(frontendAssets embed.FS) error {
 		Title:            mainWindowTitle,
 		Width:            mainWindowWidth,
 		Height:           mainWindowHeight,
+		MinWidth:         mainWindowMinWidth,
 		BackgroundColour: application.NewRGB(30, 30, 30),
 		Mac: application.MacWindow{
 			// The web title bar declares its own drag region through the

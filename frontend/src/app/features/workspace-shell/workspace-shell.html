@@ -27,7 +27,7 @@
     <app-resize-handle
       orientation="vertical"
       title="Drag to resize, double click to reset"
-      (resize)="layout.setSidebarWidth($event.x)"
+      (resize)="resizeSidebar($event.x)"
       (reset)="layout.setSidebarWidth(defaultSidebarWidth)"
     />
     <app-collection-tree
