@@ -70,4 +70,12 @@ describe('visibleEnvironments', () => {
 
     expect(production?.CollectionOnly).toBe(true);
   });
+
+  it('lists every scope defining an environment', () => {
+    const options = visibleEnvironments(
+      [summary('development', ''), summary('development', 'collections/billing')],
+      'collections/billing',
+    );
+    expect(options[0].Scopes).toEqual(['', 'collections/billing']);
+  });
 });

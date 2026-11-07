@@ -14,6 +14,7 @@
       [environments]="environments()"
       [selected]="selectedEnvironment()"
       (selectedChange)="chooseEnvironment($event)"
+      (editRequested)="editEnvironment($event)"
     />
   </div>
 </header>
@@ -92,3 +93,4 @@
 <app-new-entry-dialog />
 <app-confirmation-dialog />
 <app-prompt-dialog />
+<app-environment-dialog />

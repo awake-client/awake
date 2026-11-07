@@ -10,6 +10,8 @@ export interface EnvironmentChoice {
   HasLocalOverrides: boolean;
   CollectionOnly: boolean;
   Color: string;
+  /** Scopes defining it: '' for the global one, then the collection path. */
+  Scopes: string[];
 }
 
 /**
@@ -45,29 +47,44 @@ export interface EnvironmentChoice {
       <div class="menu" role="listbox" aria-label="Environments" (keydown)="handleKeydown($event)">
         <p class="menu-title">Environment</p>
         @for (option of options(); track option.FileName; let index = $index) {
-          <button
-            type="button"
-            role="option"
-            class="option"
+          <div
+            class="option-row"
             [class.highlighted]="index === highlighted()"
-            [attr.aria-selected]="option.FileName === selected()"
             (mouseenter)="highlighted.set(index)"
-            (click)="choose(option.FileName)"
           >
-            <span class="check" aria-hidden="true">
-              @if (option.FileName === selected()) {
-                <app-icon name="check" [size]="13" />
+            <button
+              type="button"
+              role="option"
+              class="option"
+              [attr.aria-selected]="option.FileName === selected()"
+              (click)="choose(option.FileName)"
+            >
+              <span class="check" aria-hidden="true">
+                @if (option.FileName === selected()) {
+                  <app-icon name="check" [size]="13" />
+                }
+              </span>
+              <span class="option-dot" [attr.data-color]="option.Color || null"></span>
+              <span class="option-name">{{ option.Name }}</span>
+              @if (option.HasLocalOverrides) {
+                <span class="badge">local</span>
               }
-            </span>
-            <span class="option-dot" [attr.data-color]="option.Color || null"></span>
-            <span class="option-name">{{ option.Name }}</span>
-            @if (option.HasLocalOverrides) {
-              <span class="badge">local</span>
+              @if (option.CollectionOnly) {
+                <span class="badge">collection</span>
+              }
+            </button>
+            @if (option.FileName) {
+              <button
+                type="button"
+                class="edit"
+                [title]="'Edit ' + option.Name"
+                [attr.aria-label]="'Edit ' + option.Name"
+                (click)="edit(option)"
+              >
+                <app-icon name="pencil" [size]="13" />
+              </button>
             }
-            @if (option.CollectionOnly) {
-              <span class="badge">collection</span>
-            }
-          </button>
+          </div>
         }
         <hr />
         <button type="button" class="action" (click)="create()">
@@ -90,6 +107,8 @@ export class EnvironmentPicker {
   readonly environments = input<EnvironmentChoice[]>([]);
   readonly selected = input('');
   readonly selectedChange = output<string>();
+  /** Asks to edit an environment, from the pencil next to it. */
+  readonly editRequested = output<EnvironmentChoice>();
 
   protected readonly isOpen = signal(false);
   protected readonly highlighted = signal(0);
@@ -102,6 +121,7 @@ export class EnvironmentPicker {
       HasLocalOverrides: false,
       CollectionOnly: false,
       Color: '',
+      Scopes: [],
     },
     ...this.environments(),
   ]);
@@ -131,6 +151,11 @@ export class EnvironmentPicker {
   protected choose(fileName: string): void {
     this.selectedChange.emit(fileName);
     this.isOpen.set(false);
+  }
+
+  protected edit(option: EnvironmentChoice): void {
+    this.isOpen.set(false);
+    this.editRequested.emit(option);
   }
 
   protected create(): void {

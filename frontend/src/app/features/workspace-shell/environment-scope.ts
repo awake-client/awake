@@ -45,6 +45,7 @@ export function visibleEnvironments(scoped: ScopedSummary[], scope: string): Env
     }
 
     const existing = options.get(summary.FileName);
+    const scopes = [...(existing?.Scopes ?? []), summary.Scope].sort();
     if (!existing || (existing.CollectionOnly && summary.Scope === '')) {
       options.set(summary.FileName, {
         FileName: summary.FileName,
@@ -52,9 +53,13 @@ export function visibleEnvironments(scoped: ScopedSummary[], scope: string): Env
         HasLocalOverrides: summary.HasLocalOverrides || !!existing?.HasLocalOverrides,
         CollectionOnly: summary.Scope !== '',
         Color: summary.Color || existing?.Color || '',
+        Scopes: scopes,
       });
-    } else if (summary.HasLocalOverrides) {
-      existing.HasLocalOverrides = true;
+    } else {
+      existing.Scopes = scopes;
+      if (summary.HasLocalOverrides) {
+        existing.HasLocalOverrides = true;
+      }
     }
   }
   return [...options.values()];

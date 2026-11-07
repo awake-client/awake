@@ -5,7 +5,9 @@ import { filter } from 'rxjs';
 import { ScopedSummary } from '@bindings/github.com/clementherve/awake/src/features/environments/models';
 import * as EnvironmentsService from '@bindings/github.com/clementherve/awake/src/features/environments/service';
 import * as UpdatesService from '@bindings/github.com/clementherve/awake/src/features/updates/service';
+import { EnvironmentEditing } from '@core/environment-editing';
 import { EnvironmentStore } from '@core/environment-store';
+import { EnvironmentDialog } from '../environments/environment-dialog';
 import { GitSync } from '@core/git-sync';
 import { LayoutStore, SIDEBAR_WIDTH } from '@core/layout-store';
 import { TabsStore } from '@core/tabs-store';
@@ -57,6 +59,7 @@ const SIDEBAR_SECTIONS: SidebarSection[] = [
     PromptDialog,
     RequestTabs,
     EnvironmentPicker,
+    EnvironmentDialog,
     ThemePicker,
     WorkspaceSwitcher,
     ResizeHandle,
@@ -67,6 +70,7 @@ const SIDEBAR_SECTIONS: SidebarSection[] = [
 })
 export class WorkspaceShell {
   private readonly environmentStore = inject(EnvironmentStore);
+  private readonly environmentEditing = inject(EnvironmentEditing);
   private readonly workspaceStore = inject(WorkspaceStore);
   private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
@@ -167,6 +171,10 @@ export class WorkspaceShell {
 
   protected openCommandPalette(): void {
     void this.commandPalette()?.open();
+  }
+
+  protected editEnvironment(environment: EnvironmentOption): void {
+    this.environmentEditing.open({ fileName: environment.FileName, scopes: environment.Scopes });
   }
 
   protected chooseEnvironment(fileName: string): void {

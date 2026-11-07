@@ -88,7 +88,43 @@
   cursor: pointer;
 }
 
-.option.highlighted,
+.option-row {
+  display: flex;
+  align-items: center;
+  border-radius: var(--radius-md);
+}
+
+.option-row .option {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  color: inherit;
+}
+
+.edit {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  margin-right: 2px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-subtle);
+  cursor: pointer;
+}
+
+.edit:hover,
+.edit:focus-visible {
+  background: var(--color-hover);
+  color: var(--color-text-strong);
+  outline: none;
+}
+
+.option-row.highlighted,
 .action:hover {
   background: var(--color-active);
   color: var(--color-text-strong);
