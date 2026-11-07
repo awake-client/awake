@@ -4,6 +4,47 @@
     <p class="hint">Point to a directory containing a workspace, or create a new one.</p>
   </header>
 
+  @if (recent().length > 0) {
+    <div class="field">
+      <span class="field-label" id="recent-label">Recent</span>
+      <ul class="recent" aria-labelledby="recent-label">
+        @for (workspace of recent(); track workspace.rootPath) {
+          <li class="recent-item">
+            <button
+              type="button"
+              class="recent-open"
+              [disabled]="isBusy()"
+              [title]="workspace.rootPath"
+              (click)="openRecent(workspace)"
+            >
+              <span class="avatar" aria-hidden="true" [attr.data-color]="workspace.color || null">
+                {{ workspace.name.charAt(0) }}
+              </span>
+              <span class="recent-text">
+                <span class="recent-name">
+                  {{ workspace.name }}
+                  @if (busyPath() === workspace.rootPath) {
+                    <span class="busy">opening…</span>
+                  }
+                </span>
+                <span class="recent-path">{{ workspace.rootPath }}</span>
+              </span>
+            </button>
+            <button
+              type="button"
+              class="recent-forget"
+              [title]="'Remove ' + workspace.name + ' from recent workspaces'"
+              [attr.aria-label]="'Remove ' + workspace.name + ' from recent workspaces'"
+              (click)="forgetRecent(workspace)"
+            >
+              <app-icon name="close" [size]="13" />
+            </button>
+          </li>
+        }
+      </ul>
+    </div>
+  }
+
   <div class="field">
     <label class="field-label" for="workspace-path">Directory</label>
     <div class="path-field">

@@ -9,7 +9,7 @@ import {
   Mode,
 } from '@bindings/github.com/clementherve/awake/src/features/workspace/models';
 import { chooseDirectory } from '@core/dialogs';
-import { WorkspaceStore } from '@core/workspace-store';
+import { RecentWorkspace, WorkspaceStore } from '@core/workspace-store';
 import { Icon } from '@shared/icon';
 
 @Component({
@@ -30,6 +30,9 @@ export class WorkspacePicker {
   protected readonly isBusy = signal(false);
   protected readonly version = signal('');
   protected readonly updateError = signal<string | null>(null);
+  /** Workspaces opened on this computer, most recent first. */
+  protected readonly recent = this.workspaceStore.recent;
+  protected readonly busyPath = signal<string | null>(null);
 
   async ngOnInit(): Promise<void> {
     void UpdatesService.CurrentVersion()
@@ -52,6 +55,19 @@ export class WorkspacePicker {
 
   protected async openWorkspace(): Promise<void> {
     await this.runOperation(this.workspacePath(), (rootPath) => WorkspaceService.Open(rootPath));
+  }
+
+  protected async openRecent(workspace: RecentWorkspace): Promise<void> {
+    this.busyPath.set(workspace.rootPath);
+    try {
+      await this.runOperation(workspace.rootPath, (rootPath) => WorkspaceService.Open(rootPath));
+    } finally {
+      this.busyPath.set(null);
+    }
+  }
+
+  protected forgetRecent(workspace: RecentWorkspace): void {
+    this.workspaceStore.forget(workspace.rootPath);
   }
 
   /** Lets the user pick an existing workspace and opens it right away. */
