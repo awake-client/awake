@@ -12,9 +12,11 @@
   height: 40px;
   padding: 0 8px;
   overflow-x: auto;
+  overscroll-behavior-x: contain;
   scrollbar-width: none;
 }
 
+/* The strip scrolls with the wheel or trackpad, without a visible bar. */
 .tab-strip::-webkit-scrollbar {
   display: none;
 }
@@ -24,10 +26,11 @@
   display: flex;
   align-items: center;
   gap: 7px;
-  /* Tabs follow their title and only shrink (with an ellipsis) when the
-     strip runs out of room; a single tab uses the space it needs. */
-  flex: 0 1 auto;
+  /* Tabs keep their title width; when the strip runs out of room it scrolls
+     horizontally instead of squeezing the names into unreadable labels. */
+  flex: 0 0 auto;
   min-width: 96px;
+  max-width: 100%;
   height: 28px;
   padding: 0 4px 0 10px;
   border: 1px solid transparent;

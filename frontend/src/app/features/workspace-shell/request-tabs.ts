@@ -1,4 +1,4 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, ElementRef, effect, inject, signal, viewChild } from '@angular/core';
 import { CollectionColors } from '@core/collection-colors';
 import { Confirmation } from '@core/confirmation';
 import { RequestTab, TabsStore } from '@core/tabs-store';
@@ -35,7 +35,7 @@ const METHOD_LABELS: Record<string, string> = { DELETE: 'DEL', OPTIONS: 'OPT' };
     '(window:resize)': 'closeMenu()',
   },
   template: `
-    <div class="tab-strip" role="tablist" aria-label="Open requests">
+    <div #strip class="tab-strip" role="tablist" aria-label="Open requests">
       @for (tab of tabs.tabs(); track tab.path; let index = $index) {
         <div
           class="tab"
@@ -149,6 +149,34 @@ export class RequestTabs {
   /** The tab menu, opened with a right click on a tab. */
   protected readonly menu = signal<TabMenu | null>(null);
   private dragged: string | null = null;
+  private readonly strip = viewChild<ElementRef<HTMLElement>>('strip');
+
+  constructor() {
+    // When the strip overflows, opening a tab should bring it into view.
+    effect(() => {
+      const active = this.tabs.active();
+      const strip = this.strip()?.nativeElement;
+      if (!active || !strip) {
+        return;
+      }
+      requestAnimationFrame(() => this.revealTab(strip));
+    });
+  }
+
+  /** Scrolls the strip so the active tab is fully visible. */
+  private revealTab(strip: HTMLElement): void {
+    const tab = strip.querySelector<HTMLElement>('.tab.active');
+    if (!tab) {
+      return;
+    }
+    const stripRect = strip.getBoundingClientRect();
+    const tabRect = tab.getBoundingClientRect();
+    if (tabRect.left < stripRect.left) {
+      strip.scrollLeft -= stripRect.left - tabRect.left + 8;
+    } else if (tabRect.right > stripRect.right) {
+      strip.scrollLeft += tabRect.right - stripRect.right + 8;
+    }
+  }
 
   protected label(tab: RequestTab): string {
     if (tab.protocol === 'sse') {
