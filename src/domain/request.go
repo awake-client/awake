@@ -204,40 +204,82 @@ type PathParameter struct {
 	Value string `yaml:"value"`
 }
 
-// pathParameterPattern finds the :name segments of a URL. The colon must
-// follow a slash, so a scheme or a port is never read as one.
-var pathParameterPattern = regexp.MustCompile(`/:([A-Za-z_][A-Za-z0-9_]*)`)
+// URLPlaceholder is a :name in a URL, filled from the path parameters of
+// the request: a path segment written /:name, or a query value written
+// name=:name. The colon must follow a slash or an equals sign, so a scheme,
+// a port or a time such as 12:30 is never read as one.
+type URLPlaceholder struct {
+	Name string
+	// InQuery tells a query value, escaped for a query, from a path segment.
+	InQuery bool
+	// Start and End delimit the name and its colon in the URL.
+	Start int
+	End   int
+}
 
-// PathParameterNames returns the names of the :name segments of a URL, in
+var (
+	pathPlaceholderPattern  = regexp.MustCompile(`/(:[A-Za-z_][A-Za-z0-9_]*)`)
+	queryPlaceholderPattern = regexp.MustCompile(`=(:[A-Za-z_][A-Za-z0-9_]*)`)
+)
+
+// URLPlaceholders returns the placeholders of a URL in order. A query
+// placeholder must be a whole value, ending the URL or followed by & or #.
+func URLPlaceholders(rawURL string) []URLPlaceholder {
+	queryStart := strings.Index(rawURL, "?")
+	pathPart := rawURL
+	if queryStart >= 0 {
+		pathPart = rawURL[:queryStart]
+	}
+
+	placeholders := make([]URLPlaceholder, 0)
+	for _, match := range pathPlaceholderPattern.FindAllStringSubmatchIndex(pathPart, -1) {
+		placeholders = append(placeholders, URLPlaceholder{Name: rawURL[match[2]+1 : match[3]], Start: match[2], End: match[3]})
+	}
+	if queryStart < 0 {
+		return placeholders
+	}
+
+	query := rawURL[queryStart:]
+	for _, match := range queryPlaceholderPattern.FindAllStringSubmatchIndex(query, -1) {
+		if match[3] < len(query) && query[match[3]] != '&' && query[match[3]] != '#' {
+			continue
+		}
+		start, end := queryStart+match[2], queryStart+match[3]
+		placeholders = append(placeholders, URLPlaceholder{Name: rawURL[start+1 : end], InQuery: true, Start: start, End: end})
+	}
+	return placeholders
+}
+
+// PathParameterNames returns the names of the placeholders of a URL, in
 // order and once each.
 func PathParameterNames(rawURL string) []string {
 	names := make([]string, 0)
 	seen := map[string]bool{}
-	for _, match := range pathParameterPattern.FindAllStringSubmatch(rawURL, -1) {
-		if !seen[match[1]] {
-			seen[match[1]] = true
-			names = append(names, match[1])
+	for _, placeholder := range URLPlaceholders(rawURL) {
+		if !seen[placeholder.Name] {
+			seen[placeholder.Name] = true
+			names = append(names, placeholder.Name)
 		}
 	}
 	return names
 }
 
-// ReplacePathParameters replaces each :name segment of a URL with the
-// value resolve returns for it.
-func ReplacePathParameters(rawURL string, resolve func(name string) (string, error)) (string, error) {
-	var failure error
-	replaced := pathParameterPattern.ReplaceAllStringFunc(rawURL, func(segment string) string {
-		if failure != nil {
-			return segment
-		}
-		value, err := resolve(segment[2:])
+// ReplacePathParameters replaces each placeholder of a URL, colon included,
+// with the value resolve returns for it.
+func ReplacePathParameters(rawURL string, resolve func(placeholder URLPlaceholder) (string, error)) (string, error) {
+	var builder strings.Builder
+	cursor := 0
+	for _, placeholder := range URLPlaceholders(rawURL) {
+		value, err := resolve(placeholder)
 		if err != nil {
-			failure = err
-			return segment
+			return rawURL, err
 		}
-		return "/" + value
-	})
-	return replaced, failure
+		builder.WriteString(rawURL[cursor:placeholder.Start])
+		builder.WriteString(value)
+		cursor = placeholder.End
+	}
+	builder.WriteString(rawURL[cursor:])
+	return builder.String(), nil
 }
 
 // RequestOverride holds the parts of a request replaced on this machine only.

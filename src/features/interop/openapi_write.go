@@ -161,8 +161,8 @@ func openAPIPath(rawURL string) (string, []string) {
 	}
 
 	parameters := domain.PathParameterNames(pathValue)
-	pathValue, _ = domain.ReplacePathParameters(pathValue, func(name string) (string, error) {
-		return "{" + name + "}", nil
+	pathValue, _ = domain.ReplacePathParameters(pathValue, func(placeholder domain.URLPlaceholder) (string, error) {
+		return "{" + placeholder.Name + "}", nil
 	})
 
 	for {

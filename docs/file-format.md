@@ -274,17 +274,21 @@ protocol: sse
 
 ### Path parameters
 
-A URL segment written `/:name` is a path parameter. Its value comes from
-`pathParameters`; it may hold variables, is escaped for the path, so `a/b`
-stays one segment, and a missing value stops the request instead of sending
-`:name` as is. The colon must follow a slash, so `https://` and `:8080` are
-not parameters.
+A URL placeholder written `:name` takes its value from `pathParameters`. It
+stands either as a path segment, `/:name`, or as a whole query value,
+`name=:name` followed by `&`, `#` or the end of the URL. The value may hold
+variables and is escaped for where it stands, so `a/b` stays one path segment
+and `a&b` one query value. A missing value stops the request instead of
+sending `:name` as is. The colon must follow a slash or an equals sign, so
+`https://`, `:8080` and `?time=12:30` are not placeholders.
 
 ```yaml
-url: "{{baseUrl}}/articles/:articleId/publish"
+url: "{{baseUrl}}/articles/:articleId/comments?author=:authorId"
 pathParameters:
   - name: articleId
     value: "{{articleId}}"
+  - name: authorId
+    value: "42"
 ```
 
 Local overrides of the parameters cover the path parameters too.

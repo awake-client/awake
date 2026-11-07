@@ -799,8 +799,8 @@ func TestSendFillsPathParameters(t *testing.T) {
 	request := domain.Request{
 		Name:           "Publish article",
 		Method:         domain.MethodPost,
-		URL:            "{{base_url}}/api/articles/:articleId/publish",
-		PathParameters: []domain.PathParameter{{Name: "articleId", Value: "{{article}}"}},
+		URL:            "{{base_url}}/api/articles/:articleId/publish?query=:todoId",
+		PathParameters: []domain.PathParameter{{Name: "articleId", Value: "{{article}}"}, {Name: "todoId", Value: "a&b=c d"}},
 		Parameters:     []domain.Parameter{{Name: "notify", Value: "true", Enabled: true}},
 	}
 	layers := []map[string]string{{"base_url": server.URL, "article": "a/b c"}}
@@ -812,7 +812,7 @@ func TestSendFillsPathParameters(t *testing.T) {
 	}
 	defer service.Close(response.ID)
 
-	if receivedPath != "/api/articles/a%2Fb%20c/publish?notify=true" {
+	if receivedPath != "/api/articles/a%2Fb%20c/publish?notify=true&query=a%26b%3Dc+d" {
 		t.Errorf("unexpected path: %q", receivedPath)
 	}
 

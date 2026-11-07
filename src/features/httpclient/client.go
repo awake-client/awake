@@ -669,23 +669,27 @@ func buildBody(body *domain.Body, layers []map[string]string) (io.Reader, string
 	return strings.NewReader(content), defaultContentType(body.Type), nil
 }
 
-// replacePathParameters fills the :name segments of the URL before its
-// variables are resolved. Each value is resolved then escaped for a path, so
-// it can neither add segments nor be read as a variable.
+// replacePathParameters fills the :name placeholders of the URL before its
+// variables are resolved. Each value is resolved then escaped for where it
+// stands, a path segment or a query value, so it can neither add segments or
+// fields nor be read as a variable.
 func replacePathParameters(request domain.Request, layers []map[string]string) (string, error) {
 	values := make(map[string]string, len(request.PathParameters))
 	for _, parameter := range request.PathParameters {
 		values[parameter.Name] = parameter.Value
 	}
 
-	return domain.ReplacePathParameters(request.URL, func(name string) (string, error) {
-		value, found := values[name]
+	return domain.ReplacePathParameters(request.URL, func(placeholder domain.URLPlaceholder) (string, error) {
+		value, found := values[placeholder.Name]
 		if !found || strings.TrimSpace(value) == "" {
-			return "", fmt.Errorf("%w: %s", ErrMissingPathParameter, name)
+			return "", fmt.Errorf("%w: %s", ErrMissingPathParameter, placeholder.Name)
 		}
 		resolved, err := interpolate(value, layers)
 		if err != nil {
 			return "", err
+		}
+		if placeholder.InQuery {
+			return url.QueryEscape(resolved), nil
 		}
 		return url.PathEscape(resolved), nil
 	})

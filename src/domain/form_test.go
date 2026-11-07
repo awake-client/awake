@@ -59,3 +59,24 @@ func TestPathParameterNamesSkipSchemesAndPorts(t *testing.T) {
 		t.Errorf("expected no path parameter, got %v", names)
 	}
 }
+
+func TestURLPlaceholdersInPathAndQuery(t *testing.T) {
+	placeholders := URLPlaceholders("{{base_url}}/api/articles/:articleId?query=:todoId&time=12:30&partial=a:b&last=:articleId#top")
+
+	type found struct {
+		name    string
+		inQuery bool
+	}
+	expected := []found{{"articleId", false}, {"todoId", true}, {"articleId", true}}
+	if len(placeholders) != len(expected) {
+		t.Fatalf("unexpected placeholders: %+v", placeholders)
+	}
+	for index, placeholder := range placeholders {
+		if placeholder.Name != expected[index].name || placeholder.InQuery != expected[index].inQuery {
+			t.Errorf("placeholder %d: expected %+v, got %+v", index, expected[index], placeholder)
+		}
+	}
+	if names := PathParameterNames("/a/:x?b=:y&c=:x"); len(names) != 2 || names[0] != "x" || names[1] != "y" {
+		t.Errorf("expected each name once, got %v", names)
+	}
+}

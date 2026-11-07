@@ -209,7 +209,7 @@ func entries(kind string) map[string]any {
 func pathParameters() map[string]any {
 	return map[string]any{
 		"type":        "array",
-		"description": "Values of the :name segments of the URL.",
+		"description": "Values of the :name placeholders of the URL, in its path or as whole query values.",
 		"items": object(map[string]any{
 			"name":  text("Name of the :name segment."),
 			"value": scalar("Value; may contain {{variables}}, and is escaped for the path."),
