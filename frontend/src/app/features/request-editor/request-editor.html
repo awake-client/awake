@@ -120,6 +120,7 @@
           <app-variable-input
             class="url-input"
             [bare]="true"
+            [url]="true"
             [value]="url()"
             (valueChange)="url.set($event)"
             placeholder="https://api.example.com/users"
@@ -148,6 +149,12 @@
           {{ sendLabel() }}
         </button>
       </div>
+      @if (resolvedUrl(); as resolved) {
+        <p class="resolved-url" title="URL sent, with variables and parameters filled in">
+          <span class="resolved-arrow" aria-hidden="true">→</span>
+          <span class="resolved-text">{{ resolved }}</span>
+        </p>
+      }
     </header>
 
     @if (errorMessage(); as message) {
@@ -243,7 +250,7 @@
               <div class="parameter-sections">
                 @if (pathNames().length > 0) {
                   <section class="parameter-section">
-                    <h3 class="field-label">Path</h3>
+                    <h3 class="field-label">URL parameters</h3>
                     <div class="entry-list">
                       @for (parameter of shownPathParameters(); track parameter.Name) {
                         <div class="entry-row path-row">
@@ -252,6 +259,9 @@
                             [title]="'Replaces :' + parameter.Name + ' in the URL'"
                           >
                             :{{ parameter.Name }}
+                            @if (parameter.InQuery) {
+                              <span class="placeholder-place">query</span>
+                            }
                           </span>
                           <app-variable-input
                             class="entry-value"

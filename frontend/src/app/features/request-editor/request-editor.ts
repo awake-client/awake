@@ -39,7 +39,11 @@ import { COLLECTIONS_CHANGED_EVENT, CollectionsChange } from '@core/collection-e
 import { LayoutStore, RESPONSE_RATIO } from '@core/layout-store';
 import { StashedEditorState, TabsStore } from '@core/tabs-store';
 import { emptyBody, isFormBody, parseFormContent } from '@shared/form-body';
-import { pathParameterNames } from '@shared/path-parameters';
+import {
+  pathParameterNames,
+  replaceUrlPlaceholders,
+  urlPlaceholders,
+} from '@shared/path-parameters';
 import { VariableStore } from '@core/variable-store';
 import { WorkspaceStore } from '@core/workspace-store';
 import { AuthEditor } from '@shared/auth-editor';
@@ -207,16 +211,23 @@ export class RequestEditor {
    * screen; a local override falls back to the shared value of a segment it
    * does not set.
    */
-  protected readonly shownPathParameters = computed<PathParameter[]>(() => {
-    const local = this.parametersSource() === 'local' && this.localParameters() !== null;
-    return this.pathNames().map((name) => ({
-      Name: name,
-      Value:
-        (local ? valueOf(this.localPathParameters(), name) : undefined) ??
-        valueOf(this.pathParameters(), name) ??
-        '',
-    }));
-  });
+  protected readonly shownPathParameters = computed<(PathParameter & { InQuery: boolean })[]>(
+    () => {
+      const local = this.parametersSource() === 'local' && this.localParameters() !== null;
+      const placeholders = urlPlaceholders(this.url());
+      return this.pathNames().map((name) => ({
+        Name: name,
+        Value:
+          (local ? valueOf(this.localPathParameters(), name) : undefined) ??
+          valueOf(this.pathParameters(), name) ??
+          '',
+        // Tagged when the name only stands in the query.
+        InQuery: placeholders.every(
+          (placeholder) => placeholder.name !== name || placeholder.inQuery,
+        ),
+      }));
+    },
+  );
   protected readonly localBody = signal<Body | null>(null);
   /** Which version each overridable tab shows and edits. */
   protected readonly parametersSource = signal<OverrideSource>('shared');
@@ -229,6 +240,35 @@ export class RequestEditor {
     this.bodySource() === 'local' ? (this.localBody() ?? emptyBody()) : this.body(),
   );
   /** The parameters the request sends, for the tab count. */
+  /**
+   * The URL as it will be sent: variables resolved (secrets masked), path
+   * parameters filled in and enabled query parameters appended. Shown only
+   * when it differs from what is typed.
+   */
+  protected readonly resolvedUrl = computed(() => {
+    const raw = this.url().trim();
+    const local = this.localParameters() !== null;
+    const encode = (text: string) =>
+      encodeURIComponent(this.variableStore.preview(text)).replace(/%E2%80%A2/g, '•');
+
+    let resolved = replaceUrlPlaceholders(raw, (placeholder) => {
+      const value =
+        (local ? valueOf(this.localPathParameters(), placeholder.name) : undefined) ??
+        valueOf(this.pathParameters(), placeholder.name) ??
+        '';
+      return value.trim() === '' ? ':' + placeholder.name : encode(value);
+    });
+    resolved = this.variableStore.preview(resolved);
+
+    const query = (this.localParameters() ?? this.parameters())
+      .filter((parameter) => parameter.Enabled && parameter.Name.trim() !== '')
+      .map((parameter) => `${encode(parameter.Name)}=${encode(parameter.Value)}`);
+    if (query.length > 0) {
+      resolved += (resolved.includes('?') ? '&' : '?') + query.join('&');
+    }
+    return resolved === raw ? '' : resolved;
+  });
+
   protected readonly sentParameters = computed(
     () => (this.localParameters() ?? this.parameters()).length + this.pathNames().length,
   );

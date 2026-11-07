@@ -75,8 +75,11 @@ input::placeholder {
   color: var(--color-text-subtle);
 }
 
+/* The selected text stays transparent: the drawn text behind shows it, so
+   it is never painted twice. */
 input::selection {
   background: var(--color-selection);
+  color: transparent;
 }
 
 /* Reference states ---------------------------------------------------------- */
@@ -175,4 +178,20 @@ input::selection {
 :host(.masked) input {
   color: var(--color-text-strong);
   -webkit-text-security: disc;
+}
+
+/* Request URLs: path parameters and the parts of the query. Colors only, so
+   the drawn text keeps the width of the field's text. */
+.path-parameter {
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--method-post) 16%, transparent);
+  color: var(--method-post);
+}
+
+.query-name {
+  color: var(--method-put);
+}
+
+.query-separator {
+  color: var(--color-text-subtle);
 }

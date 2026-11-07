@@ -1,6 +1,7 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  DestroyRef,
   ElementRef,
   computed,
   inject,
@@ -14,7 +15,84 @@ import { VariableInfo, VariableStore } from '@core/variable-store';
 /** A run of text drawn behind the field, highlighted when it is a reference. */
 interface Segment {
   text: string;
-  state: 'text' | 'defined' | 'missing' | 'dynamic' | 'secret';
+  state:
+    | 'text'
+    | 'defined'
+    | 'missing'
+    | 'dynamic'
+    | 'secret'
+    | 'path-parameter'
+    | 'query-name'
+    | 'query-value'
+    | 'query-separator';
+}
+
+/** Where a URL reader stands, carried across the variables of the URL. */
+interface UrlPosition {
+  inQuery: boolean;
+  inValue: boolean;
+}
+
+const PATH_PARAMETER_START = /\/:[A-Za-z_]/;
+const PATH_PARAMETER_NAME = /^:[A-Za-z_][A-Za-z0-9_]*/;
+const QUERY_PLACEHOLDER_VALUE = /^(:[A-Za-z_][A-Za-z0-9_]*)(?=[&#]|$)/;
+
+/**
+ * Splits plain URL text into path parameters and query parts. Variables are
+ * cut out beforehand, so position carries whether the text is in the query
+ * and in a value.
+ */
+export function urlSegments(text: string, position: UrlPosition): Segment[] {
+  const segments: Segment[] = [];
+  const push = (part: string, state: Segment['state']) => {
+    if (part === '') {
+      return;
+    }
+    const last = segments[segments.length - 1];
+    if (last?.state === state) {
+      last.text += part;
+    } else {
+      segments.push({ text: part, state });
+    }
+  };
+
+  let index = 0;
+  while (index < text.length) {
+    const character = text[index];
+    if (!position.inQuery) {
+      if (character === '?') {
+        push(character, 'query-separator');
+        position.inQuery = true;
+        index += 1;
+        continue;
+      }
+      if (character === '/' && PATH_PARAMETER_START.test(text.slice(index, index + 3))) {
+        push(character, 'text');
+        const name = PATH_PARAMETER_NAME.exec(text.slice(index + 1))![0];
+        push(name, 'path-parameter');
+        index += 1 + name.length;
+        continue;
+      }
+      push(character, 'text');
+    } else if (character === '&' || character === '#') {
+      push(character, 'query-separator');
+      position.inValue = false;
+    } else if (character === '=' && !position.inValue) {
+      push(character, 'query-separator');
+      position.inValue = true;
+      // A whole value written :name is a placeholder, like a path segment.
+      const placeholder = QUERY_PLACEHOLDER_VALUE.exec(text.slice(index + 1));
+      if (placeholder) {
+        push(placeholder[1], 'path-parameter');
+        index += 1 + placeholder[1].length;
+        continue;
+      }
+    } else {
+      push(character, position.inValue ? 'query-value' : 'query-name');
+    }
+    index += 1;
+  }
+  return segments;
 }
 
 /** The `{{partial` being typed before the caret. */
@@ -65,7 +143,8 @@ const MAX_SUGGESTIONS = 8;
       (keyup)="handleCaretMove($event)"
       (click)="refreshSuggestions()"
       (scroll)="syncScroll()"
-      (blur)="close()"
+      (focus)="followScroll()"
+      (blur)="close(); stopFollowingScroll()"
     />
     @if (isOpen()) {
       <ul
@@ -105,9 +184,20 @@ export class VariableInput {
   readonly mono = input(true);
   /** Hides the characters, for secrets. */
   readonly masked = input(false);
+  /** Highlights path parameters and the query, for a request URL. */
+  readonly url = input(false);
   readonly valueChange = output<string>();
 
   protected readonly scrollLeft = signal(0);
+  private scrollFrame: number | null = null;
+
+  constructor() {
+    inject(DestroyRef).onDestroy(() => {
+      if (this.scrollFrame !== null) {
+        cancelAnimationFrame(this.scrollFrame);
+      }
+    });
+  }
   protected readonly pending = signal<PendingReference | null>(null);
   protected readonly activeIndex = signal(0);
   protected readonly popupPosition = signal({ top: 0, left: 0, width: 0 });
@@ -115,10 +205,18 @@ export class VariableInput {
   protected readonly segments = computed<Segment[]>(() => {
     const text = this.value();
     const segments: Segment[] = [];
+    const position: UrlPosition = { inQuery: false, inValue: false };
+    const pushText = (part: string) => {
+      if (this.url()) {
+        segments.push(...urlSegments(part, position));
+      } else {
+        segments.push({ text: part, state: 'text' });
+      }
+    };
     let cursor = 0;
     for (const reference of this.store.references(text)) {
       if (reference.start > cursor) {
-        segments.push({ text: text.slice(cursor, reference.start), state: 'text' });
+        pushText(text.slice(cursor, reference.start));
       }
       const source = reference.variable?.source;
       segments.push({
@@ -134,7 +232,7 @@ export class VariableInput {
       cursor = reference.end;
     }
     if (cursor < text.length) {
-      segments.push({ text: text.slice(cursor), state: 'text' });
+      pushText(text.slice(cursor));
     }
     return segments;
   });
@@ -272,5 +370,27 @@ export class VariableInput {
 
   protected syncScroll(): void {
     this.scrollLeft.set(this.field().nativeElement.scrollLeft);
+  }
+
+  /**
+   * Keeps the drawn text under the field's text while it has the focus.
+   * WebKit scrolls an input without a scroll event when a selection is
+   * dragged past its edge, so the offset is read on every frame instead.
+   */
+  protected followScroll(): void {
+    this.stopFollowingScroll();
+    const follow = () => {
+      this.syncScroll();
+      this.scrollFrame = requestAnimationFrame(follow);
+    };
+    this.scrollFrame = requestAnimationFrame(follow);
+  }
+
+  protected stopFollowingScroll(): void {
+    if (this.scrollFrame !== null) {
+      cancelAnimationFrame(this.scrollFrame);
+      this.scrollFrame = null;
+    }
+    this.syncScroll();
   }
 }

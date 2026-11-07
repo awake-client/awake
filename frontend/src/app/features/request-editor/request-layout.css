@@ -233,3 +233,11 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+.placeholder-place {
+  margin-left: auto;
+  padding-left: 8px;
+  font-family: var(--font-sans);
+  font-size: var(--text-xs);
+  color: var(--color-text-subtle);
+}
