@@ -202,7 +202,7 @@ scripts:
     awake.log("sending", request.method, request.url);
   postResponse: |
     awake.test("successful", response.status === 200);
-    awake.setVariable("lastUserId", JSON.parse(response.body).id);
+    awake.environment.set("lastUserId", response.json().id);
 ```
 
 | Field | Description |
@@ -213,7 +213,8 @@ scripts:
 The `request` object exposes `method`, `url`, `headers`, `query` and `body`.
 Mutating it changes the outgoing request: setting a header or a query
 parameter adds it, deleting one removes it. The `response` object exposes
-`status`, `statusText`, `headers`, `body`, `encoding` and `duration`.
+`status`, `statusText`, `headers`, `body`, `encoding` and `duration`, and
+`response.json()` parses the body.
 
 The `awake` helper provides:
 
@@ -223,9 +224,17 @@ The `awake` helper provides:
 | `awake.test(name, value)` | Records an assertion; `value` may be a boolean or a function |
 | `awake.getVariable(name)` | Reads a resolved variable |
 | `awake.setVariable(name, value)` | Sets a variable for the current request only |
+| `awake.environment.get(name)` | Reads a resolved variable |
+| `awake.environment.set(name, value)` | Saves a variable in the selected environment |
+| `awake.environment.unset(name)` | Removes a variable saved in the selected environment |
 
-Variables set by a script apply to that execution and are never written to
-the environment. A failing script does not abort the request; its error is
+`awake.setVariable` only applies to that execution. `awake.environment.set`
+also saves the value for later requests, in the most specific environment of
+the selected name: the collection's one when it declares it, otherwise the
+global one. The value goes to the git ignored local overrides file, so tokens
+never reach the repository, or to the keychain when the name is a declared
+secret. Values that are not strings are stored as JSON. Without a selected
+environment, nothing is saved and the response reports it. A failing script does not abort the request; its error is
 reported with the response. Post-response scripts see the response preview
 (first 256 KiB), so assertions on a large body only cover that preview.
 
