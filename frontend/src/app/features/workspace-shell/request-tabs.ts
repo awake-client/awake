@@ -1,4 +1,5 @@
 import { Component, inject, signal } from '@angular/core';
+import { CollectionColors } from '@core/collection-colors';
 import { Confirmation } from '@core/confirmation';
 import { RequestTab, TabsStore } from '@core/tabs-store';
 
@@ -26,6 +27,7 @@ const METHOD_LABELS: Record<string, string> = { DELETE: 'DEL', OPTIONS: 'OPT' };
           [class.active]="tab.path === tabs.active()"
           [class.preview]="tab.preview"
           [class.drop-before]="dropIndex() === index"
+          [attr.data-color]="collectionColors.colorOf(tab.path) || null"
           [attr.aria-selected]="tab.path === tabs.active()"
           [title]="tab.path"
           (click)="tabs.open(tab.path)"
@@ -66,6 +68,7 @@ const METHOD_LABELS: Record<string, string> = { DELETE: 'DEL', OPTIONS: 'OPT' };
 })
 export class RequestTabs {
   protected readonly tabs = inject(TabsStore);
+  protected readonly collectionColors = inject(CollectionColors);
   private readonly confirmation = inject(Confirmation);
 
   protected readonly dropIndex = signal<number | null>(null);

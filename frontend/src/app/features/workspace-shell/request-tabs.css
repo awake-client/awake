@@ -52,6 +52,21 @@
   box-shadow: var(--shadow-card);
 }
 
+/* A very slight wash of the collection color, so requests of a collection
+   are easy to tell apart without competing with the content. */
+.tab[data-color] {
+  background: color-mix(in srgb, var(--entity-color) 6%, transparent);
+}
+
+.tab[data-color]:hover {
+  background: color-mix(in srgb, var(--entity-color) 10%, var(--color-hover));
+}
+
+.tab.active[data-color] {
+  border-color: color-mix(in srgb, var(--entity-color) 18%, var(--color-border));
+  background: color-mix(in srgb, var(--entity-color) 8%, var(--color-background));
+}
+
 .tab.preview .tab-name {
   font-style: italic;
 }
