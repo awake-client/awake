@@ -1,8 +1,4 @@
-<section
-  #editor
-  class="request-editor"
-  [class.side]="layout.editorLayout() === 'side'"
->
+<section #editor class="request-editor" [class.side]="layout.editorLayout() === 'side'">
   <div class="request-section">
     <header class="editor-toolbar">
       <div class="request-meta">
@@ -33,11 +29,22 @@
         <button
           type="button"
           class="icon-btn"
-          [title]="layout.editorLayout() === 'side' ? 'Show the response below' : 'Show the response on the right'"
-          [attr.aria-label]="layout.editorLayout() === 'side' ? 'Show the response below' : 'Show the response on the right'"
+          [title]="
+            layout.editorLayout() === 'side'
+              ? 'Show the response below'
+              : 'Show the response on the right'
+          "
+          [attr.aria-label]="
+            layout.editorLayout() === 'side'
+              ? 'Show the response below'
+              : 'Show the response on the right'
+          "
           (click)="layout.toggleEditorLayout()"
         >
-          <app-icon [name]="layout.editorLayout() === 'side' ? 'layout-rows' : 'layout-columns'" [size]="15" />
+          <app-icon
+            [name]="layout.editorLayout() === 'side' ? 'layout-rows' : 'layout-columns'"
+            [size]="15"
+          />
         </button>
       </div>
 
@@ -160,8 +167,8 @@
             [attr.aria-selected]="activeTab() === tab"
             (click)="selectTab(tab)"
           >
-  <span class="full-label">{{ tabLabels[tab] }}</span>
-          <span class="short-label">{{ shortTabLabels[tab] }}</span>
+            <span class="full-label">{{ tabLabels[tab] }}</span>
+            <span class="short-label">{{ shortTabLabels[tab] }}</span>
             @if (tab === 'parameters' && parameters().length > 0) {
               <span class="tab-count">{{ parameters().length }}</span>
             }
@@ -284,7 +291,9 @@
                   {{
                     oauth2Busy()
                       ? 'Authorizing…'
-                      : authentication().GrantType !== OAuth2GrantType.OAuth2GrantAuthorizationCode && authentication().GrantType
+                      : authentication().GrantType !==
+                            OAuth2GrantType.OAuth2GrantAuthorizationCode &&
+                          authentication().GrantType
                         ? 'Get token'
                         : 'Authorize in browser'
                   }}
