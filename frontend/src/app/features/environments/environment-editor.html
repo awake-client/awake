@@ -1,0 +1,214 @@
+@if (errorMessage(); as text) {
+  <p class="editor-message error">{{ text }}</p>
+}
+@if (message(); as text) {
+  <p class="editor-message success">{{ text }}</p>
+}
+
+<p class="editor-file">
+  <code>{{ scope() ? scope() + '/' : '' }}environments/{{ fileName() }}.yaml</code>
+  @if (targetFileName() && targetFileName() !== fileName()) {
+    <span class="rename-hint"
+      >→ renamed to <code>{{ targetFileName() }}.yaml</code> on save</span
+    >
+  }
+</p>
+
+<label class="field">
+  <span class="field-label">Display name</span>
+  <input
+    type="text"
+    name="environmentName"
+    [ngModel]="name()"
+    (ngModelChange)="name.set($event)"
+    autocomplete="off"
+  />
+</label>
+
+<div class="field">
+  <span class="field-label">Color</span>
+  <app-color-picker [value]="color()" (valueChange)="color.set($event)" />
+  <span class="field-hint">
+    Shown on the environment picker and along the top of the work area, so a production environment
+    is hard to miss.
+  </span>
+</div>
+
+<article class="editor-section">
+  <header class="section-header">
+    <h2>Variables</h2>
+    <button type="button" class="ghost-button" (click)="addVariable()">Add variable</button>
+  </header>
+
+  @if (variables().length === 0) {
+    <p class="section-empty">No variable yet.</p>
+  } @else {
+    <div class="variable-rows">
+      @for (variable of variables(); track $index) {
+        <div class="variable-row">
+          <input
+            type="text"
+            [name]="'variableName' + $index"
+            [ngModel]="variable.name"
+            (ngModelChange)="updateVariable($index, 'name', $event)"
+            placeholder="baseUrl"
+            autocomplete="off"
+            spellcheck="false"
+          />
+          <input
+            type="text"
+            [name]="'variableValue' + $index"
+            [ngModel]="variable.value"
+            [class.overridden]="localNames().has(variable.name.trim())"
+            [title]="
+              localNames().has(variable.name.trim()) ? 'Overridden by a local override below' : ''
+            "
+            (ngModelChange)="updateVariable($index, 'value', $event)"
+            placeholder="https://example.com"
+            autocomplete="off"
+            spellcheck="false"
+          />
+          <button
+            type="button"
+            class="icon-button"
+            title="Remove variable"
+            (click)="removeVariable($index)"
+          >
+            Remove
+          </button>
+        </div>
+      }
+    </div>
+  }
+</article>
+
+<article class="editor-section">
+  <header class="section-header">
+    <h2>Local overrides</h2>
+    <button type="button" class="ghost-button" (click)="addVariable('local')">Add override</button>
+  </header>
+  <p class="section-hint">
+    Kept on this machine in <code>{{ fileName() }}.local.yaml</code>, which git ignores. They win
+    over the variables above, and scripts save here with <code>awake.environment.set</code>.
+  </p>
+
+  @if (variables().length === 0) {
+    <p class="section-empty">No local override.</p>
+  } @else {
+    <div class="variable-rows">
+      @for (variable of localVariables(); track $index) {
+        <div class="variable-row">
+          <input
+            type="text"
+            [name]="'localName' + $index"
+            [ngModel]="variable.name"
+            (ngModelChange)="updateVariable($index, 'name', $event, 'local')"
+            placeholder="baseUrl"
+            autocomplete="off"
+            spellcheck="false"
+          />
+          <input
+            type="text"
+            [name]="'localValue' + $index"
+            [ngModel]="variable.value"
+            (ngModelChange)="updateVariable($index, 'value', $event, 'local')"
+            placeholder="https://example.com"
+            autocomplete="off"
+            spellcheck="false"
+          />
+          <button
+            type="button"
+            class="icon-button"
+            title="Remove override"
+            (click)="removeVariable($index, 'local')"
+          >
+            Remove
+          </button>
+        </div>
+      }
+    </div>
+  }
+</article>
+
+<article class="editor-section">
+  <header class="section-header">
+    <h2>Secrets</h2>
+  </header>
+
+  <div class="secret-add">
+    <input
+      type="text"
+      name="newSecretName"
+      [ngModel]="newSecretName()"
+      (ngModelChange)="newSecretName.set($event)"
+      placeholder="apiToken"
+      autocomplete="off"
+      spellcheck="false"
+    />
+    <button type="button" class="ghost-button" (click)="addSecretName()">Declare secret</button>
+  </div>
+
+  @if (secretNames().length === 0) {
+    <p class="section-empty">No secret declared yet.</p>
+  } @else {
+    <div class="secret-rows">
+      @for (secretName of secretNames(); track secretName) {
+        <div class="secret-row">
+          <div class="secret-identity">
+            <span class="secret-name">{{ secretName }}</span>
+            <span class="secret-state" [class.set]="secretIsSet(secretName)">
+              {{ secretIsSet(secretName) ? 'Stored' : 'Not stored' }}
+            </span>
+          </div>
+
+          <app-secret-input
+            class="secret-value"
+            [value]="secretValues()[secretName] ?? ''"
+            (valueChange)="updateSecretValue(secretName, $event)"
+            placeholder="New value"
+            [ariaLabel]="'Value of ' + secretName"
+          />
+          <button type="button" class="ghost-button" (click)="storeSecret(secretName)">
+            Store
+          </button>
+          <button
+            type="button"
+            class="icon-button"
+            [disabled]="!secretIsSet(secretName)"
+            (click)="clearSecret(secretName)"
+          >
+            Clear
+          </button>
+          <button
+            type="button"
+            class="icon-button"
+            title="Stop declaring this secret"
+            (click)="removeSecretName(secretName)"
+          >
+            Remove
+          </button>
+        </div>
+      }
+    </div>
+  }
+</article>
+
+<footer class="editor-actions">
+  <button type="button" class="btn btn-danger" (click)="deleteEnvironment()">
+    <app-icon name="trash" [size]="14" />
+    Delete
+  </button>
+  <button type="button" class="ghost-button" [disabled]="isLoading()" (click)="cloneEnvironment()">
+    <app-icon name="copy" [size]="14" />
+    Clone…
+  </button>
+  <span class="actions-spacer"></span>
+  <button
+    type="button"
+    class="primary-button"
+    [disabled]="isSaving() || isLoading()"
+    (click)="saveEnvironment()"
+  >
+    {{ isSaving() ? 'Saving…' : 'Save environment' }}
+  </button>
+</footer>
