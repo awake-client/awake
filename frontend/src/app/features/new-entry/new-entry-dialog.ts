@@ -430,6 +430,7 @@ export class NewEntryDialog {
       URL: url,
       Protocol: protocol,
       Parameters: null,
+      PathParameters: null,
       Headers: parsed.headers.length > 0 ? parsed.headers : null,
       Authentication: parsed.authentication,
       Body: parsed.body,

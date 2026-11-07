@@ -43,6 +43,7 @@ describe('parseRequestInput', () => {
     expect(parsed.body).toEqual({
       Type: BodyType.BodyJSON,
       Content: '{"name":"Ada"}',
+      Fields: null,
     });
     expect(parsed.warnings).toEqual([]);
   });
@@ -53,7 +54,11 @@ describe('parseRequestInput', () => {
     expect(parsed.method).toBe('POST');
     expect(parsed.body).toEqual({
       Type: BodyType.BodyFormURLEncoded,
-      Content: 'user=ada&pass=x',
+      Content: '',
+      Fields: [
+        { Name: 'user', Value: 'ada', Enabled: true },
+        { Name: 'pass', Value: 'x', Enabled: true },
+      ],
     });
   });
 

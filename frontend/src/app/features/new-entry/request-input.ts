@@ -7,6 +7,7 @@ import {
   OAuth2GrantType,
   Protocol,
 } from '@bindings/github.com/clementherve/awake/src/domain/models';
+import { isFormBody, parseFormContent } from '@shared/form-body';
 
 /** What the smart request field recognised in the text typed or pasted. */
 export type RequestInputKind = 'empty' | 'url' | 'method-url' | 'curl';
@@ -219,7 +220,10 @@ function parseCurl(command: string): ParsedRequestInput {
       addHeaderIfMissing(headers, 'Accept', 'application/json');
     }
     const content = data.join('&');
-    body = { Type: inferBodyType(content, headers, json), Content: content };
+    const type = inferBodyType(content, headers, json);
+    body = isFormBody(type)
+      ? { Type: type, Content: '', Fields: parseFormContent(content) }
+      : { Type: type, Content: content, Fields: null };
   }
 
   if (!method) {

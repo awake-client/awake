@@ -169,8 +169,11 @@
           >
             <span class="full-label">{{ tabLabels[tab] }}</span>
             <span class="short-label">{{ shortTabLabels[tab] }}</span>
-            @if (tab === 'parameters' && parameters().length > 0) {
-              <span class="tab-count">{{ parameters().length }}</span>
+            @if (tab === 'parameters' && sentParameters() > 0) {
+              <span class="tab-count">{{ sentParameters() }}</span>
+            }
+            @if ((tab === 'parameters' && localParameters()) || (tab === 'body' && localBody())) {
+              <span class="override-dot" title="Overridden on this machine"></span>
             }
             @if (tab === 'headers' && headers().length > 0) {
               <span class="tab-count">{{ headers().length }}</span>
@@ -182,49 +185,132 @@
       <div class="tab-panel" role="tabpanel">
         @switch (activeTab()) {
           @case ('parameters') {
-            <div class="entry-list">
-              @for (parameter of parameters(); track $index) {
-                <div class="entry-row">
-                  <input
-                    type="checkbox"
-                    [ngModel]="parameter.Enabled"
-                    (ngModelChange)="updateParameter($index, 'Enabled', $event)"
-                    aria-label="Enable parameter"
-                  />
-                  <input
-                    class="input mono entry-name"
-                    type="text"
-                    [ngModel]="parameter.Name"
-                    (ngModelChange)="updateParameter($index, 'Name', $event)"
-                    placeholder="name"
-                    spellcheck="false"
-                  />
-                  <app-variable-input
-                    class="entry-value"
-                    [value]="parameter.Value"
-                    (valueChange)="updateParameter($index, 'Value', $event)"
-                    placeholder="value"
-                    ariaLabel="Parameter value"
-                  />
-                  <button
-                    type="button"
-                    class="icon-btn danger"
-                    aria-label="Remove parameter"
-                    title="Remove parameter"
-                    (click)="removeParameter($index)"
-                  >
-                    <app-icon name="trash" [size]="14" />
+            <div class="override-bar">
+              <div class="override-switch" role="radiogroup" aria-label="Parameters version">
+                <button
+                  type="button"
+                  role="radio"
+                  [class.selected]="parametersSource() === 'shared'"
+                  [attr.aria-checked]="parametersSource() === 'shared'"
+                  (click)="parametersSource.set('shared')"
+                >
+                  Shared
+                </button>
+                <button
+                  type="button"
+                  role="radio"
+                  [class.selected]="parametersSource() === 'local'"
+                  [attr.aria-checked]="parametersSource() === 'local'"
+                  title="Kept on this machine in {{ overrideFileName() }}, which git ignores"
+                  (click)="parametersSource.set('local')"
+                >
+                  Local
+                  @if (localParameters()) {
+                    <span class="override-dot" aria-label="overridden"></span>
+                  }
+                </button>
+              </div>
+              @if (parametersSource() === 'shared' && localParameters()) {
+                <span class="override-note"
+                  >Overridden on this machine: the local version is sent.</span
+                >
+              }
+              @if (parametersSource() === 'local' && localParameters()) {
+                <span class="override-note"
+                  >Sent instead of the shared version, never committed.</span
+                >
+                <button
+                  type="button"
+                  class="btn btn-sm btn-ghost"
+                  (click)="removeOverride('parameters')"
+                >
+                  Remove local override
+                </button>
+              }
+            </div>
+            @if (parametersSource() === 'local' && !localParameters()) {
+              <div class="override-empty">
+                <p class="panel-note">
+                  No local override. Override the parameters on this machine only: they are kept in
+                  <code>{{ overrideFileName() }}</code
+                  >, which git ignores, and sent instead of the shared ones.
+                </p>
+                <button type="button" class="btn btn-sm" (click)="overrideLocally('parameters')">
+                  Override locally
+                </button>
+              </div>
+            } @else {
+              <div class="parameter-sections">
+                @if (pathNames().length > 0) {
+                  <section class="parameter-section">
+                    <h3 class="field-label">Path</h3>
+                    <div class="entry-list">
+                      @for (parameter of shownPathParameters(); track parameter.Name) {
+                        <div class="entry-row path-row">
+                          <span
+                            class="path-name mono"
+                            [title]="'Replaces :' + parameter.Name + ' in the URL'"
+                          >
+                            :{{ parameter.Name }}
+                          </span>
+                          <app-variable-input
+                            class="entry-value"
+                            [value]="parameter.Value"
+                            (valueChange)="updatePathParameter(parameter.Name, $event)"
+                            placeholder="value"
+                            [ariaLabel]="'Value of :' + parameter.Name"
+                          />
+                        </div>
+                      }
+                    </div>
+                  </section>
+                  <h3 class="field-label">Query</h3>
+                }
+                <div class="entry-list">
+                  @for (parameter of shownParameters(); track $index) {
+                    <div class="entry-row">
+                      <input
+                        type="checkbox"
+                        [ngModel]="parameter.Enabled"
+                        (ngModelChange)="updateParameter($index, 'Enabled', $event)"
+                        aria-label="Enable parameter"
+                      />
+                      <input
+                        class="input mono entry-name"
+                        type="text"
+                        [ngModel]="parameter.Name"
+                        (ngModelChange)="updateParameter($index, 'Name', $event)"
+                        placeholder="name"
+                        spellcheck="false"
+                      />
+                      <app-variable-input
+                        class="entry-value"
+                        [value]="parameter.Value"
+                        (valueChange)="updateParameter($index, 'Value', $event)"
+                        placeholder="value"
+                        ariaLabel="Parameter value"
+                      />
+                      <button
+                        type="button"
+                        class="icon-btn danger"
+                        aria-label="Remove parameter"
+                        title="Remove parameter"
+                        (click)="removeParameter($index)"
+                      >
+                        <app-icon name="trash" [size]="14" />
+                      </button>
+                    </div>
+                  } @empty {
+                    <p class="empty-panel">No query parameters.</p>
+                  }
+
+                  <button type="button" class="add-button" (click)="addParameter()">
+                    <app-icon name="plus" [size]="14" />
+                    Add parameter
                   </button>
                 </div>
-              } @empty {
-                <p class="empty-panel">No query parameters.</p>
-              }
-
-              <button type="button" class="add-button" (click)="addParameter()">
-                <app-icon name="plus" [size]="14" />
-                Add parameter
-              </button>
-            </div>
+              </div>
+            }
           }
 
           @case ('headers') {
@@ -315,48 +401,147 @@
           }
 
           @case ('body') {
-            <div class="body-panel">
-              <div class="body-toolbar">
-                <div class="body-types" role="radiogroup" aria-label="Body type">
-                  @for (option of bodyTypes; track option.type) {
+            <div class="override-bar">
+              <div class="override-switch" role="radiogroup" aria-label="Body version">
+                <button
+                  type="button"
+                  role="radio"
+                  [class.selected]="bodySource() === 'shared'"
+                  [attr.aria-checked]="bodySource() === 'shared'"
+                  (click)="bodySource.set('shared')"
+                >
+                  Shared
+                </button>
+                <button
+                  type="button"
+                  role="radio"
+                  [class.selected]="bodySource() === 'local'"
+                  [attr.aria-checked]="bodySource() === 'local'"
+                  title="Kept on this machine in {{ overrideFileName() }}, which git ignores"
+                  (click)="bodySource.set('local')"
+                >
+                  Local
+                  @if (localBody()) {
+                    <span class="override-dot" aria-label="overridden"></span>
+                  }
+                </button>
+              </div>
+              @if (bodySource() === 'shared' && localBody()) {
+                <span class="override-note"
+                  >Overridden on this machine: the local version is sent.</span
+                >
+              }
+              @if (bodySource() === 'local' && localBody()) {
+                <span class="override-note"
+                  >Sent instead of the shared version, never committed.</span
+                >
+                <button type="button" class="btn btn-sm btn-ghost" (click)="removeOverride('body')">
+                  Remove local override
+                </button>
+              }
+            </div>
+            @if (bodySource() === 'local' && !localBody()) {
+              <div class="override-empty">
+                <p class="panel-note">
+                  No local override. Override the body on this machine only: they are kept in
+                  <code>{{ overrideFileName() }}</code
+                  >, which git ignores, and sent instead of the shared ones.
+                </p>
+                <button type="button" class="btn btn-sm" (click)="overrideLocally('body')">
+                  Override locally
+                </button>
+              </div>
+            } @else {
+              <div class="body-panel">
+                <div class="body-toolbar">
+                  <div class="body-types" role="radiogroup" aria-label="Body type">
+                    @for (option of bodyTypes; track option.type) {
+                      <button
+                        type="button"
+                        role="radio"
+                        [class.selected]="shownBody().Type === option.type"
+                        [attr.aria-checked]="shownBody().Type === option.type"
+                        (click)="selectBodyType(option.type)"
+                      >
+                        {{ option.label }}
+                      </button>
+                    }
+                  </div>
+                  @if (shownBody().Type === BodyType.BodyJSON) {
                     <button
                       type="button"
-                      role="radio"
-                      [class.selected]="body().Type === option.type"
-                      [attr.aria-checked]="body().Type === option.type"
-                      (click)="selectBodyType(option.type)"
+                      class="btn btn-sm btn-ghost"
+                      title="Indent the JSON body"
+                      (click)="formatBody()"
                     >
-                      {{ option.label }}
+                      <app-icon name="code" [size]="13" />
+                      Format
                     </button>
                   }
                 </div>
-                @if (body().Type === BodyType.BodyJSON) {
-                  <button
-                    type="button"
-                    class="btn btn-sm btn-ghost"
-                    title="Indent the JSON body"
-                    (click)="formatBody()"
-                  >
-                    <app-icon name="code" [size]="13" />
-                    Format
-                  </button>
+
+                @if (
+                  shownBody().Type === BodyType.BodyMultipart ||
+                  shownBody().Type === BodyType.BodyBinary
+                ) {
+                  <p class="panel-note">Multipart and binary bodies arrive with the HTTP client.</p>
+                } @else if (shownBody().Type === BodyType.BodyNone) {
+                  <p class="panel-note">This request sends no body.</p>
+                } @else if (shownBody().Type === BodyType.BodyFormURLEncoded) {
+                  <div class="entry-list">
+                    @for (field of shownBody().Fields ?? []; track $index) {
+                      <div class="entry-row">
+                        <input
+                          type="checkbox"
+                          [ngModel]="field.Enabled"
+                          (ngModelChange)="updateFormField($index, 'Enabled', $event)"
+                          aria-label="Send this field"
+                        />
+                        <input
+                          class="input mono entry-name"
+                          type="text"
+                          [ngModel]="field.Name"
+                          (ngModelChange)="updateFormField($index, 'Name', $event)"
+                          placeholder="name"
+                          spellcheck="false"
+                        />
+                        <app-variable-input
+                          class="entry-value"
+                          [value]="field.Value"
+                          (valueChange)="updateFormField($index, 'Value', $event)"
+                          placeholder="value"
+                          ariaLabel="Field value"
+                        />
+                        <button
+                          type="button"
+                          class="icon-btn danger"
+                          aria-label="Remove field"
+                          title="Remove field"
+                          (click)="removeFormField($index)"
+                        >
+                          <app-icon name="trash" [size]="14" />
+                        </button>
+                      </div>
+                    } @empty {
+                      <p class="empty-panel">No form field.</p>
+                    }
+
+                    <button type="button" class="add-button" (click)="addFormField()">
+                      <app-icon name="plus" [size]="14" />
+                      Add field
+                    </button>
+                  </div>
+                } @else {
+                  <app-code-editor
+                    class="body-editor"
+                    [value]="shownBody().Content"
+                    [lang]="bodyLanguage()"
+                    placeholder="Request body — use {{ '{{variables}}' }} anywhere"
+                    (valueChange)="updateBodyContent($event)"
+                  />
                 }
               </div>
-
-              @if (body().Type === BodyType.BodyMultipart || body().Type === BodyType.BodyBinary) {
-                <p class="panel-note">Multipart and binary bodies arrive with the HTTP client.</p>
-              } @else if (body().Type === BodyType.BodyNone) {
-                <p class="panel-note">This request sends no body.</p>
-              } @else {
-                <app-code-editor
-                  class="body-editor"
-                  [value]="body().Content"
-                  [lang]="bodyLanguage()"
-                  placeholder="Request body — use {{ '{{variables}}' }} anywhere"
-                  (valueChange)="updateBodyContent($event)"
-                />
-              }
-            </div>
+            }
           }
 
           @case ('scripts') {

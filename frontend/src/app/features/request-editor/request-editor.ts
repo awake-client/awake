@@ -28,6 +28,8 @@ import {
   Header,
   OAuth2GrantType,
   Parameter,
+  PathParameter,
+  RequestOverride,
   Protocol,
   Request,
   ScriptOutcome,
@@ -36,6 +38,8 @@ import { EnvironmentStore } from '@core/environment-store';
 import { COLLECTIONS_CHANGED_EVENT, CollectionsChange } from '@core/collection-events';
 import { LayoutStore, RESPONSE_RATIO } from '@core/layout-store';
 import { StashedEditorState, TabsStore } from '@core/tabs-store';
+import { emptyBody, isFormBody, parseFormContent } from '@shared/form-body';
+import { pathParameterNames } from '@shared/path-parameters';
 import { VariableStore } from '@core/variable-store';
 import { WorkspaceStore } from '@core/workspace-store';
 import { AuthEditor } from '@shared/auth-editor';
@@ -88,6 +92,18 @@ const TAB_LABELS: Record<EditorTab, string> = {
  * Edits a single request file. Changes stay local until the user saves, which
  * writes the canonical YAML representation back to disk.
  */
+/** The version of an overridable tab: tracked by git, or this machine only. */
+type OverrideSource = 'shared' | 'local';
+type OverrideSection = 'parameters' | 'body';
+
+function emptyOverride(): RequestOverride {
+  return { Parameters: null, PathParameters: null, Body: null };
+}
+
+function valueOf(parameters: PathParameter[] | null, name: string): string | undefined {
+  return parameters?.find((parameter) => parameter.Name === name)?.Value;
+}
+
 @Component({
   selector: 'app-request-editor',
   imports: [
@@ -176,7 +192,49 @@ export class RequestEditor {
   protected readonly parameters = signal<Parameter[]>([]);
   protected readonly headers = signal<Header[]>([]);
   protected readonly authentication = signal<Authentication>(defaultAuthentication());
-  protected readonly body = signal<Body>({ Type: BodyType.BodyNone, Content: '' });
+  protected readonly body = signal<Body>(emptyBody());
+  /**
+   * Local overrides, kept on this machine in <request>.local.yaml: null keeps
+   * the shared section, a value replaces it when the request is sent.
+   */
+  protected readonly localParameters = signal<Parameter[] | null>(null);
+  /** Values of the :name segments of the URL, shared and local. */
+  protected readonly pathParameters = signal<PathParameter[]>([]);
+  protected readonly localPathParameters = signal<PathParameter[] | null>(null);
+  protected readonly pathNames = computed(() => pathParameterNames(this.url()));
+  /**
+   * One row per :name segment of the URL, with the value of the version on
+   * screen; a local override falls back to the shared value of a segment it
+   * does not set.
+   */
+  protected readonly shownPathParameters = computed<PathParameter[]>(() => {
+    const local = this.parametersSource() === 'local' && this.localParameters() !== null;
+    return this.pathNames().map((name) => ({
+      Name: name,
+      Value:
+        (local ? valueOf(this.localPathParameters(), name) : undefined) ??
+        valueOf(this.pathParameters(), name) ??
+        '',
+    }));
+  });
+  protected readonly localBody = signal<Body | null>(null);
+  /** Which version each overridable tab shows and edits. */
+  protected readonly parametersSource = signal<OverrideSource>('shared');
+  protected readonly bodySource = signal<OverrideSource>('shared');
+  /** The parameters and body shown, local when a local override is open. */
+  protected readonly shownParameters = computed(() =>
+    this.parametersSource() === 'local' ? (this.localParameters() ?? []) : this.parameters(),
+  );
+  protected readonly shownBody = computed(() =>
+    this.bodySource() === 'local' ? (this.localBody() ?? emptyBody()) : this.body(),
+  );
+  /** The parameters the request sends, for the tab count. */
+  protected readonly sentParameters = computed(
+    () => (this.localParameters() ?? this.parameters()).length + this.pathNames().length,
+  );
+  protected readonly overrideFileName = computed(
+    () => (this.requestPath().split('/').pop() ?? '').replace(/\.yaml$/, '') + '.local.yaml',
+  );
   protected readonly preRequestScript = signal('');
   protected readonly postResponseScript = signal('');
   protected readonly activeTab = signal<EditorTab>('parameters');
@@ -193,6 +251,7 @@ export class RequestEditor {
   protected readonly isLoadingChunk = signal(false);
 
   private readonly snapshot = signal('');
+  private readonly overrideSnapshot = signal('');
   private responseNextOffset = 0;
 
   private readonly draft = computed<Request>(() => ({
@@ -201,6 +260,13 @@ export class RequestEditor {
     URL: this.url(),
     Protocol: this.protocol(),
     Parameters: this.parameters().filter((parameter) => parameter.Name.trim() !== ''),
+    // Only the segments still in the URL are kept.
+    PathParameters: this.pathNames().length
+      ? this.pathNames().map((name) => ({
+          Name: name,
+          Value: valueOf(this.pathParameters(), name) ?? '',
+        }))
+      : null,
     Headers: this.headers().filter((header) => header.Name.trim() !== ''),
     Authentication: this.authentication(),
     Body: this.body(),
@@ -214,7 +280,28 @@ export class RequestEditor {
     Documentation: this.documentation(),
   }));
 
-  protected readonly isDirty = computed(() => JSON.stringify(this.draft()) !== this.snapshot());
+  private readonly overrideDraft = computed<RequestOverride>(() => ({
+    PathParameters:
+      this.localParameters() !== null && this.pathNames().length
+        ? this.pathNames().map((name) => ({
+            Name: name,
+            Value:
+              valueOf(this.localPathParameters(), name) ??
+              valueOf(this.pathParameters(), name) ??
+              '',
+          }))
+        : null,
+    Parameters: this.localParameters()?.filter((parameter) => parameter.Name.trim() !== '') ?? null,
+    Body: this.localBody(),
+  }));
+
+  private readonly isOverrideDirty = computed(
+    () => JSON.stringify(this.overrideDraft()) !== this.overrideSnapshot(),
+  );
+
+  protected readonly isDirty = computed(
+    () => JSON.stringify(this.draft()) !== this.snapshot() || this.isOverrideDirty(),
+  );
 
   protected readonly isStreaming = computed(() => this.protocol() !== Protocol.ProtocolHTTP);
 
@@ -226,7 +313,7 @@ export class RequestEditor {
   protected readonly streamLive = computed(() => this.streamPanel()?.isLive() ?? false);
 
   protected readonly bodyLanguage = computed<CodeLanguage>(() => {
-    switch (this.body().Type) {
+    switch (this.shownBody().Type) {
       case BodyType.BodyJSON:
         return 'json';
       case BodyType.BodyXML:
@@ -395,6 +482,15 @@ export class RequestEditor {
         request,
       );
 
+      if (this.isOverrideDirty()) {
+        await CollectionsService.SaveRequestOverride(
+          this.workspaceStore.rootPath() ?? '',
+          this.requestPath(),
+          this.overrideDraft(),
+        );
+        this.overrideSnapshot.set(JSON.stringify(this.overrideDraft()));
+      }
+
       this.name.set(request.Name);
       this.url.set(request.URL);
       this.snapshot.set(JSON.stringify(this.draft()));
@@ -548,7 +644,7 @@ export class RequestEditor {
   }
 
   protected addParameter(): void {
-    this.parameters.update((parameters) => [...parameters, { Name: '', Value: '', Enabled: true }]);
+    this.editParameters((parameters) => [...parameters, { Name: '', Value: '', Enabled: true }]);
   }
 
   protected updateParameter(
@@ -556,7 +652,7 @@ export class RequestEditor {
     field: 'Name' | 'Value' | 'Enabled',
     value: string | boolean,
   ): void {
-    this.parameters.update((parameters) =>
+    this.editParameters((parameters) =>
       parameters.map((parameter, position) =>
         position === index ? ({ ...parameter, [field]: value } as Parameter) : parameter,
       ),
@@ -564,7 +660,7 @@ export class RequestEditor {
   }
 
   protected removeParameter(index: number): void {
-    this.parameters.update((parameters) =>
+    this.editParameters((parameters) =>
       parameters.filter((_parameter, position) => position !== index),
     );
   }
@@ -744,16 +840,101 @@ export class RequestEditor {
     return `Token stored until ${new Date(status.ExpiresAtMilliseconds).toLocaleString()}.`;
   }
 
+  /** Starts a local override of a tab from a copy of its shared version. */
+  protected overrideLocally(section: OverrideSection): void {
+    if (section === 'parameters') {
+      this.localParameters.set(this.parameters().map((parameter) => ({ ...parameter })));
+      this.localPathParameters.set(this.pathParameters().map((parameter) => ({ ...parameter })));
+      this.parametersSource.set('local');
+    } else {
+      this.localBody.set({ ...this.body() });
+      this.bodySource.set('local');
+    }
+  }
+
+  /** Drops a local override; the shared version is sent again once saved. */
+  protected removeOverride(section: OverrideSection): void {
+    if (section === 'parameters') {
+      this.localParameters.set(null);
+      this.localPathParameters.set(null);
+      this.parametersSource.set('shared');
+    } else {
+      this.localBody.set(null);
+      this.bodySource.set('shared');
+    }
+  }
+
+  /** Sets the value of a :name segment in the version on screen. */
+  protected updatePathParameter(name: string, value: string): void {
+    const upsert = (parameters: PathParameter[] | null): PathParameter[] => [
+      ...(parameters ?? []).filter((parameter) => parameter.Name !== name),
+      { Name: name, Value: value },
+    ];
+    if (this.parametersSource() === 'local' && this.localParameters()) {
+      this.localPathParameters.update(upsert);
+    } else {
+      this.pathParameters.update(upsert);
+    }
+  }
+
+  private editParameters(change: (parameters: Parameter[]) => Parameter[]): void {
+    if (this.parametersSource() === 'local' && this.localParameters()) {
+      this.localParameters.update((parameters) => change(parameters ?? []));
+    } else {
+      this.parameters.update(change);
+    }
+  }
+
+  private editBody(change: (body: Body) => Body): void {
+    if (this.bodySource() === 'local' && this.localBody()) {
+      this.localBody.update((body) => change(body ?? emptyBody()));
+    } else {
+      this.body.update(change);
+    }
+  }
+
   protected formatBody(): void {
-    const content = this.body().Content;
+    const content = this.shownBody().Content;
     const formatted = prettyJson(content);
     if (formatted !== content) {
       this.updateBodyContent(formatted);
     }
   }
 
+  /**
+   * Changes the body format. A text body becoming a form is read into
+   * fields, so nothing typed is lost.
+   */
   protected selectBodyType(type: BodyType): void {
-    this.body.update((body) => ({ ...body, Type: type }));
+    this.editBody((body) => {
+      if (isFormBody(type) && !body.Fields?.length && body.Content.trim() !== '') {
+        return { Type: type, Content: '', Fields: parseFormContent(body.Content) };
+      }
+      return { ...body, Type: type };
+    });
+  }
+
+  protected addFormField(): void {
+    this.editBody((body) => ({
+      ...body,
+      Fields: [...(body.Fields ?? []), { Name: '', Value: '', Enabled: true }],
+    }));
+  }
+
+  protected updateFormField(index: number, field: keyof Parameter, value: string | boolean): void {
+    this.editBody((body) => ({
+      ...body,
+      Fields: (body.Fields ?? []).map((entry, position) =>
+        position === index ? ({ ...entry, [field]: value } as Parameter) : entry,
+      ),
+    }));
+  }
+
+  protected removeFormField(index: number): void {
+    this.editBody((body) => ({
+      ...body,
+      Fields: (body.Fields ?? []).filter((_entry, position) => position !== index),
+    }));
   }
 
   protected toggleKindMenu(event: Event): void {
@@ -788,7 +969,7 @@ export class RequestEditor {
   }
 
   protected updateBodyContent(value: string): void {
-    this.body.update((body) => ({ ...body, Content: value }));
+    this.editBody((body) => ({ ...body, Content: value }));
   }
 
   /**
@@ -803,6 +984,8 @@ export class RequestEditor {
     const state: StashedEditorState = {
       draft: this.draft(),
       snapshot: this.snapshot(),
+      override: this.overrideDraft(),
+      overrideSnapshot: this.overrideSnapshot(),
       responseIdentifier: this.response()?.ID,
       response: this.response(),
       responseBody: this.responseBody(),
@@ -820,7 +1003,9 @@ export class RequestEditor {
 
   private restore(state: StashedEditorState): void {
     this.applyRequest(state.draft as Request);
+    this.applyOverride((state['override'] as RequestOverride | undefined) ?? emptyOverride());
     this.snapshot.set(state.snapshot);
+    this.overrideSnapshot.set((state['overrideSnapshot'] as string) ?? this.overrideSnapshot());
     this.response.set((state['response'] as HTTPResponse | null) ?? null);
     this.responseBody.set((state['responseBody'] as string) ?? '');
     this.responseHasMore.set(Boolean(state['responseHasMore']));
@@ -855,11 +1040,13 @@ export class RequestEditor {
 
     this.isLoading.set(true);
     try {
-      const request = await CollectionsService.LoadRequest(
-        this.workspaceStore.rootPath() ?? '',
-        path,
-      );
+      const rootPath = this.workspaceStore.rootPath() ?? '';
+      const [request, override] = await Promise.all([
+        CollectionsService.LoadRequest(rootPath, path),
+        CollectionsService.LoadRequestOverride(rootPath, path),
+      ]);
       this.applyRequest(request);
+      this.applyOverride(override);
       void this.loadLastRun(path);
     } catch (error) {
       this.errorMessage.set(describeError(error));
@@ -875,6 +1062,7 @@ export class RequestEditor {
     this.url.set(request.URL);
     this.documentation.set(request.Documentation ?? '');
     this.parameters.set(request.Parameters ?? []);
+    this.pathParameters.set(request.PathParameters ?? []);
     this.headers.set(request.Headers ?? []);
     this.authentication.set({
       ...defaultAuthentication(),
@@ -883,12 +1071,30 @@ export class RequestEditor {
     this.body.set({
       Type: request.Body?.Type ?? BodyType.BodyNone,
       Content: request.Body?.Content ?? '',
+      Fields: request.Body?.Fields ?? null,
     });
     this.preRequestScript.set(request.Scripts?.PreRequest ?? '');
     this.postResponseScript.set(request.Scripts?.PostResponse ?? '');
     this.activeTab.set('parameters');
     this.snapshot.set(JSON.stringify(this.draft()));
     void this.refreshOAuth2Status();
+  }
+
+  /** Shows the local version of a tab whenever it has one. */
+  private applyOverride(override: RequestOverride): void {
+    const overridesParameters = !!override.Parameters || !!override.PathParameters;
+    this.localParameters.set(
+      override.Parameters
+        ? [...override.Parameters]
+        : overridesParameters
+          ? this.parameters().map((parameter) => ({ ...parameter }))
+          : null,
+    );
+    this.localPathParameters.set(override.PathParameters ? [...override.PathParameters] : null);
+    this.localBody.set(override.Body ? { ...override.Body } : null);
+    this.parametersSource.set(overridesParameters ? 'local' : 'shared');
+    this.bodySource.set(override.Body ? 'local' : 'shared');
+    this.overrideSnapshot.set(JSON.stringify(this.overrideDraft()));
   }
 
   private async refreshOAuth2Status(): Promise<void> {

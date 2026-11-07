@@ -118,7 +118,12 @@
             </dl>
             <h4>Body</h4>
             @if (exchange.RequestBody) {
-              <app-code-editor class="body" [value]="formatBody(exchange.RequestBody)" [lang]="languageOf(exchange.RequestBody)" [readOnly]="true" />
+              <app-code-editor
+                class="body"
+                [value]="formatBody(exchange.RequestBody)"
+                [lang]="languageOf(exchange.RequestBody)"
+                [readOnly]="true"
+              />
             } @else {
               <p class="hint">No body.</p>
             }
@@ -141,7 +146,12 @@
             @if (exchange.ResponseEncoding === 'base64') {
               <p class="hint">Binary response, not shown.</p>
             } @else if (exchange.ResponseBody) {
-              <app-code-editor class="body" [value]="formatBody(exchange.ResponseBody)" [lang]="languageOf(exchange.ResponseBody)" [readOnly]="true" />
+              <app-code-editor
+                class="body"
+                [value]="formatBody(exchange.ResponseBody)"
+                [lang]="languageOf(exchange.ResponseBody)"
+                [readOnly]="true"
+              />
             } @else {
               <p class="hint">Empty body.</p>
             }
