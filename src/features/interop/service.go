@@ -81,6 +81,7 @@ func (service *Service) Import(workspaceRoot string, sourcePath string, format F
 			return result, fmt.Errorf("create collection %s: %w", collection.Name, err)
 		}
 		result.Collections += 1
+		result.Warnings = append(result.Warnings, collection.Warnings...)
 
 		requests, warnings, err := service.writeRequests(workspaceRoot, collectionPath, collection.Requests, collection.Folders)
 		if err != nil {

@@ -223,3 +223,35 @@ func TestBrunoPathParametersRoundTrip(t *testing.T) {
 		t.Errorf("unexpected written request:\n%s", written)
 	}
 }
+
+func TestImportBrunoSkipsRequestsItCannotRead(t *testing.T) {
+	root := t.TempDir()
+	files := map[string]string{
+		"bruno.json":                "{\"name\": \"Game\"}",
+		"Chat/BroadcastMessage.bru": "meta {\n  name: BroadcastMessage\n  type: grpc\n}\n\ngrpc {\n  url: {{grpcUrl}}\n  method: /chat/Broadcast\n}\n",
+		"Player/Profile.bru":        "meta {\n  name: Profile\n}\n\nget {\n  url: {{baseUrl}}/profile\n}\n",
+		"Player/Broken.bru":         "meta {\n  name: Broken\n}\n",
+	}
+	for name, content := range files {
+		path := filepath.Join(root, filepath.FromSlash(name))
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	result, err := NewService(newFakeWriter(), fakeSource{}).Import(t.TempDir(), root, FormatBruno)
+	if err != nil {
+		t.Fatalf("import: %v", err)
+	}
+	if result.Requests != 1 {
+		t.Errorf("expected the HTTP request only, got %+v", result)
+	}
+	warnings := strings.Join(result.Warnings, "\n")
+	if !strings.Contains(warnings, "1 gRPC request skipped, not supported by Awake: Chat/BroadcastMessage.bru") ||
+		!strings.Contains(warnings, "Player/Broken.bru skipped") {
+		t.Errorf("unexpected warnings:\n%s", warnings)
+	}
+}

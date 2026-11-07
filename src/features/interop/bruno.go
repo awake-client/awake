@@ -192,6 +192,7 @@ func readBrunoCollection(root string) (Collection, error) {
 		folders: map[string]*brunoFolderBuilder{},
 	}
 
+	skipped := map[string][]string{}
 	err = filepath.WalkDir(root, func(filePath string, entry os.DirEntry, walkError error) error {
 		if walkError != nil {
 			return walkError
@@ -230,7 +231,14 @@ func readBrunoCollection(root string) (Collection, error) {
 		requestName := strings.TrimSuffix(entry.Name(), brunoExtension)
 		request, err := parseBrunoRequest(string(content), requestName)
 		if err != nil {
-			return fmt.Errorf("read %s: %w", relativePath, err)
+			// One request Awake cannot read must not stop the others.
+			var unsupported unsupportedBrunoRequest
+			if errors.As(err, &unsupported) {
+				skipped[unsupported.kind] = append(skipped[unsupported.kind], filepath.ToSlash(relativePath))
+				return nil
+			}
+			collection.Warnings = append(collection.Warnings, fmt.Sprintf("%s skipped: %v", filepath.ToSlash(relativePath), err))
+			return nil
 		}
 
 		requestName = brunoRequestName(string(content), requestName)
@@ -243,6 +251,7 @@ func readBrunoCollection(root string) (Collection, error) {
 	}
 
 	collection.Requests, collection.Folders = builder.result()
+	collection.Warnings = append(collection.Warnings, skipWarnings(skipped)...)
 
 	if len(collection.Requests) == 0 && len(collection.Folders) == 0 {
 		return Collection{}, ErrEmptyCollection
@@ -319,6 +328,31 @@ func brunoList(content string, name string) []string {
 	return values
 }
 
+// skipWarnings sums up the requests skipped by kind, naming a few of them.
+func skipWarnings(skipped map[string][]string) []string {
+	kinds := make([]string, 0, len(skipped))
+	for kind := range skipped {
+		kinds = append(kinds, kind)
+	}
+	sort.Strings(kinds)
+
+	warnings := make([]string, 0, len(kinds))
+	for _, kind := range kinds {
+		paths := skipped[kind]
+		sort.Strings(paths)
+		listed := strings.Join(paths[:min(len(paths), maximumListedSkips)], ", ")
+		if len(paths) > maximumListedSkips {
+			listed += fmt.Sprintf(" and %d more", len(paths)-maximumListedSkips)
+		}
+		noun := "request"
+		if len(paths) > 1 {
+			noun = "requests"
+		}
+		warnings = append(warnings, fmt.Sprintf("%d %s %s skipped, %v: %s", len(paths), kind, noun, errUnsupportedBrunoRequest, listed))
+	}
+	return warnings
+}
+
 func (builder *brunoFolderBuilder) add(relativeDirectory string, request Request) {
 	if relativeDirectory == "." || relativeDirectory == "" {
 		builder.requests = append(builder.requests, request)
@@ -358,8 +392,32 @@ func (builder *brunoFolderBuilder) result() ([]Request, []Folder) {
 	return builder.requests, folders
 }
 
+// errUnsupportedBrunoRequest marks a request of a kind Awake cannot hold,
+// such as gRPC; the import skips it with a warning.
+var errUnsupportedBrunoRequest = errors.New("not supported by Awake")
+
+// unsupportedBrunoRequest names the kind of a request Awake cannot hold.
+type unsupportedBrunoRequest struct{ kind string }
+
+func (failure unsupportedBrunoRequest) Error() string {
+	return failure.kind + " request, " + errUnsupportedBrunoRequest.Error()
+}
+
+func (failure unsupportedBrunoRequest) Unwrap() error { return errUnsupportedBrunoRequest }
+
+// maximumListedSkips bounds the files named in one skip warning.
+const maximumListedSkips = 3
+
+// brunoUnsupportedBlocks are the request blocks of kinds Awake cannot send.
+var brunoUnsupportedBlocks = map[string]string{"grpc": "gRPC"}
+
 func parseBrunoRequest(content string, fallbackName string) (domain.Request, error) {
 	blocks := parseBrunoBlocks(content)
+	for _, block := range blocks {
+		if kind, unsupported := brunoUnsupportedBlocks[block.Name]; unsupported {
+			return domain.Request{}, unsupportedBrunoRequest{kind: kind}
+		}
+	}
 
 	request := domain.Request{
 		Name:           fallbackName,

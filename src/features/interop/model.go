@@ -37,6 +37,9 @@ type Collection struct {
 	Requests       []Request
 	Folders        []Folder
 	Environments   []Environment
+	// Warnings lists what the reader skipped, such as requests of a kind
+	// Awake does not support.
+	Warnings []string
 }
 
 // Environment is a set of variables shipped with a collection, imported as
