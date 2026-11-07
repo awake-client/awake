@@ -24,6 +24,9 @@ var (
 	ErrUnsupportedBody = errors.New("httpclient: unsupported body type")
 	// ErrResponseNotFound is returned when a response expired or was closed.
 	ErrResponseNotFound = errors.New("httpclient: response not found")
+	// ErrMissingPathParameter is returned when a :name segment of the URL
+	// has no value.
+	ErrMissingPathParameter = errors.New("httpclient: path parameter has no value")
 	// ErrInvalidChunk is returned for an out-of-range chunk request.
 	ErrInvalidChunk = errors.New("httpclient: invalid chunk")
 	// ErrOAuth2AuthorizationRequired is returned when an OAuth 2 request needs

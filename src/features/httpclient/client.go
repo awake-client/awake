@@ -485,7 +485,11 @@ func buildHTTPRequest(request domain.Request, layers []map[string]string, oauth2
 }
 
 func buildHTTPRequestWithContext(parent context.Context, request domain.Request, layers []map[string]string, oauth2Token string) (*http.Request, error) {
-	rawURL, err := interpolate(request.URL, layers)
+	withPath, err := replacePathParameters(request, layers)
+	if err != nil {
+		return nil, err
+	}
+	rawURL, err := interpolate(withPath, layers)
 	if err != nil {
 		return nil, err
 	}
@@ -663,6 +667,28 @@ func buildBody(body *domain.Body, layers []map[string]string) (io.Reader, string
 	}
 
 	return strings.NewReader(content), defaultContentType(body.Type), nil
+}
+
+// replacePathParameters fills the :name segments of the URL before its
+// variables are resolved. Each value is resolved then escaped for a path, so
+// it can neither add segments nor be read as a variable.
+func replacePathParameters(request domain.Request, layers []map[string]string) (string, error) {
+	values := make(map[string]string, len(request.PathParameters))
+	for _, parameter := range request.PathParameters {
+		values[parameter.Name] = parameter.Value
+	}
+
+	return domain.ReplacePathParameters(request.URL, func(name string) (string, error) {
+		value, found := values[name]
+		if !found || strings.TrimSpace(value) == "" {
+			return "", fmt.Errorf("%w: %s", ErrMissingPathParameter, name)
+		}
+		resolved, err := interpolate(value, layers)
+		if err != nil {
+			return "", err
+		}
+		return url.PathEscape(resolved), nil
+	})
 }
 
 // encodeForm encodes the enabled fields in order, each after its variables

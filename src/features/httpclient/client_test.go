@@ -750,3 +750,75 @@ func TestSendRetriesOnceWithAFreshTokenAfterA401(t *testing.T) {
 		t.Fatalf("expected one retry with the fresh token, got %v", seen)
 	}
 }
+
+func TestSendEncodesFormFieldsAfterResolvingVariables(t *testing.T) {
+	var received string
+	var contentType string
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		content, _ := io.ReadAll(request.Body)
+		received = string(content)
+		contentType = request.Header.Get("Content-Type")
+	}))
+	defer server.Close()
+
+	service := newTestService(t, fakeSource{
+		request: domain.Request{
+			Name:   "Create article",
+			Method: domain.MethodPost,
+			URL:    server.URL,
+			Body: &domain.Body{Type: domain.BodyFormURLEncoded, Fields: []domain.Parameter{
+				{Name: "title", Value: "{{title}}", Enabled: true},
+				{Name: "draft", Value: "yes", Enabled: false},
+				{Name: "tags", Value: "foo,bar", Enabled: true},
+			}},
+		},
+		layers: []map[string]string{{"title": "a&b=c d"}},
+	})
+
+	response, err := service.Send(t.TempDir(), "collections/cms/create.yaml", "")
+	if err != nil {
+		t.Fatalf("send: %v", err)
+	}
+	defer service.Close(response.ID)
+
+	if received != "title=a%26b%3Dc+d&tags=foo%2Cbar" {
+		t.Errorf("unexpected form: %q", received)
+	}
+	if contentType != "application/x-www-form-urlencoded" {
+		t.Errorf("unexpected content type: %q", contentType)
+	}
+}
+
+func TestSendFillsPathParameters(t *testing.T) {
+	var receivedPath string
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		receivedPath = request.URL.EscapedPath() + "?" + request.URL.RawQuery
+	}))
+	defer server.Close()
+
+	request := domain.Request{
+		Name:           "Publish article",
+		Method:         domain.MethodPost,
+		URL:            "{{base_url}}/api/articles/:articleId/publish",
+		PathParameters: []domain.PathParameter{{Name: "articleId", Value: "{{article}}"}},
+		Parameters:     []domain.Parameter{{Name: "notify", Value: "true", Enabled: true}},
+	}
+	layers := []map[string]string{{"base_url": server.URL, "article": "a/b c"}}
+
+	service := newTestService(t, fakeSource{request: request, layers: layers})
+	response, err := service.Send(t.TempDir(), "collections/cms/publish.yaml", "")
+	if err != nil {
+		t.Fatalf("send: %v", err)
+	}
+	defer service.Close(response.ID)
+
+	if receivedPath != "/api/articles/a%2Fb%20c/publish?notify=true" {
+		t.Errorf("unexpected path: %q", receivedPath)
+	}
+
+	request.PathParameters = nil
+	missing := newTestService(t, fakeSource{request: request, layers: layers})
+	if _, err := missing.Send(t.TempDir(), "collections/cms/publish.yaml", ""); !errors.Is(err, ErrMissingPathParameter) {
+		t.Errorf("expected ErrMissingPathParameter, got %v", err)
+	}
+}
