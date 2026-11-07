@@ -597,6 +597,9 @@
                           change.Removed ? 'UNSET' : 'SAVED'
                         }}</span>
                         <code>{{ change.Name }}</code>
+                        @if (change.Environment) {
+                          <span class="script-environment-target">in {{ change.Environment }}</span>
+                        }
                       </li>
                     }
                   </ul>

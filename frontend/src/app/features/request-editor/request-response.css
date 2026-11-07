@@ -247,3 +247,8 @@
   font-size: var(--text-sm);
   color: var(--color-text-strong);
 }
+
+.script-environment-target {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
