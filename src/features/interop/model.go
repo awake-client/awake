@@ -36,6 +36,17 @@ type Collection struct {
 	Authentication *domain.Authentication
 	Requests       []Request
 	Folders        []Folder
+	Environments   []Environment
+}
+
+// Environment is a set of variables shipped with a collection, imported as
+// an environment of that collection.
+type Environment struct {
+	Name      string
+	Variables map[string]string
+	// SecretVariables are declared without a value: the source keeps secret
+	// values out of its files.
+	SecretVariables []string
 }
 
 // Folder groups requests inside a collection.
@@ -54,9 +65,10 @@ type Request struct {
 
 // ImportResult summarizes what an import wrote to the workspace.
 type ImportResult struct {
-	Collections int
-	Requests    int
-	Warnings    []string
+	Collections  int
+	Requests     int
+	Environments int
+	Warnings     []string
 }
 
 // ExportResult lists the files and directories an export wrote.

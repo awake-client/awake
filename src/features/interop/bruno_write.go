@@ -121,6 +121,14 @@ func requestFile(request domain.Request) string {
 	builder.WriteString("  auth: " + string(authType(request.Authentication)) + "\n")
 	builder.WriteString("}\n")
 
+	if len(request.PathParameters) > 0 {
+		builder.WriteString("\nparams:path {\n")
+		for _, parameter := range request.PathParameters {
+			builder.WriteString(brunoEntryLine(true, parameter.Name, parameter.Value))
+		}
+		builder.WriteString("}\n")
+	}
+
 	if len(request.Parameters) > 0 {
 		builder.WriteString("\nparams:query {\n")
 		for _, parameter := range request.Parameters {
@@ -139,9 +147,15 @@ func requestFile(request domain.Request) string {
 
 	if request.Body != nil && request.Body.Type != domain.BodyNone {
 		builder.WriteString("\nbody:" + string(request.Body.Type) + " {\n")
-		builder.WriteString(request.Body.Content)
-		if request.Body.Content != "" && !strings.HasSuffix(request.Body.Content, "\n") {
-			builder.WriteString("\n")
+		if request.Body.IsForm() {
+			for _, field := range request.Body.Fields {
+				builder.WriteString(brunoEntryLine(field.Enabled, field.Name, field.Value))
+			}
+		} else {
+			builder.WriteString(request.Body.Content)
+			if request.Body.Content != "" && !strings.HasSuffix(request.Body.Content, "\n") {
+				builder.WriteString("\n")
+			}
 		}
 		builder.WriteString("}\n")
 	}

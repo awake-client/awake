@@ -2,10 +2,12 @@ package app
 
 import (
 	"errors"
+	"os"
 	"strings"
 
 	"github.com/clementherve/awake/src/domain"
 	"github.com/clementherve/awake/src/features/collections"
+	"github.com/clementherve/awake/src/features/environments"
 	"github.com/clementherve/awake/src/features/interop"
 )
 
@@ -15,6 +17,21 @@ type interopAdapter struct{}
 
 func (interopAdapter) CreateCollection(workspaceRoot string, relativePath string, collection domain.Collection) error {
 	return collections.NewRepository(workspaceRoot).CreateCollection(relativePath, collection)
+}
+
+func (interopAdapter) CreateEnvironment(workspaceRoot string, scope string, fileName string, environment interop.Environment) error {
+	repository, err := environments.NewScopedRepository(workspaceRoot, scope)
+	if err != nil {
+		return err
+	}
+	if _, err := os.Stat(repository.SharedPath(fileName)); err == nil {
+		return os.ErrExist
+	}
+	return repository.Save(fileName, environments.Environment{
+		Name:            environment.Name,
+		Variables:       environment.Variables,
+		SecretVariables: environment.SecretVariables,
+	})
 }
 
 func (interopAdapter) CreateRequest(workspaceRoot string, relativePath string, request domain.Request) error {

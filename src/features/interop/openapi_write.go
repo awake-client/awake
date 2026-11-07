@@ -160,7 +160,11 @@ func openAPIPath(rawURL string) (string, []string) {
 		pathValue = "/"
 	}
 
-	parameters := []string{}
+	parameters := domain.PathParameterNames(pathValue)
+	pathValue, _ = domain.ReplacePathParameters(pathValue, func(name string) (string, error) {
+		return "{" + name + "}", nil
+	})
+
 	for {
 		start := strings.Index(pathValue, "{{")
 		if start < 0 {
@@ -215,7 +219,19 @@ func openAPIRequestBody(body *domain.Body) map[string]any {
 	}
 
 	media := map[string]any{}
-	if body.Content != "" {
+	if body.IsForm() && len(body.Fields) > 0 {
+		example := map[string]any{}
+		properties := map[string]any{}
+		for _, field := range body.Fields {
+			if !field.Enabled {
+				continue
+			}
+			example[field.Name] = field.Value
+			properties[field.Name] = map[string]any{"type": "string"}
+		}
+		media["schema"] = map[string]any{"type": "object", "properties": properties}
+		media["example"] = example
+	} else if body.Content != "" {
 		switch body.Type {
 		case domain.BodyJSON:
 			media["example"] = jsonExample(body.Content)

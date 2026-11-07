@@ -16,6 +16,9 @@ import (
 type Writer interface {
 	CreateCollection(workspaceRoot string, relativePath string, collection domain.Collection) error
 	CreateRequest(workspaceRoot string, relativePath string, request domain.Request) error
+	// CreateEnvironment writes an environment of a collection, scope being
+	// the collection path. It returns os.ErrExist rather than replace one.
+	CreateEnvironment(workspaceRoot string, scope string, fileName string, environment Environment) error
 }
 
 // CollectionSnapshot is a collection read from a workspace for export.
@@ -85,6 +88,13 @@ func (service *Service) Import(workspaceRoot string, sourcePath string, format F
 		}
 
 		result.Requests += requests
+		result.Warnings = append(result.Warnings, warnings...)
+
+		environments, warnings, err := service.writeEnvironments(workspaceRoot, collectionPath, collection.Environments)
+		if err != nil {
+			return result, err
+		}
+		result.Environments += environments
 		result.Warnings = append(result.Warnings, warnings...)
 	}
 
@@ -169,6 +179,61 @@ func readCollections(sourcePath string, format Format) ([]Collection, error) {
 	default:
 		return nil, ErrUnsupportedFormat
 	}
+}
+
+// writeEnvironments writes the environments of an imported collection. A
+// variable whose name Awake cannot use is skipped with a warning, and an
+// existing environment is kept.
+func (service *Service) writeEnvironments(workspaceRoot string, collectionPath string, environments []Environment) (int, []string, error) {
+	written := 0
+	warnings := make([]string, 0)
+	used := map[string]int{}
+
+	for _, environment := range environments {
+		fileName := uniqueName(used, slugify(environment.Name), "environment")
+		cleaned := Environment{Name: environment.Name, Variables: map[string]string{}}
+		for name, value := range environment.Variables {
+			if !isVariableName(name) {
+				warnings = append(warnings, fmt.Sprintf("environment %s: variable %q skipped, its name is not a valid identifier", environment.Name, name))
+				continue
+			}
+			cleaned.Variables[name] = value
+		}
+		for _, name := range environment.SecretVariables {
+			if !isVariableName(name) {
+				warnings = append(warnings, fmt.Sprintf("environment %s: secret %q skipped, its name is not a valid identifier", environment.Name, name))
+				continue
+			}
+			cleaned.SecretVariables = append(cleaned.SecretVariables, name)
+		}
+		if len(cleaned.SecretVariables) > 0 {
+			warnings = append(warnings, fmt.Sprintf("environment %s: secret values are not part of the export, store them in the keychain: %s", environment.Name, strings.Join(cleaned.SecretVariables, ", ")))
+		}
+
+		err := service.writer.CreateEnvironment(workspaceRoot, collectionPath, fileName, cleaned)
+		if errors.Is(err, os.ErrExist) {
+			warnings = append(warnings, fmt.Sprintf("environment %s: %s/environments/%s.yaml already exists and was kept", environment.Name, collectionPath, fileName))
+			continue
+		}
+		if err != nil {
+			return written, warnings, fmt.Errorf("create environment %s: %w", environment.Name, err)
+		}
+		written += 1
+	}
+	return written, warnings, nil
+}
+
+// isVariableName mirrors the variable names environments accept.
+func isVariableName(name string) bool {
+	for index, character := range name {
+		switch {
+		case character == '_', character >= 'a' && character <= 'z', character >= 'A' && character <= 'Z':
+		case index > 0 && character >= '0' && character <= '9':
+		default:
+			return false
+		}
+	}
+	return name != ""
 }
 
 func (service *Service) writeRequests(

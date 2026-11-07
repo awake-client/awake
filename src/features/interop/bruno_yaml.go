@@ -3,7 +3,6 @@ package interop
 import (
 	"errors"
 	"fmt"
-	"net/url"
 	"os"
 	"path/filepath"
 	"sort"
@@ -365,7 +364,10 @@ func parseBrunoYAMLRequest(content []byte, fallbackName string) (domain.Request,
 	}
 
 	for _, parameter := range document.HTTP.Params {
-		// Path parameters are already part of the URL.
+		if strings.EqualFold(parameter.Type, "path") {
+			request.PathParameters = append(request.PathParameters, domain.PathParameter{Name: parameter.Name, Value: parameter.Value})
+			continue
+		}
 		if !strings.EqualFold(parameter.Type, "query") && parameter.Type != "" {
 			continue
 		}
@@ -397,7 +399,7 @@ func brunoYAMLBodyValue(body *brunoYAMLBody) *domain.Body {
 	bodyType := brunoBodyType(body.Type)
 	switch bodyType {
 	case domain.BodyFormURLEncoded, domain.BodyMultipart:
-		return &domain.Body{Type: bodyType, Content: brunoYAMLFormContent(&body.Data)}
+		return &domain.Body{Type: bodyType, Fields: brunoYAMLFormFields(&body.Data)}
 	case domain.BodyBinary:
 		return &domain.Body{Type: bodyType, Content: brunoYAMLNodeString(&body.Data)}
 	default:
@@ -405,20 +407,20 @@ func brunoYAMLBodyValue(body *brunoYAMLBody) *domain.Body {
 	}
 }
 
-func brunoYAMLFormContent(node *yaml.Node) string {
+func brunoYAMLFormFields(node *yaml.Node) []domain.Parameter {
 	var fields []brunoYAMLFormField
 	if err := node.Decode(&fields); err != nil {
-		return ""
+		return nil
 	}
 
-	parts := make([]string, 0, len(fields))
+	result := make([]domain.Parameter, 0, len(fields))
 	for _, field := range fields {
-		if field.Disabled || field.Name == "" {
+		if field.Name == "" {
 			continue
 		}
-		parts = append(parts, url.QueryEscape(field.Name)+"="+url.QueryEscape(brunoYAMLNodeString(&field.Value)))
+		result = append(result, domain.Parameter{Name: field.Name, Value: brunoYAMLNodeString(&field.Value), Enabled: !field.Disabled})
 	}
-	return strings.Join(parts, "&")
+	return result
 }
 
 func brunoYAMLNodeString(node *yaml.Node) string {

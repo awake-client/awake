@@ -1,6 +1,7 @@
 package interop
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -15,6 +16,12 @@ const (
 	brunoExtension          = ".bru"
 	brunoCollectionFileName = "collection.bru"
 	brunoFolderFileName     = "folder.bru"
+	// brunoManifestFileName marks every Bruno collection; collection.bru is
+	// optional.
+	brunoManifestFileName = "bruno.json"
+	// brunoEnvironmentDirectory holds the environments of a collection, at
+	// its root; its files are variables, not requests.
+	brunoEnvironmentDirectory = "environments"
 )
 
 var brunoMethodBlocks = map[string]string{
@@ -114,19 +121,56 @@ func brunoCollectionRoots(root string) ([]string, error) {
 
 func isBrunoCollectionRoot(directory string) bool {
 	return fileExists(filepath.Join(directory, brunoCollectionFileName)) ||
-		fileExists(filepath.Join(directory, brunoYAMLCollectionFileName)) ||
+		fileExists(filepath.Join(directory, brunoManifestFileName)) ||
+		isBrunoYAMLCollectionRoot(directory)
+}
+
+func isBrunoYAMLCollectionRoot(directory string) bool {
+	return fileExists(filepath.Join(directory, brunoYAMLCollectionFileName)) ||
 		fileExists(filepath.Join(directory, "opencollection.yaml"))
 }
 
+// brunoManifest is the part of bruno.json the import uses.
+type brunoManifest struct {
+	Name   string   `json:"name"`
+	Ignore []string `json:"ignore"`
+}
+
+func readBrunoManifest(root string) (brunoManifest, error) {
+	content, err := os.ReadFile(filepath.Join(root, brunoManifestFileName))
+	if errors.Is(err, os.ErrNotExist) {
+		return brunoManifest{}, nil
+	}
+	if err != nil {
+		return brunoManifest{}, fmt.Errorf("read %s: %w", brunoManifestFileName, err)
+	}
+	var manifest brunoManifest
+	if err := json.Unmarshal(content, &manifest); err != nil {
+		return brunoManifest{}, fmt.Errorf("read %s: %w", brunoManifestFileName, err)
+	}
+	return manifest, nil
+}
+
 func readBrunoCollection(root string) (Collection, error) {
-	if !fileExists(filepath.Join(root, brunoCollectionFileName)) &&
-		isBrunoCollectionRoot(root) {
+	if !fileExists(filepath.Join(root, brunoCollectionFileName)) && isBrunoYAMLCollectionRoot(root) {
 		return readBrunoYAMLCollection(root)
+	}
+
+	manifest, err := readBrunoManifest(root)
+	if err != nil {
+		return Collection{}, err
+	}
+	ignored := map[string]bool{".git": true}
+	for _, name := range manifest.Ignore {
+		ignored[name] = true
 	}
 
 	collection := Collection{
 		Name:      filepath.Base(root),
 		Variables: map[string]string{},
+	}
+	if strings.TrimSpace(manifest.Name) != "" {
+		collection.Name = manifest.Name
 	}
 
 	configurationPath := filepath.Join(root, brunoCollectionFileName)
@@ -148,11 +192,22 @@ func readBrunoCollection(root string) (Collection, error) {
 		folders: map[string]*brunoFolderBuilder{},
 	}
 
-	err := filepath.WalkDir(root, func(filePath string, entry os.DirEntry, walkError error) error {
+	err = filepath.WalkDir(root, func(filePath string, entry os.DirEntry, walkError error) error {
 		if walkError != nil {
 			return walkError
 		}
+		if entry.IsDir() && filePath != root && ignored[entry.Name()] {
+			return filepath.SkipDir
+		}
 		if entry.IsDir() {
+			if filepath.Dir(filePath) == filepath.Clean(root) && entry.Name() == brunoEnvironmentDirectory {
+				environments, err := readBrunoEnvironments(filePath)
+				if err != nil {
+					return err
+				}
+				collection.Environments = environments
+				return filepath.SkipDir
+			}
 			return nil
 		}
 		if !strings.HasSuffix(strings.ToLower(entry.Name()), brunoExtension) {
@@ -194,6 +249,74 @@ func readBrunoCollection(root string) (Collection, error) {
 	}
 
 	return collection, nil
+}
+
+// readBrunoEnvironments parses the .bru files of a collection's environments
+// directory, sorted by name.
+func readBrunoEnvironments(directory string) ([]Environment, error) {
+	entries, err := os.ReadDir(directory)
+	if err != nil {
+		return nil, fmt.Errorf("read bruno environments: %w", err)
+	}
+
+	environments := make([]Environment, 0, len(entries))
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(strings.ToLower(entry.Name()), brunoExtension) {
+			continue
+		}
+		content, err := os.ReadFile(filepath.Join(directory, entry.Name()))
+		if err != nil {
+			return nil, fmt.Errorf("read bruno environment %s: %w", entry.Name(), err)
+		}
+		name := strings.TrimSuffix(entry.Name(), filepath.Ext(entry.Name()))
+		environments = append(environments, parseBrunoEnvironment(string(content), name))
+	}
+	return environments, nil
+}
+
+// parseBrunoEnvironment reads a vars block and a vars:secret list. Disabled
+// variables are skipped, as Bruno does not apply them.
+func parseBrunoEnvironment(content string, name string) Environment {
+	environment := Environment{Name: name, Variables: map[string]string{}}
+
+	for _, block := range parseBrunoBlocks(content) {
+		if block.Name != "vars" {
+			continue
+		}
+		for _, entry := range brunoKeyValues(block.Lines) {
+			if !entry.disabled {
+				environment.Variables[entry.key] = entry.value
+			}
+		}
+	}
+
+	for _, secretName := range brunoList(content, "vars:secret") {
+		delete(environment.Variables, secretName)
+		environment.SecretVariables = append(environment.SecretVariables, secretName)
+	}
+	return environment
+}
+
+// brunoList reads a bracketed list such as vars:secret [ token, password ].
+func brunoList(content string, name string) []string {
+	lines := strings.Split(content, "\n")
+	values := make([]string, 0)
+	for index := 0; index < len(lines); index += 1 {
+		if strings.TrimSpace(lines[index]) != name+" [" {
+			continue
+		}
+		for index += 1; index < len(lines); index += 1 {
+			item := strings.TrimSpace(lines[index])
+			if item == "]" {
+				break
+			}
+			item = strings.TrimSpace(strings.TrimSuffix(item, ","))
+			if item != "" && !strings.HasPrefix(item, "~") {
+				values = append(values, unquote(item))
+			}
+		}
+	}
+	return values
 }
 
 func (builder *brunoFolderBuilder) add(relativeDirectory string, request Request) {
@@ -254,6 +377,10 @@ func parseBrunoRequest(content string, fallbackName string) (domain.Request, err
 		case brunoMethodBlocks[block.Name] != "":
 			request.Method = brunoMethodBlocks[block.Name]
 			request.URL = keyValue(block.Lines, "url")
+		case block.Name == "params:path":
+			for _, entry := range brunoKeyValues(block.Lines) {
+				request.PathParameters = append(request.PathParameters, domain.PathParameter{Name: entry.key, Value: entry.value})
+			}
 		case block.Name == "params:query":
 			for _, entry := range brunoKeyValues(block.Lines) {
 				request.Parameters = append(request.Parameters, domain.Parameter{
@@ -298,9 +425,13 @@ func parseBrunoRequest(content string, fallbackName string) (domain.Request, err
 			request.Documentation = strings.TrimSpace(strings.Join(block.Lines, "\n"))
 		case strings.HasPrefix(block.Name, "body:"):
 			bodyType := brunoBodyType(strings.TrimPrefix(block.Name, "body:"))
-			request.Body = &domain.Body{
-				Type:    bodyType,
-				Content: strings.TrimRight(strings.Join(block.Lines, "\n"), "\n"),
+			request.Body = &domain.Body{Type: bodyType}
+			if request.Body.IsForm() {
+				for _, entry := range brunoKeyValues(block.Lines) {
+					request.Body.Fields = append(request.Body.Fields, domain.Parameter{Name: entry.key, Value: entry.value, Enabled: !entry.disabled})
+				}
+			} else {
+				request.Body.Content = strings.TrimRight(strings.Join(block.Lines, "\n"), "\n")
 			}
 		}
 	}

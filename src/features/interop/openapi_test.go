@@ -70,8 +70,11 @@ paths:
 	if getRequest.Name != "Get user" || getRequest.Request.Method != domain.MethodGet {
 		t.Errorf("unexpected get request: %+v", getRequest)
 	}
-	if getRequest.Request.URL != "{{baseUrl}}/users/{{id}}" {
+	if getRequest.Request.URL != "{{baseUrl}}/users/:id" {
 		t.Errorf("unexpected url %q", getRequest.Request.URL)
+	}
+	if len(getRequest.Request.PathParameters) != 1 || getRequest.Request.PathParameters[0].Name != "id" {
+		t.Errorf("expected the id path parameter, got %+v", getRequest.Request.PathParameters)
 	}
 	if len(getRequest.Request.Parameters) != 1 || getRequest.Request.Parameters[0].Value != "profile" {
 		t.Errorf("unexpected query parameters: %+v", getRequest.Request.Parameters)

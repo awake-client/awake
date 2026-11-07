@@ -2,6 +2,7 @@ package interop
 
 import (
 	"fmt"
+	"regexp"
 	"sort"
 	"strings"
 
@@ -133,6 +134,8 @@ func openAPIRequest(method string, requestPath string, pathItem map[string]any, 
 
 			value := parameterValue(parameter)
 			switch stringValue(parameter["in"]) {
+			case "path":
+				request.PathParameters = append(request.PathParameters, domain.PathParameter{Name: parameterName, Value: value})
 			case "query":
 				request.Parameters = append(request.Parameters, domain.Parameter{
 					Name:    parameterName,
@@ -154,9 +157,13 @@ func openAPIRequest(method string, requestPath string, pathItem map[string]any, 
 	return Request{Name: name, Request: request}
 }
 
+// pathTemplate turns the {name} segments of an OpenAPI path into the :name
+// segments Awake fills from its path parameters.
 func pathTemplate(requestPath string) string {
-	return strings.NewReplacer("{", "{{", "}", "}}").Replace(requestPath)
+	return openAPIPathParameter.ReplaceAllString(requestPath, ":$1")
 }
+
+var openAPIPathParameter = regexp.MustCompile(`\{([A-Za-z_][A-Za-z0-9_]*)\}`)
 
 func documentText(operation map[string]any) string {
 	description := stringValue(operation["description"])
@@ -191,9 +198,50 @@ func openAPIBody(rawBody any) *domain.Body {
 		}
 	}
 
-	return &domain.Body{
-		Type:    bodyType,
-		Content: encodeValue(example),
+	body := &domain.Body{Type: bodyType}
+	if body.IsForm() {
+		body.Fields = formFields(example, mapValue(media["schema"]))
+		return body
+	}
+	body.Content = encodeValue(example)
+	return body
+}
+
+// formFields turns an example object into form fields, or lists the
+// properties of the schema with empty values when there is no example.
+func formFields(example any, schema map[string]any) []domain.Parameter {
+	values := mapValue(example)
+	names := make([]string, 0)
+	if values != nil {
+		for name := range values {
+			names = append(names, name)
+		}
+	} else {
+		for name := range mapValue(schema["properties"]) {
+			names = append(names, name)
+		}
+	}
+	sort.Strings(names)
+
+	fields := make([]domain.Parameter, 0, len(names))
+	for _, name := range names {
+		value := ""
+		if values != nil {
+			value = scalarString(values[name])
+		}
+		fields = append(fields, domain.Parameter{Name: name, Value: value, Enabled: true})
+	}
+	return fields
+}
+
+func scalarString(value any) string {
+	switch typed := value.(type) {
+	case nil:
+		return ""
+	case string:
+		return typed
+	default:
+		return encodeValue(typed)
 	}
 }
 

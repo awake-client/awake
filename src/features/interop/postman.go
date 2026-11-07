@@ -3,7 +3,6 @@ package interop
 import (
 	"encoding/json"
 	"fmt"
-	"net/url"
 	"strings"
 
 	"github.com/clementherve/awake/src/domain"
@@ -55,6 +54,8 @@ type postmanURL struct {
 	Host     flexibleStringList  `json:"host"`
 	Path     flexibleStringList  `json:"path"`
 	Query    []postmanQueryEntry `json:"query"`
+	// Variable gives the values of the :name segments of the path.
+	Variable []postmanVariable `json:"variable"`
 }
 
 type postmanQueryEntry struct {
@@ -243,6 +244,12 @@ func convertPostmanRequest(name string, request postmanRequest) Request {
 		})
 	}
 
+	for _, variable := range request.URL.Variable {
+		if variable.Key != "" {
+			converted.PathParameters = append(converted.PathParameters, domain.PathParameter{Name: variable.Key, Value: variable.Value})
+		}
+	}
+
 	for _, query := range request.URL.Query {
 		if query.Key == "" {
 			continue
@@ -339,13 +346,13 @@ func postmanBodyValue(body *postmanBody) *domain.Body {
 		return &domain.Body{Type: bodyType, Content: body.Raw}
 	case "urlencoded":
 		return &domain.Body{
-			Type:    domain.BodyFormURLEncoded,
-			Content: encodePostmanForm(body.URLEncoded),
+			Type:   domain.BodyFormURLEncoded,
+			Fields: postmanFormFields(body.URLEncoded),
 		}
 	case "formdata":
 		return &domain.Body{
-			Type:    domain.BodyMultipart,
-			Content: encodePostmanForm(body.FormData),
+			Type:   domain.BodyMultipart,
+			Fields: postmanFormFields(body.FormData),
 		}
 	case "file":
 		if body.File != nil {
@@ -357,13 +364,13 @@ func postmanBodyValue(body *postmanBody) *domain.Body {
 	}
 }
 
-func encodePostmanForm(entries []postmanFormEntry) string {
-	parts := make([]string, 0, len(entries))
+func postmanFormFields(entries []postmanFormEntry) []domain.Parameter {
+	fields := make([]domain.Parameter, 0, len(entries))
 	for _, entry := range entries {
-		if entry.Disabled || entry.Key == "" {
+		if entry.Key == "" {
 			continue
 		}
-		parts = append(parts, url.QueryEscape(entry.Key)+"="+url.QueryEscape(entry.Value))
+		fields = append(fields, domain.Parameter{Name: entry.Key, Value: entry.Value, Enabled: !entry.Disabled})
 	}
-	return strings.Join(parts, "&")
+	return fields
 }

@@ -2,8 +2,6 @@ package interop
 
 import (
 	"encoding/json"
-	"net/url"
-	"strings"
 
 	"github.com/clementherve/awake/src/domain"
 )
@@ -129,10 +127,18 @@ func postmanURLValueFromRequest(request domain.Request) map[string]any {
 		})
 	}
 
-	return map[string]any{
+	result := map[string]any{
 		"raw":   request.URL,
 		"query": query,
 	}
+	if len(request.PathParameters) > 0 {
+		variables := make([]any, 0, len(request.PathParameters))
+		for _, parameter := range request.PathParameters {
+			variables = append(variables, map[string]any{"key": parameter.Name, "value": parameter.Value})
+		}
+		result["variable"] = variables
+	}
+	return result
 }
 
 func postmanBodyFromRequest(body *domain.Body) map[string]any {
@@ -160,12 +166,12 @@ func postmanBodyFromRequest(body *domain.Body) map[string]any {
 	case domain.BodyFormURLEncoded:
 		return map[string]any{
 			"mode":       "urlencoded",
-			"urlencoded": postmanFormEntries(body.Content),
+			"urlencoded": postmanFormEntries(body.Fields),
 		}
 	case domain.BodyMultipart:
 		return map[string]any{
 			"mode":     "formdata",
-			"formdata": postmanFormEntries(body.Content),
+			"formdata": postmanFormEntries(body.Fields),
 		}
 	case domain.BodyBinary:
 		return map[string]any{
@@ -177,28 +183,18 @@ func postmanBodyFromRequest(body *domain.Body) map[string]any {
 	}
 }
 
-func postmanFormEntries(content string) []any {
-	values := url.Values{}
-	if parsed, err := url.ParseQuery(content); err == nil {
-		values = parsed
-	} else {
-		for _, line := range strings.Split(content, "\n") {
-			key, value, found := strings.Cut(line, "=")
-			if found {
-				values.Add(strings.TrimSpace(key), strings.TrimSpace(value))
-			}
+func postmanFormEntries(fields []domain.Parameter) []any {
+	entries := make([]any, 0, len(fields))
+	for _, field := range fields {
+		entry := map[string]any{
+			"key":   field.Name,
+			"value": field.Value,
+			"type":  "text",
 		}
-	}
-
-	entries := make([]any, 0)
-	for key, list := range values {
-		for _, value := range list {
-			entries = append(entries, map[string]any{
-				"key":   key,
-				"value": value,
-				"type":  "text",
-			})
+		if !field.Enabled {
+			entry["disabled"] = true
 		}
+		entries = append(entries, entry)
 	}
 	return entries
 }

@@ -140,8 +140,9 @@ export class InteropPanel {
     try {
       const result = await InteropService.Import(workspaceRoot, sourcePath, this.importFormat());
 
+      const environments = result.Environments ? ` and ${result.Environments} environment(s)` : '';
       this.importMessage.set(
-        `Imported ${result.Requests} request(s) into ${result.Collections} collection(s).`,
+        `Imported ${result.Requests} request(s)${environments} into ${result.Collections} collection(s).`,
       );
       this.importWarnings.set(result.Warnings ?? []);
       this.importPath.set('');

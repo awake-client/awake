@@ -40,5 +40,6 @@ export enum Format {
 export interface ImportResult {
     "Collections": number;
     "Requests": number;
+    "Environments": number;
     "Warnings": string[] | null;
 }
