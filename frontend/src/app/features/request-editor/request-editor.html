@@ -721,18 +721,61 @@
         }
         @if (responseTab() === 'body') {
           <div class="response-body-container">
-            @if (current.Encoding === 'base64') {
+            @if (isImageResponse()) {
+              <div class="response-image">
+                @if (imageUrl(); as source) {
+                  <img [src]="source" alt="Response image" />
+                } @else if (isLoadingImage()) {
+                  <p class="empty-panel">Loading image…</p>
+                } @else if (imageError(); as message) {
+                  <p class="empty-panel">{{ message }}</p>
+                }
+              </div>
+            } @else if (current.Encoding === 'base64') {
               <p class="empty-panel">Binary response ({{ formatSize(current.Size) }}).</p>
             } @else {
-              <app-code-editor
-                class="response-body"
-                [value]="formattedResponseBody()"
-                [lang]="responseLanguage()"
-                [readOnly]="true"
-              />
+              @if (isHtmlResponse()) {
+                <div class="response-view-toggle" role="tablist" aria-label="HTML view">
+                  <button
+                    type="button"
+                    role="tab"
+                    [class.active]="!htmlPreview()"
+                    [attr.aria-selected]="!htmlPreview()"
+                    (click)="htmlPreview.set(false)"
+                  >
+                    Source
+                  </button>
+                  <button
+                    type="button"
+                    role="tab"
+                    [class.active]="htmlPreview()"
+                    [attr.aria-selected]="htmlPreview()"
+                    (click)="htmlPreview.set(true)"
+                  >
+                    Preview
+                  </button>
+                </div>
+              }
+
+              @if (isHtmlResponse() && htmlPreview()) {
+                <iframe
+                  class="response-preview"
+                  title="HTML preview"
+                  sandbox=""
+                  referrerpolicy="no-referrer"
+                  [srcdoc]="responseBody()"
+                ></iframe>
+              } @else {
+                <app-code-editor
+                  class="response-body"
+                  [value]="formattedResponseBody()"
+                  [lang]="responseLanguage()"
+                  [readOnly]="true"
+                />
+              }
             }
 
-            @if (responseHasMore()) {
+            @if (responseHasMore() && !isImageResponse()) {
               <button
                 type="button"
                 class="add-button"

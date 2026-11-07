@@ -65,6 +65,9 @@ type EditorTab =
 
 const HTTP_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'] as const;
 
+/** Largest image the response panel decodes, so a huge payload stays in check. */
+const MAX_IMAGE_BYTES = 16 << 20;
+
 /** Reason phrases for the statuses shown from the history. */
 const STATUS_TEXTS: Record<number, string> = {
   200: 'OK',
@@ -295,6 +298,21 @@ export class RequestEditor {
   protected readonly isSending = signal(false);
   protected readonly isLoadingChunk = signal(false);
 
+  /** Images get a picture instead of the "binary response" note. */
+  protected readonly isImageResponse = computed(() =>
+    isImageContentType(this.response()?.ContentType ?? ''),
+  );
+  protected readonly isHtmlResponse = computed(() =>
+    isHtmlContentType(this.response()?.ContentType ?? ''),
+  );
+  /** HTML responses can also be rendered, not just shown as source. */
+  protected readonly htmlPreview = signal(false);
+  protected readonly imageUrl = signal<string | null>(null);
+  protected readonly isLoadingImage = signal(false);
+  protected readonly imageError = signal<string | null>(null);
+  private imageObjectUrl: string | null = null;
+  private imageLoadToken = 0;
+
   private readonly snapshot = signal('');
   private readonly overrideSnapshot = signal('');
   private responseNextOffset = 0;
@@ -504,6 +522,7 @@ export class RequestEditor {
   ngOnDestroy(): void {
     void this.streamPanel()?.release();
     this.stashCurrent();
+    this.releaseImage();
   }
 
   /** Turns the handle position into the share of the editor the response takes. */
@@ -603,6 +622,7 @@ export class RequestEditor {
       this.response.set(response);
       this.responseTab.set('body');
       this.responseHasMore.set(false);
+      this.htmlPreview.set(false);
 
       if (response.Encoding === 'utf-8') {
         this.responseBody.set(response.Preview);
@@ -612,11 +632,109 @@ export class RequestEditor {
         this.responseBody.set('');
         this.responseNextOffset = 0;
       }
+
+      void this.loadImage(response);
     } catch (error) {
       this.responseError.set(describeError(error));
     } finally {
       this.isSending.set(false);
     }
+  }
+
+  /**
+   * Builds a blob URL for an image response. The preview covers small images;
+   * larger ones are read from the stored body one chunk at a time.
+   */
+  private async loadImage(response: HTTPResponse | null): Promise<void> {
+    this.releaseImage();
+    if (!response || !isImageContentType(response.ContentType)) {
+      return;
+    }
+
+    if (response.Size === 0) {
+      this.imageError.set('The response has no image data.');
+      return;
+    }
+    if (response.Size > MAX_IMAGE_BYTES) {
+      this.imageError.set(`Image too large to preview (${this.formatSize(response.Size)}).`);
+      return;
+    }
+
+    const token = ++this.imageLoadToken;
+    this.isLoadingImage.set(true);
+
+    try {
+      const bytes = await this.imageBytes(response, token);
+      if (token !== this.imageLoadToken) {
+        return;
+      }
+      const type = mediaTypeOf(response.ContentType) || 'application/octet-stream';
+      const url = URL.createObjectURL(new Blob([bytes.buffer as ArrayBuffer], { type }));
+      this.imageObjectUrl = url;
+      this.imageUrl.set(url);
+    } catch (error) {
+      if (token === this.imageLoadToken) {
+        this.imageError.set(describeError(error));
+      }
+    } finally {
+      if (token === this.imageLoadToken) {
+        this.isLoadingImage.set(false);
+      }
+    }
+  }
+
+  private async imageBytes(response: HTTPResponse, token: number): Promise<Uint8Array> {
+    if (response.Encoding === 'utf-8') {
+      // SVG arrives as text; read the rest of the body when it was truncated.
+      let text = this.responseBody();
+      let offset = new TextEncoder().encode(text).length;
+      while (response.ID && offset < response.Size) {
+        const chunk = await HTTPClientService.ReadChunk(response.ID, offset, 1 << 20);
+        if (token !== this.imageLoadToken) {
+          throw new Error('Image preview replaced.');
+        }
+        text += decodeChunk(chunk);
+        if (!chunk.HasMore) {
+          break;
+        }
+        offset = chunk.NextOffset;
+      }
+      return new TextEncoder().encode(text);
+    }
+
+    const preview = base64Bytes(response.Preview);
+    if (preview.length >= response.Size) {
+      return preview;
+    }
+    if (!response.ID) {
+      throw new Error('This image is truncated in the history.');
+    }
+
+    const parts = [preview];
+    let offset = preview.length;
+    while (offset < response.Size) {
+      const chunk = await HTTPClientService.ReadChunk(response.ID, offset, 1 << 20);
+      if (token !== this.imageLoadToken) {
+        throw new Error('Image preview replaced.');
+      }
+      parts.push(base64Bytes(chunk.Content));
+      if (!chunk.HasMore) {
+        break;
+      }
+      offset = chunk.NextOffset;
+    }
+    return concatBytes(parts);
+  }
+
+  private releaseImage(): void {
+    this.imageLoadToken += 1;
+    if (this.imageObjectUrl) {
+      URL.revokeObjectURL(this.imageObjectUrl);
+      this.imageObjectUrl = null;
+    }
+    this.imageUrl.set(null);
+    this.imageError.set(null);
+    this.isLoadingImage.set(false);
   }
 
   protected async loadMore(): Promise<void> {
@@ -798,6 +916,8 @@ export class RequestEditor {
       });
       this.responseBody.set(exchange.ResponseEncoding === 'base64' ? '' : exchange.ResponseBody);
       this.responseHasMore.set(false);
+      this.htmlPreview.set(false);
+      void this.loadImage(this.response());
       this.lastRunAt.set(entry.ExecutedAt);
     } catch {
       // Without history, the editor simply opens without a response.
@@ -1068,6 +1188,7 @@ export class RequestEditor {
     this.tabsStore.stash(path, state);
     // The store owns the response handle from now on.
     this.response.set(null);
+    this.releaseImage();
   }
 
   private restore(state: StashedEditorState): void {
@@ -1083,6 +1204,8 @@ export class RequestEditor {
     this.responseError.set((state['responseError'] as string | null) ?? null);
     this.activeTab.set((state['activeTab'] as EditorTab) ?? 'parameters');
     this.lastRunAt.set((state['lastRunAt'] as string | null) ?? null);
+    this.htmlPreview.set(false);
+    void this.loadImage(this.response());
   }
 
   private async load(path: string): Promise<void> {
@@ -1199,6 +1322,7 @@ export class RequestEditor {
   }
   private async closeResponse(): Promise<void> {
     const response = this.response();
+    this.releaseImage();
     this.response.set(null);
     this.responseBody.set('');
     this.responseHasMore.set(false);
@@ -1224,6 +1348,40 @@ function decodeChunk(chunk: Chunk): string {
   const binary = atob(chunk.Content);
   const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
   return new TextDecoder().decode(bytes);
+}
+
+/** "image/png; charset=binary" becomes "image/png". */
+function mediaTypeOf(contentType: string): string {
+  return contentType.split(';', 1)[0].trim().toLowerCase();
+}
+
+function isImageContentType(contentType: string): boolean {
+  return mediaTypeOf(contentType).startsWith('image/');
+}
+
+function isHtmlContentType(contentType: string): boolean {
+  const mediaType = mediaTypeOf(contentType);
+  return mediaType === 'text/html' || mediaType === 'application/xhtml+xml';
+}
+
+function base64Bytes(value: string): Uint8Array {
+  const binary = atob(value);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+  return bytes;
+}
+
+function concatBytes(parts: Uint8Array[]): Uint8Array {
+  const total = parts.reduce((size, part) => size + part.length, 0);
+  const result = new Uint8Array(total);
+  let offset = 0;
+  for (const part of parts) {
+    result.set(part, offset);
+    offset += part.length;
+  }
+  return result;
 }
 
 function defaultAuthentication(): Authentication {

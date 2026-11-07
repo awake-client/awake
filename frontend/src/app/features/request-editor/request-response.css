@@ -111,6 +111,62 @@
   min-height: 0;
 }
 
+/* Image responses ------------------------------------------------------- */
+
+.response-image {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  align-items: center;
+  justify-content: center;
+  overflow: auto;
+}
+
+.response-image img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  border-radius: var(--radius-md);
+}
+
+/* HTML responses can be read as source or rendered as a page. */
+.response-view-toggle {
+  display: flex;
+  align-self: flex-end;
+  gap: 2px;
+  padding: 2px;
+  border-radius: var(--radius-md);
+  background: var(--color-active);
+}
+
+.response-view-toggle button {
+  height: 22px;
+  padding: 0 10px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.response-view-toggle button.active {
+  background: var(--color-field);
+  color: var(--color-text-strong);
+  box-shadow: var(--shadow-card);
+}
+
+/* Scripts and form submissions are blocked: the preview never runs page code. */
+.response-preview {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: #ffffff;
+}
+
 .response-body-container .add-button {
   align-self: flex-start;
   margin-top: 0;
