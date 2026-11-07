@@ -214,7 +214,10 @@ The `request` object exposes `method`, `url`, `headers`, `query` and `body`.
 Mutating it changes the outgoing request: setting a header or a query
 parameter adds it, deleting one removes it. The `response` object exposes
 `status`, `statusText`, `headers`, `body`, `encoding` and `duration`, and
-`response.json()` parses the body.
+`response.json()` parses the body. Repeated headers are joined with `, `, so
+read cookies from `response.cookies` (name to value) or
+`response.cookieHeader` (`a=1; b=2`, ready for a `Cookie` request header)
+rather than from `Set-Cookie`.
 
 The `awake` helper provides:
 
@@ -227,6 +230,14 @@ The `awake` helper provides:
 | `awake.environment.get(name)` | Reads a resolved variable |
 | `awake.environment.set(name, value)` | Saves a variable in the selected environment |
 | `awake.environment.unset(name)` | Removes a variable saved in the selected environment |
+| `awake.environments.get(name)` | Opens another environment by file or display name, with its own `get`, `set` and `unset` |
+
+`console.log`, `info`, `debug`, `warn` and `error` also write to the script
+logs.
+
+```js
+awake.environments.get("Production").set("cookies", response.cookieHeader);
+```
 
 `awake.setVariable` only applies to that execution. `awake.environment.set`
 also saves the value for later requests, in the most specific environment of
@@ -234,7 +245,10 @@ the selected name: the collection's one when it declares it, otherwise the
 global one. The value goes to the git ignored local overrides file, so tokens
 never reach the repository, or to the keychain when the name is a declared
 secret. Values that are not strings are stored as JSON. Without a selected
-environment, nothing is saved and the response reports it. A failing script does not abort the request; its error is
+environment, nothing is saved and the response reports it.
+`awake.environments.get(name)` follows the same rules for the environment it
+opens, looking in the request's collection and in the workspace; its changes
+are saved but do not affect the running request. A failing script does not abort the request; its error is
 reported with the response. Post-response scripts see the response preview
 (first 256 KiB), so assertions on a large body only cover that preview.
 
