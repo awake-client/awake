@@ -13,8 +13,9 @@ import (
 )
 
 // Version is the running application version. Release builds override it with
-// -ldflags "-X github.com/clementherve/awake/src/features/updates.Version=1.2.3".
-var Version = "0.1.0"
+// -ldflags "-X github.com/clementherve/awake/src/features/updates.Version=1.2.3";
+// development builds keep "dev" so they never look like a published release.
+var Version = "dev"
 
 const checkTimeout = 15 * time.Minute
 

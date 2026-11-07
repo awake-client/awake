@@ -1,4 +1,4 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import * as WorkspaceService from '@bindings/github.com/clementherve/awake/src/features/workspace/service';
@@ -11,6 +11,7 @@ import {
 import { chooseDirectory } from '@core/dialogs';
 import { RecentWorkspace, WorkspaceStore } from '@core/workspace-store';
 import { Icon } from '@shared/icon';
+import { formatVersion } from '@shared/version-label';
 
 @Component({
   selector: 'app-workspace-picker',
@@ -29,6 +30,7 @@ export class WorkspacePicker {
   protected readonly errorMessage = signal<string | null>(null);
   protected readonly isBusy = signal(false);
   protected readonly version = signal('');
+  protected readonly versionLabel = computed(() => formatVersion(this.version()));
   protected readonly updateError = signal<string | null>(null);
   /** Workspaces opened on this computer, most recent first. */
   protected readonly recent = this.workspaceStore.recent;

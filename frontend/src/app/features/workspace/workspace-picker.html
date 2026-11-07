@@ -131,7 +131,7 @@
   }
 
   <footer class="app-footer">
-    <span class="version">Awake {{ version() ? 'v' + version() : '' }}</span>
+    <span class="version">Awake {{ versionLabel() }}</span>
     <button type="button" class="link-button" (click)="checkForUpdates()">Check for updates</button>
     @if (updateError(); as message) {
       <span class="update-error" [title]="message">Update unavailable</span>

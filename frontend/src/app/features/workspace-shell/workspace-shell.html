@@ -60,7 +60,7 @@
           {{ gitSync.label() }}
         </a>
       } @else {
-        <span class="sidebar-version">v{{ version() || '0.1.0' }}</span>
+        <span class="sidebar-version">{{ versionLabel() }}</span>
       }
       <span class="footer-spacer"></span>
       @if (updateError(); as message) {
@@ -70,7 +70,7 @@
       <button
         type="button"
         class="icon-btn"
-        [title]="'Check for updates' + (version() ? ' (v' + version() + ')' : '')"
+        [title]="'Check for updates (' + versionLabel() + ')'"
         aria-label="Check for updates"
         (click)="checkForUpdates()"
       >

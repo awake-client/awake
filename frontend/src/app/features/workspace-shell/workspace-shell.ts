@@ -19,6 +19,7 @@ import { ConfirmationDialog } from '@shared/confirmation-dialog';
 import { Icon, IconName } from '@shared/icon';
 import { PromptDialog } from '@shared/prompt-dialog';
 import { ResizeHandle } from '@shared/resize-handle';
+import { formatVersion } from '@shared/version-label';
 import { collectionScopeOf, visibleEnvironments } from './environment-scope';
 import { EnvironmentChoice, EnvironmentPicker } from './environment-picker';
 import { RequestTabs } from './request-tabs';
@@ -94,6 +95,7 @@ export class WorkspaceShell {
   );
   protected readonly selectedEnvironment = this.environmentStore.selected;
   protected readonly version = signal('');
+  protected readonly versionLabel = computed(() => formatVersion(this.version()));
   protected readonly updateError = signal<string | null>(null);
   /** Color of the active environment, shown along the top of the work area. */
   protected readonly environmentColor = computed(
