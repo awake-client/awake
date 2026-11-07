@@ -21,9 +21,11 @@
   flex: 0 0 auto;
 }
 
-/* Leave room for the macOS traffic lights drawn over the inset title bar. */
+/* Leave room for the macOS traffic lights drawn over the inset title bar, and
+   nudge the content down so it centers with them. */
 :host-context(html[data-platform='darwin']) .titlebar {
   padding-left: 96px;
+  padding-top: 6px;
 }
 
 .titlebar a,
