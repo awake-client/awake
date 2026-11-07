@@ -12,13 +12,24 @@
 
 .response-toolbar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 14px;
-  padding: 0 12px 0 24px;
+  gap: 6px 14px;
+  padding: 6px 12px 6px 24px;
   border-bottom: 1px solid var(--color-border);
   background: color-mix(in srgb, var(--color-window) 45%, var(--color-background));
   flex: 0 0 auto;
   min-height: 38px;
+}
+
+/* On a narrow response pane the metadata wraps as a block instead of
+   breaking "200 OK" or "252 ms" across two lines. */
+.status-pill,
+.response-meta,
+.response-warning,
+.last-run {
+  flex: 0 0 auto;
+  white-space: nowrap;
 }
 
 .status-pill {
@@ -63,7 +74,9 @@
 
 .response-tabs {
   display: flex;
+  flex: 0 0 auto;
   gap: 2px;
+  margin-left: auto;
 }
 
 .response-tabs .tab {
@@ -80,6 +93,7 @@
 
 .response-close {
   display: inline-flex;
+  flex: 0 0 auto;
   align-items: center;
   justify-content: center;
   width: 26px;
