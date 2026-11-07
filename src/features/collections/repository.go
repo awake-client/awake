@@ -23,7 +23,10 @@ const (
 	// workspace ignores it in git.
 	privateDirectoryName = "local"
 	collectionFileName   = "collection.yaml"
-	fileExtension        = ".yaml"
+	// localOverrideSuffix ends the git ignored file holding the parts of a
+	// request replaced on this machine only.
+	localOverrideSuffix = ".local.yaml"
+	fileExtension       = ".yaml"
 	// folderFileName stores the display name of a folder. It also keeps an
 	// empty folder in git, which ignores empty directories.
 	folderFileName = "folder.yaml"
@@ -505,6 +508,12 @@ func (repository *Repository) Move(relativePath string, targetDirectory string) 
 	if err := os.Rename(sourcePath, destinationPath); err != nil {
 		return "", fmt.Errorf("move %s: %w", relativePath, err)
 	}
+	if !sourceInfo.IsDir() {
+		err := os.Rename(overridePath(sourcePath), overridePath(destinationPath))
+		if err != nil && !errors.Is(err, os.ErrNotExist) {
+			return "", fmt.Errorf("move local overrides of %s: %w", relativePath, err)
+		}
+	}
 	return destination, nil
 }
 
@@ -535,6 +544,9 @@ func (repository *Repository) Delete(relativePath string) error {
 		}
 		if err := os.Remove(target); err != nil {
 			return fmt.Errorf("delete request %s: %w", relativePath, err)
+		}
+		if err := os.Remove(overridePath(target)); err != nil && !errors.Is(err, os.ErrNotExist) {
+			return fmt.Errorf("delete local overrides of %s: %w", relativePath, err)
 		}
 		return nil
 	}
@@ -649,8 +661,15 @@ type folderMetadata struct {
 
 // isMetadataFile reports whether a file describes its directory rather than
 // holding a request.
+// isMetadataFile reports a file that sits among requests without being one:
+// collection and folder metadata, and the local overrides of a request.
 func isMetadataFile(name string) bool {
-	return name == collectionFileName || name == folderFileName
+	return name == collectionFileName || name == folderFileName || strings.HasSuffix(name, localOverrideSuffix)
+}
+
+// overridePath returns the path of the local overrides of a request.
+func overridePath(requestPath string) string {
+	return strings.TrimSuffix(requestPath, fileExtension) + localOverrideSuffix
 }
 
 // readFolderName returns the display name stored in folder.yaml, or the
@@ -749,4 +768,64 @@ func matchesQuery(entry Entry, terms []string) bool {
 	}
 
 	return true
+}
+
+// LoadRequestOverride reads the local overrides of a request. A request
+// without overrides returns an empty override.
+func (repository *Repository) LoadRequestOverride(relativePath string) (domain.RequestOverride, error) {
+	if !isRequestPath(relativePath) {
+		return domain.RequestOverride{}, ErrInvalidPath
+	}
+	filePath, err := repository.resolve(relativePath)
+	if err != nil {
+		return domain.RequestOverride{}, err
+	}
+
+	content, err := os.ReadFile(overridePath(filePath))
+	if errors.Is(err, os.ErrNotExist) {
+		return domain.RequestOverride{}, nil
+	}
+	if err != nil {
+		return domain.RequestOverride{}, fmt.Errorf("read local overrides of %s: %w", relativePath, err)
+	}
+
+	var override domain.RequestOverride
+	if err := yaml.Unmarshal(content, &override); err != nil {
+		return domain.RequestOverride{}, fmt.Errorf("%w: local overrides of %s: %v", domain.ErrInvalidRequest, relativePath, err)
+	}
+	if override.Body != nil {
+		override.Body.NormalizeForm()
+	}
+	return override, nil
+}
+
+// SaveRequestOverride writes the local overrides of a request, or removes the
+// file when the override replaces nothing.
+func (repository *Repository) SaveRequestOverride(relativePath string, override domain.RequestOverride) error {
+	if !isRequestPath(relativePath) {
+		return ErrInvalidPath
+	}
+	filePath, err := repository.resolve(relativePath)
+	if err != nil {
+		return err
+	}
+	if _, err := os.Stat(filePath); err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return ErrEntryNotFound
+		}
+		return fmt.Errorf("inspect %s: %w", relativePath, err)
+	}
+
+	if override.IsEmpty() {
+		if err := os.Remove(overridePath(filePath)); err != nil && !errors.Is(err, os.ErrNotExist) {
+			return fmt.Errorf("delete local overrides of %s: %w", relativePath, err)
+		}
+		return nil
+	}
+
+	content, err := yamlcodec.EncodeValue(override)
+	if err != nil {
+		return fmt.Errorf("encode local overrides of %s: %w", relativePath, err)
+	}
+	return files.WriteAtomically(overridePath(filePath), content)
 }

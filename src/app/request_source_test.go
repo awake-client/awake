@@ -109,3 +109,30 @@ func TestLoadRequestInheritsTheCollectionAuthentication(t *testing.T) {
 		t.Fatalf("without collection authentication the request sends none, got %+v, %v", open.Authentication, err)
 	}
 }
+
+func TestLoadRequestAppliesLocalOverrides(t *testing.T) {
+	root := t.TempDir()
+	write := func(path string, content string) {
+		t.Helper()
+		full := filepath.Join(root, filepath.FromSlash(path))
+		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(full, []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write("collections/billing/invoices.yaml", "name: Invoices\nmethod: POST\nurl: https://example.com\nparameters:\n  - name: page\n    value: \"1\"\n    enabled: true\nbody:\n  type: json\n  content: '{\"shared\":true}'\n")
+	write("collections/billing/invoices.local.yaml", "body:\n  type: json\n  content: '{\"local\":true}'\n")
+
+	request, err := requestSource{}.LoadRequest(root, "collections/billing/invoices.yaml")
+	if err != nil {
+		t.Fatalf("load request: %v", err)
+	}
+	if request.Body == nil || request.Body.Content != `{"local":true}` {
+		t.Errorf("expected the local body, got %+v", request.Body)
+	}
+	if len(request.Parameters) != 1 || request.Parameters[0].Value != "1" {
+		t.Errorf("parameters are not overridden and must stay shared, got %+v", request.Parameters)
+	}
+}

@@ -17,15 +17,20 @@ type requestSource struct {
 	secrets *secrets.Repository
 }
 
-// LoadRequest returns a request ready to be sent: when it inherits its
-// authentication, the authentication of its collection replaces it, or none
-// when the collection defines no authentication.
+// LoadRequest returns a request ready to be sent: its local overrides
+// applied and, when it inherits its authentication, the authentication of its
+// collection in its place, or none when the collection defines none.
 func (requestSource) LoadRequest(workspaceRoot string, relativePath string) (domain.Request, error) {
 	repository := collections.NewRepository(workspaceRoot)
 	request, err := repository.LoadRequest(relativePath)
 	if err != nil {
 		return domain.Request{}, err
 	}
+	override, err := repository.LoadRequestOverride(relativePath)
+	if err != nil {
+		return domain.Request{}, err
+	}
+	request = override.ApplyTo(request)
 	if request.Authentication == nil || request.Authentication.Type != domain.AuthenticationInherit {
 		return request, nil
 	}

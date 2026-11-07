@@ -70,11 +70,27 @@ export function LoadRequest(workspaceRoot: string, relativePath: string): $Cance
 }
 
 /**
+ * LoadRequestOverride returns the parts of a request replaced on this
+ * machine, empty when there are none.
+ */
+export function LoadRequestOverride(workspaceRoot: string, relativePath: string): $CancellablePromise<domain$0.RequestOverride> {
+    return $Call.ByID(3447045183, workspaceRoot, relativePath);
+}
+
+/**
  * Move moves a request or a folder into another collection or folder and
  * returns its new path.
  */
 export function Move(workspaceRoot: string, relativePath: string, targetDirectory: string): $CancellablePromise<string> {
     return $Call.ByID(4074981479, workspaceRoot, relativePath, targetDirectory);
+}
+
+/**
+ * SaveRequestOverride writes the parts of a request replaced on this machine,
+ * or removes them when the override is empty.
+ */
+export function SaveRequestOverride(workspaceRoot: string, relativePath: string, override: domain$0.RequestOverride): $CancellablePromise<void> {
+    return $Call.ByID(4258051352, workspaceRoot, relativePath, override);
 }
 
 /**

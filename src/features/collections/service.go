@@ -21,6 +21,18 @@ func (service *Service) LoadRequest(workspaceRoot string, relativePath string) (
 	return NewRepository(workspaceRoot).LoadRequest(relativePath)
 }
 
+// LoadRequestOverride returns the parts of a request replaced on this
+// machine, empty when there are none.
+func (service *Service) LoadRequestOverride(workspaceRoot string, relativePath string) (domain.RequestOverride, error) {
+	return NewRepository(workspaceRoot).LoadRequestOverride(relativePath)
+}
+
+// SaveRequestOverride writes the parts of a request replaced on this machine,
+// or removes them when the override is empty.
+func (service *Service) SaveRequestOverride(workspaceRoot string, relativePath string, override domain.RequestOverride) error {
+	return NewRepository(workspaceRoot).SaveRequestOverride(relativePath, override)
+}
+
 // LoadCollection returns collection metadata, or ErrEntryNotFound when the
 // directory has no collection file.
 func (service *Service) LoadCollection(workspaceRoot string, relativePath string) (domain.Collection, error) {

@@ -571,3 +571,81 @@ func TestSearchRequestsReturnsNothingWithoutCollections(t *testing.T) {
 		t.Fatalf("expected no entries, got %+v", entries)
 	}
 }
+
+func TestRequestOverrideRoundTripAndStaysOutOfTheTree(t *testing.T) {
+	workspaceRoot := t.TempDir()
+	writeTestFile(t, workspaceRoot, "collections/platform/list.yaml", "name: List users\nmethod: GET\nurl: https://example.com\n")
+	repository := NewRepository(workspaceRoot)
+
+	parameters := []domain.Parameter{{Name: "page", Value: "2", Enabled: true}}
+	override := domain.RequestOverride{
+		Parameters: &parameters,
+		Body:       &domain.Body{Type: domain.BodyJSON, Content: `{"local":true}`},
+	}
+	if err := repository.SaveRequestOverride("collections/platform/list.yaml", override); err != nil {
+		t.Fatalf("save override: %v", err)
+	}
+
+	loaded, err := repository.LoadRequestOverride("collections/platform/list.yaml")
+	if err != nil {
+		t.Fatalf("load override: %v", err)
+	}
+	if loaded.Parameters == nil || (*loaded.Parameters)[0].Value != "2" || loaded.Body == nil || loaded.Body.Content != `{"local":true}` {
+		t.Errorf("unexpected override: %+v", loaded)
+	}
+
+	entries, err := repository.List("collections/platform")
+	if err != nil {
+		t.Fatalf("list: %v", err)
+	}
+	if len(entries) != 1 || entries[0].Path != "collections/platform/list.yaml" {
+		t.Errorf("the override must not show in the tree: %+v", entries)
+	}
+	if _, err := repository.LoadRequest("collections/platform/list.local.yaml"); !errors.Is(err, ErrInvalidPath) {
+		t.Errorf("an override file is not a request, got %v", err)
+	}
+
+	if err := repository.SaveRequestOverride("collections/platform/list.yaml", domain.RequestOverride{}); err != nil {
+		t.Fatalf("clear override: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(workspaceRoot, "collections/platform/list.local.yaml")); !errors.Is(err, os.ErrNotExist) {
+		t.Errorf("an empty override must remove the file, got %v", err)
+	}
+}
+
+func TestEmptyOverrideSectionStillReplaces(t *testing.T) {
+	empty := []domain.Parameter{}
+	request := domain.Request{Parameters: []domain.Parameter{{Name: "page", Value: "1", Enabled: true}}}
+
+	applied := domain.RequestOverride{Parameters: &empty}.ApplyTo(request)
+	if len(applied.Parameters) != 0 {
+		t.Errorf("an empty local list must replace the shared one, got %+v", applied.Parameters)
+	}
+	if kept := (domain.RequestOverride{}).ApplyTo(request); len(kept.Parameters) != 1 {
+		t.Errorf("no override must keep the shared parameters, got %+v", kept.Parameters)
+	}
+}
+
+func TestMoveAndDeleteCarryTheOverride(t *testing.T) {
+	workspaceRoot := t.TempDir()
+	writeTestFile(t, workspaceRoot, "collections/platform/list.yaml", "name: List users\nmethod: GET\nurl: https://example.com\n")
+	writeTestFile(t, workspaceRoot, "collections/platform/list.local.yaml", "body:\n  type: text\n  content: local\n")
+	writeTestFile(t, workspaceRoot, "collections/platform/users/folder.yaml", "name: Users\n")
+	repository := NewRepository(workspaceRoot)
+
+	moved, err := repository.Move("collections/platform/list.yaml", "collections/platform/users")
+	if err != nil {
+		t.Fatalf("move: %v", err)
+	}
+	override, err := repository.LoadRequestOverride(moved)
+	if err != nil || override.Body == nil || override.Body.Content != "local" {
+		t.Fatalf("expected the override to follow the request, got %+v (%v)", override, err)
+	}
+
+	if err := repository.Delete(moved); err != nil {
+		t.Fatalf("delete: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(workspaceRoot, "collections/platform/users/list.local.yaml")); !errors.Is(err, os.ErrNotExist) {
+		t.Errorf("expected the override to be deleted, got %v", err)
+	}
+}
