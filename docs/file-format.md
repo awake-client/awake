@@ -365,12 +365,38 @@ loopback address for the callback. Its access token stays in memory for the
 session and is refreshed with the refresh token when one is returned. Tokens
 are never written to the workspace or to request history.
 
+## Editor schemas
+
+Awake writes a JSON schema for each kind of file to `.vscode/awake/` and
+associates them in `.vscode/settings.json` under `yaml.schemas`, when a
+workspace is created or opened. Editors using the YAML language server, such
+as VS Code and Cursor with the YAML extension, then validate and complete the
+files by hand. These associations take precedence over the public SchemaStore
+catalog, whose unrelated `**/collections/*/*.yaml` pattern would otherwise
+claim requests. Files are rewritten only when they change; a settings file with
+comments is left untouched, and its associations must then be added by hand.
+
 ## Private requests and local overlays
 
 - A private collection lives in `local/` with the same layout as
   `collections/`. It is ignored by git and only visible on the local machine.
 - Local environment files override shared values without changing tracked
   files.
+- A request may have local overrides in `<name>.local.yaml`, next to it and
+  git ignored. Each section present replaces the shared one when the request
+  is sent, even when empty; an absent section keeps the shared one. Moving or
+  deleting the request carries the overrides with it.
+
+```yaml
+# collections/platform/users/list.local.yaml
+parameters:
+  - name: page
+    value: "2"
+    enabled: true
+body:
+  type: json
+  content: '{"debug": true}'
+```
 
 ## Merge rules
 
