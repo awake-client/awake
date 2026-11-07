@@ -4,8 +4,9 @@ import * as HistoryService from '@bindings/github.com/clementherve/awake/src/fea
 import { HistoryEntry } from '@bindings/github.com/clementherve/awake/src/domain/models';
 import { Confirmation } from '@core/confirmation';
 import { WorkspaceStore } from '@core/workspace-store';
-import { CodeEditor, CodeLanguage } from '@shared/code-editor';
+import { CodeEditor, CodeLanguage, prettyJson } from '@shared/code-editor';
 import { Icon } from '@shared/icon';
+import { looksLikeMarkup, prettyMarkup } from '@shared/markup-format';
 
 const PAGE_SIZE = 30;
 
@@ -171,23 +172,21 @@ export class RequestHistory {
 
   /** Pretty prints JSON bodies, leaves anything else untouched. */
   protected formatBody(body: string): string {
-    const trimmed = body.trim();
-    if (!trimmed.startsWith('{') && !trimmed.startsWith('[')) {
-      return body;
-    }
-    try {
-      return JSON.stringify(JSON.parse(trimmed), null, 2);
-    } catch {
-      return body;
+    switch (this.languageOf(body)) {
+      case 'json':
+        return prettyJson(body);
+      case 'xml':
+        return prettyMarkup(body);
+      default:
+        return body;
     }
   }
 
   protected languageOf(body: string): CodeLanguage {
-    const trimmed = body.trim();
-    if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+    if (prettyJson(body) !== body) {
       return 'json';
     }
-    return trimmed.startsWith('<') ? 'xml' : 'text';
+    return looksLikeMarkup(body) ? 'xml' : 'text';
   }
 
   protected formatSize(bytes: number): string {

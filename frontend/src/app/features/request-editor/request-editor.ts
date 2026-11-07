@@ -52,6 +52,7 @@ import { VariableStore } from '@core/variable-store';
 import { WorkspaceStore } from '@core/workspace-store';
 import { AuthEditor } from '@shared/auth-editor';
 import { CodeEditor, CodeLanguage, prettyJson } from '@shared/code-editor';
+import { looksLikeMarkup, prettyMarkup } from '@shared/markup-format';
 import { ResizeHandle } from '@shared/resize-handle';
 import { Icon } from '@shared/icon';
 import { VariableInput } from '@shared/variable-input';
@@ -376,11 +377,28 @@ export class RequestEditor {
     if (contentType.includes('xml') || contentType.includes('html')) {
       return 'xml';
     }
-    return prettyJson(this.responseBody()) !== this.responseBody() ? 'json' : 'text';
+
+    // A missing or generic content type still gets formatted when the body
+    // clearly is JSON or markup.
+    const body = this.responseBody();
+    if (prettyJson(body) !== body) {
+      return 'json';
+    }
+    return looksLikeMarkup(body) ? 'xml' : 'text';
   });
 
-  /** The response body, indented when it is JSON. */
-  protected readonly formattedResponseBody = computed(() => prettyJson(this.responseBody()));
+  /** The response body, indented when it is JSON, XML or HTML. */
+  protected readonly formattedResponseBody = computed(() => {
+    const body = this.responseBody();
+    switch (this.responseLanguage()) {
+      case 'json':
+        return prettyJson(body);
+      case 'xml':
+        return prettyMarkup(body);
+      default:
+        return body;
+    }
+  });
 
   /** Set when the response shown is the last run read from the history. */
   protected readonly lastRunAt = signal<string | null>(null);
