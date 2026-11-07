@@ -145,11 +145,24 @@ type ScriptTest struct {
 	Error  string
 }
 
+// EnvironmentChange is a variable a script stores in, or removes from, the
+// selected environment so later requests see it.
+type EnvironmentChange struct {
+	Name    string
+	Value   string
+	Removed bool
+}
+
 // ScriptOutcome is the result of a pre-request or post-response script.
 type ScriptOutcome struct {
 	Logs  []string
 	Tests []ScriptTest
 	Error string
+	// EnvironmentChanges lists, in order, the variables the script stored in
+	// the selected environment.
+	EnvironmentChanges []EnvironmentChange
+	// EnvironmentError explains why the environment changes were not saved.
+	EnvironmentError string
 }
 
 // ScriptResponse is the response view exposed to post-response scripts. Body

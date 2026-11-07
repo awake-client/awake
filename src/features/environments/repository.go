@@ -10,6 +10,7 @@ import (
 
 	"go.yaml.in/yaml/v3"
 
+	"github.com/clementherve/awake/src/domain"
 	"github.com/clementherve/awake/src/shared/files"
 	"github.com/clementherve/awake/src/shared/yamlcodec"
 )
@@ -362,4 +363,76 @@ func (repository *Repository) Delete(fileName string) error {
 func fileExists(path string) bool {
 	info, err := os.Stat(path)
 	return err == nil && !info.IsDir()
+}
+
+// localOverrides is the shape written for a new local override file: it only
+// carries variables, its name defaulting to the file name when read.
+type localOverrides struct {
+	Variables map[string]string `yaml:"variables,omitempty"`
+}
+
+// ApplyLocalChanges stores or removes variables in the local override file of
+// an environment, creating the file when needed. The file is git ignored, so
+// values produced by scripts, such as tokens, never reach the repository.
+func (repository *Repository) ApplyLocalChanges(fileName string, changes []domain.EnvironmentChange) error {
+	if len(changes) == 0 {
+		return nil
+	}
+	if err := validateFileName(fileName); err != nil {
+		return err
+	}
+	if _, err := repository.readShared(fileName); err != nil {
+		return err
+	}
+
+	local, err := repository.readLocal(fileName)
+	if err != nil {
+		return err
+	}
+	if local == nil {
+		local = &Environment{Name: fileName}
+	}
+
+	values := make(map[string]string, len(local.Variables)+len(changes))
+	for name, value := range local.Variables {
+		values[name] = value
+	}
+	for _, change := range changes {
+		if !IsVariableName(change.Name) {
+			return fmt.Errorf("%w: %q is not a valid variable name", ErrInvalidEnvironment, change.Name)
+		}
+		if change.Removed {
+			delete(values, change.Name)
+		} else {
+			values[change.Name] = change.Value
+		}
+	}
+	local.Variables = values
+	if err := local.validate(); err != nil {
+		return err
+	}
+
+	path := repository.LocalPath(fileName)
+	content, err := encodeLocalOverrides(path, values)
+	if err != nil {
+		return fmt.Errorf("encode local overrides of %s: %w", fileName, err)
+	}
+	return files.WriteAtomically(path, content)
+}
+
+// encodeLocalOverrides rewrites only the variables of an existing file, so
+// its comments and other keys survive.
+func encodeLocalOverrides(path string, values map[string]string) ([]byte, error) {
+	existing, err := os.ReadFile(path)
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return nil, err
+	}
+	if len(existing) > 0 {
+		document, err := yamlcodec.Parse(existing)
+		if err == nil && len(document.Root().Content) > 0 && document.Root().Content[0].Kind == yaml.MappingNode {
+			setStringMap(document.Root().Content[0], "variables", values)
+			return document.Encode()
+		}
+	}
+	return yamlcodec.EncodeValue(localOverrides{Variables: values})
 }

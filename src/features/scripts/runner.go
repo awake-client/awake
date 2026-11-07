@@ -40,7 +40,7 @@ func (runner *Runner) BeforeRequest(script string, request *domain.Request, vari
 	outcome := domain.ScriptOutcome{}
 	requestObject := requestToObject(runtime, request)
 	variablesObject := variablesToObject(runtime, variables)
-	installHelper(runtime, variables, &outcome)
+	installHelper(runtime, variablesObject, &outcome)
 
 	runtime.Set("request", requestObject)
 	runtime.Set("variables", variablesObject)
@@ -62,7 +62,7 @@ func (runner *Runner) AfterResponse(script string, request domain.Request, respo
 	runtime := goja.New()
 	outcome := domain.ScriptOutcome{}
 	variablesObject := variablesToObject(runtime, variables)
-	installHelper(runtime, variables, &outcome)
+	installHelper(runtime, variablesObject, &outcome)
 
 	runtime.Set("request", requestToObject(runtime, &request))
 	runtime.Set("response", responseToObject(runtime, response))
@@ -85,7 +85,7 @@ func run(runtime *goja.Runtime, script string, timeout time.Duration, outcome *d
 	}
 }
 
-func installHelper(runtime *goja.Runtime, variables map[string]string, outcome *domain.ScriptOutcome) {
+func installHelper(runtime *goja.Runtime, variablesObject *goja.Object, outcome *domain.ScriptOutcome) {
 	helper := runtime.NewObject()
 
 	_ = helper.Set("log", func(call goja.FunctionCall) goja.Value {
@@ -129,17 +129,30 @@ func installHelper(runtime *goja.Runtime, variables map[string]string, outcome *
 		return goja.Undefined()
 	})
 
+	// The variables object is the single source of truth while the script
+	// runs, so awake.setVariable and direct writes to variables agree.
 	_ = helper.Set("getVariable", func(name string) goja.Value {
-		value, found := variables[name]
-		if !found {
-			return goja.Null()
-		}
-		return runtime.ToValue(value)
+		return readVariable(variablesObject, name)
 	})
 
-	_ = helper.Set("setVariable", func(name string, value string) {
-		variables[name] = value
+	_ = helper.Set("setVariable", func(name string, value goja.Value) {
+		_ = variablesObject.Set(name, valueToString(value))
 	})
+
+	environment := runtime.NewObject()
+	_ = environment.Set("get", func(name string) goja.Value {
+		return readVariable(variablesObject, name)
+	})
+	_ = environment.Set("set", func(name string, value goja.Value) {
+		text := valueToString(value)
+		_ = variablesObject.Set(name, text)
+		outcome.EnvironmentChanges = append(outcome.EnvironmentChanges, domain.EnvironmentChange{Name: name, Value: text})
+	})
+	_ = environment.Set("unset", func(name string) {
+		_ = variablesObject.Delete(name)
+		outcome.EnvironmentChanges = append(outcome.EnvironmentChanges, domain.EnvironmentChange{Name: name, Removed: true})
+	})
+	_ = helper.Set("environment", environment)
 
 	_ = runtime.Set("awake", helper)
 }
@@ -188,6 +201,17 @@ func responseToObject(runtime *goja.Runtime, response domain.ScriptResponse) *go
 	}
 	_ = object.Set("headers", headers)
 
+	// json parses the body preview, throwing a JavaScript error when it is not
+	// valid JSON, like JSON.parse.
+	_ = object.Set("json", func(goja.FunctionCall) goja.Value {
+		parse, _ := goja.AssertFunction(runtime.Get("JSON").ToObject(runtime).Get("parse"))
+		value, err := parse(goja.Undefined(), runtime.ToValue(response.Body))
+		if err != nil {
+			panic(err)
+		}
+		return value
+	})
+
 	return object
 }
 
@@ -199,10 +223,21 @@ func variablesToObject(runtime *goja.Runtime, variables map[string]string) *goja
 	return object
 }
 
+// readVariables copies the variables object back into the map, dropping the
+// names the script deleted.
 func readVariables(object *goja.Object, variables map[string]string) {
+	clear(variables)
 	for _, name := range object.Keys() {
-		variables[name] = object.Get(name).String()
+		variables[name] = valueToString(object.Get(name))
 	}
+}
+
+func readVariable(object *goja.Object, name string) goja.Value {
+	value := object.Get(name)
+	if value == nil || goja.IsUndefined(value) {
+		return goja.Null()
+	}
+	return value
 }
 
 func applyRequestObject(runtime *goja.Runtime, object *goja.Object, request *domain.Request) {
@@ -295,6 +330,9 @@ func sortedKeys(values map[string]string) []string {
 }
 
 func valueToString(value goja.Value) string {
+	if value == nil || goja.IsUndefined(value) {
+		return ""
+	}
 	exported := value.Export()
 	switch typed := exported.(type) {
 	case string:

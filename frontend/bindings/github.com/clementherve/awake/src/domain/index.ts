@@ -12,6 +12,7 @@ export type {
     Authentication,
     Body,
     Collection,
+    EnvironmentChange,
     Header,
     HistoryEntry,
     HistoryExchange,

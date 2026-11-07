@@ -48,6 +48,7 @@ func newServices() (*services, error) {
 	oauth2Service := oauth2.NewService(source)
 	httpclient.SetOAuth2Provider(httpClient, oauth2.NewProvider(oauth2Service))
 	httpclient.SetScriptRunner(httpClient, scripts.NewRunner())
+	httpclient.SetEnvironmentWriter(httpClient, environmentWriter{secrets: secretRepository})
 
 	return &services{
 		Collections:  collections.NewService(),

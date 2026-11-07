@@ -617,6 +617,69 @@ func TestSendSkipsScriptsWhenTheyAreEmpty(t *testing.T) {
 	}
 }
 
+type environmentScriptRunner struct {
+	fakeScriptRunner
+}
+
+func (runner *environmentScriptRunner) AfterResponse(
+	_ string,
+	_ domain.Request,
+	_ domain.ScriptResponse,
+	_ map[string]string,
+) domain.ScriptOutcome {
+	return domain.ScriptOutcome{EnvironmentChanges: []domain.EnvironmentChange{{Name: "token", Value: "abc"}}}
+}
+
+type fakeEnvironmentWriter struct {
+	environmentFileName string
+	changes             []domain.EnvironmentChange
+}
+
+func (writer *fakeEnvironmentWriter) ApplyEnvironmentChanges(_ string, _ string, environmentFileName string, changes []domain.EnvironmentChange) error {
+	writer.environmentFileName = environmentFileName
+	writer.changes = changes
+	return nil
+}
+
+func TestSendSavesScriptEnvironmentChanges(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		_, _ = writer.Write([]byte("ok"))
+	}))
+	defer server.Close()
+
+	request := domain.Request{
+		Method:  domain.MethodGet,
+		URL:     server.URL,
+		Scripts: &domain.Scripts{PostResponse: "awake.environment.set('token', 'abc')"},
+	}
+
+	for _, environmentFileName := range []string{"development", ""} {
+		service := newTestService(t, fakeSource{request: request})
+		SetScriptRunner(service, &environmentScriptRunner{})
+		writer := &fakeEnvironmentWriter{}
+		SetEnvironmentWriter(service, writer)
+
+		response, err := service.Send(t.TempDir(), "collections/users/list.yaml", environmentFileName)
+		if err != nil {
+			t.Fatalf("send request: %v", err)
+		}
+		service.Close(response.ID)
+
+		if environmentFileName == "" {
+			if writer.changes != nil || response.PostResponseOutcome.EnvironmentError != noEnvironmentMessage {
+				t.Errorf("expected the changes to be refused without an environment: %+v", response.PostResponseOutcome)
+			}
+			continue
+		}
+		if writer.environmentFileName != "development" || len(writer.changes) != 1 || writer.changes[0].Value != "abc" {
+			t.Errorf("unexpected saved changes: %+v", writer)
+		}
+		if response.PostResponseOutcome.EnvironmentError != "" {
+			t.Errorf("unexpected environment error: %s", response.PostResponseOutcome.EnvironmentError)
+		}
+	}
+}
+
 func newTestService(t *testing.T, source Source) *Service {
 	t.Helper()
 

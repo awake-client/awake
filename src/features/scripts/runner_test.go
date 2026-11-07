@@ -183,3 +183,81 @@ func headerValues(headers []domain.Header) map[string]string {
 	}
 	return values
 }
+
+func TestScriptsStoreEnvironmentChanges(t *testing.T) {
+	request := domain.Request{Method: domain.MethodGet, URL: "https://example.com"}
+	variables := map[string]string{"token": "old", "stale": "value"}
+
+	outcome := NewRunner().AfterResponse(`
+		awake.environment.set("token", "new");
+		awake.environment.set("count", 3);
+		awake.environment.unset("stale");
+		awake.test("reads its own write", awake.environment.get("token") === "new");
+		awake.test("removed value reads as null", awake.environment.get("stale") === null);
+	`, request, domain.ScriptResponse{StatusCode: 200}, variables)
+
+	if outcome.Error != "" {
+		t.Fatalf("unexpected script error: %s", outcome.Error)
+	}
+	for _, test := range outcome.Tests {
+		if !test.Passed {
+			t.Errorf("test %q failed: %s", test.Name, test.Error)
+		}
+	}
+
+	expected := []domain.EnvironmentChange{
+		{Name: "token", Value: "new"},
+		{Name: "count", Value: "3"},
+		{Name: "stale", Removed: true},
+	}
+	if len(outcome.EnvironmentChanges) != len(expected) {
+		t.Fatalf("unexpected changes: %+v", outcome.EnvironmentChanges)
+	}
+	for index, change := range expected {
+		if outcome.EnvironmentChanges[index] != change {
+			t.Errorf("change %d: expected %+v, got %+v", index, change, outcome.EnvironmentChanges[index])
+		}
+	}
+	if variables["token"] != "new" {
+		t.Errorf("expected the variable map to follow the script, got %q", variables["token"])
+	}
+	if _, found := variables["stale"]; found {
+		t.Error("expected the removed variable to leave the map")
+	}
+}
+
+// Regression: setVariable on an existing name was overwritten by the stale
+// value of the variables object when the script ended.
+func TestSetVariableOverridesAnExistingValue(t *testing.T) {
+	request := domain.Request{Method: domain.MethodGet, URL: "https://example.com"}
+	variables := map[string]string{"token": "old"}
+
+	outcome := NewRunner().BeforeRequest(`awake.setVariable("token", "new");`, &request, variables)
+
+	if outcome.Error != "" {
+		t.Fatalf("unexpected script error: %s", outcome.Error)
+	}
+	if variables["token"] != "new" {
+		t.Errorf("expected token to be new, got %q", variables["token"])
+	}
+	if len(outcome.EnvironmentChanges) != 0 {
+		t.Errorf("setVariable must not touch the environment: %+v", outcome.EnvironmentChanges)
+	}
+}
+
+func TestResponseJSONParsesTheBody(t *testing.T) {
+	request := domain.Request{Method: domain.MethodGet, URL: "https://example.com"}
+	response := domain.ScriptResponse{StatusCode: 200, Body: `{"token":"abc"}`}
+
+	outcome := NewRunner().AfterResponse(`
+		awake.test("parsed", response.json().token === "abc");
+	`, request, response, map[string]string{})
+	if outcome.Error != "" || !outcome.Tests[0].Passed {
+		t.Fatalf("unexpected outcome: %+v", outcome)
+	}
+
+	invalid := NewRunner().AfterResponse(`response.json();`, request, domain.ScriptResponse{Body: "not json"}, map[string]string{})
+	if !strings.Contains(invalid.Error, "SyntaxError") {
+		t.Errorf("expected a syntax error, got %q", invalid.Error)
+	}
+}

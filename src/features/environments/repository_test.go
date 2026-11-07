@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/clementherve/awake/src/domain"
 	"github.com/clementherve/awake/src/shared/variables"
 )
 
@@ -258,5 +259,69 @@ func TestSaveKeepsTheEnvironmentColor(t *testing.T) {
 	}
 	if err := repository.Save("production", Environment{Name: "Production", Color: "neon"}); err == nil {
 		t.Error("expected an unknown color to be rejected")
+	}
+}
+
+func TestApplyLocalChangesKeepsSharedFileAndComments(t *testing.T) {
+	workspaceRoot := t.TempDir()
+	shared := "name: Development\nvariables:\n  baseUrl: https://development.example.com\n"
+	writeEnvironmentFile(t, workspaceRoot, "development.yaml", shared)
+	writeEnvironmentFile(t, workspaceRoot, "development.local.yaml", "# my machine\nvariables:\n  pageSize: \"50\"\n  stale: x\n")
+
+	repository := NewRepository(workspaceRoot)
+	err := repository.ApplyLocalChanges("development", []domain.EnvironmentChange{
+		{Name: "token", Value: "abc"},
+		{Name: "stale", Removed: true},
+	})
+	if err != nil {
+		t.Fatalf("apply local changes: %v", err)
+	}
+
+	resolved, err := repository.Load("development")
+	if err != nil {
+		t.Fatalf("load environment: %v", err)
+	}
+	if resolved.Local == nil || resolved.Local.Variables["token"] != "abc" || resolved.Local.Variables["pageSize"] != "50" {
+		t.Fatalf("unexpected local overrides: %+v", resolved.Local)
+	}
+	if _, found := resolved.Local.Variables["stale"]; found {
+		t.Error("expected stale to be removed")
+	}
+
+	sharedContent, _ := os.ReadFile(repository.SharedPath("development"))
+	if string(sharedContent) != shared {
+		t.Errorf("shared file changed:\n%s", sharedContent)
+	}
+	localContent, _ := os.ReadFile(repository.LocalPath("development"))
+	if !strings.Contains(string(localContent), "# my machine") {
+		t.Errorf("expected the comment to survive:\n%s", localContent)
+	}
+}
+
+func TestApplyLocalChangesCreatesTheLocalFile(t *testing.T) {
+	workspaceRoot := t.TempDir()
+	writeEnvironmentFile(t, workspaceRoot, "development.yaml", "name: Development\n")
+
+	repository := NewRepository(workspaceRoot)
+	if err := repository.ApplyLocalChanges("development", []domain.EnvironmentChange{{Name: "token", Value: "abc"}}); err != nil {
+		t.Fatalf("apply local changes: %v", err)
+	}
+
+	resolved, err := repository.Load("development")
+	if err != nil {
+		t.Fatalf("load environment: %v", err)
+	}
+	if resolved.Local == nil || resolved.Local.Variables["token"] != "abc" {
+		t.Fatalf("unexpected local overrides: %+v", resolved.Local)
+	}
+}
+
+func TestApplyLocalChangesRejectsInvalidNames(t *testing.T) {
+	workspaceRoot := t.TempDir()
+	writeEnvironmentFile(t, workspaceRoot, "development.yaml", "name: Development\n")
+
+	err := NewRepository(workspaceRoot).ApplyLocalChanges("development", []domain.EnvironmentChange{{Name: "not valid", Value: "x"}})
+	if !errors.Is(err, ErrInvalidEnvironment) {
+		t.Fatalf("expected ErrInvalidEnvironment, got %v", err)
 	}
 }

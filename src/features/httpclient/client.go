@@ -70,6 +70,18 @@ type ScriptRunner interface {
 	) domain.ScriptOutcome
 }
 
+// EnvironmentWriter saves the variables a script stores in the selected
+// environment. The application layer supplies the implementation so this
+// feature does not depend on the environments feature.
+type EnvironmentWriter interface {
+	ApplyEnvironmentChanges(
+		workspaceRoot string,
+		requestPath string,
+		environmentFileName string,
+		changes []domain.EnvironmentChange,
+	) error
+}
+
 // Service exposes request execution to the application layer.
 type Service struct {
 	source       Source
@@ -80,6 +92,7 @@ type Service struct {
 	recorder     HistoryRecorder
 	oauth2       OAuth2TokenProvider
 	scripts      ScriptRunner
+	environments EnvironmentWriter
 }
 
 // NewService returns an HTTP client service backed by source.
@@ -117,6 +130,13 @@ func SetScriptRunner(service *Service, runner ScriptRunner) {
 	service.scripts = runner
 }
 
+// SetEnvironmentWriter lets scripts save variables in the selected
+// environment. It is a package function rather than a service method, so the
+// writer never crosses the Wails bridge.
+func SetEnvironmentWriter(service *Service, writer EnvironmentWriter) {
+	service.environments = writer
+}
+
 // Send executes a request and streams its body to the response store.
 func (service *Service) Send(workspaceRoot string, requestPath string, environmentFileName string) (Response, error) {
 	request, err := service.source.LoadRequest(workspaceRoot, requestPath)
@@ -131,6 +151,7 @@ func (service *Service) Send(workspaceRoot string, requestPath string, environme
 	layers := variables.Maps(labeledLayers)
 
 	layers, preRequestOutcome := service.runPreRequest(&request, layers)
+	service.saveEnvironmentChanges(workspaceRoot, requestPath, environmentFileName, &preRequestOutcome)
 
 	oauth2Token, err := service.oauth2Token(workspaceRoot, requestPath, environmentFileName, request, layers)
 	if err != nil {
@@ -176,6 +197,7 @@ func (service *Service) Send(workspaceRoot string, requestPath string, environme
 
 	response.PreRequestOutcome = preRequestOutcome
 	response.PostResponseOutcome = service.runPostResponse(request, response, layers)
+	service.saveEnvironmentChanges(workspaceRoot, requestPath, environmentFileName, &response.PostResponseOutcome)
 	response.HistoryWarning = service.recordHistory(workspaceRoot, requestPath, environmentFileName, request, sent, response)
 
 	return response, nil
@@ -219,6 +241,28 @@ func (service *Service) runPostResponse(request domain.Request, response Respons
 		},
 		mergeLayers(layers),
 	)
+}
+
+// noEnvironmentMessage explains why awake.environment changes were dropped.
+const noEnvironmentMessage = "no environment is selected, so the environment changes were not saved"
+
+// saveEnvironmentChanges writes what a script stored with awake.environment
+// and reports a failure on the outcome rather than failing the request.
+func (service *Service) saveEnvironmentChanges(workspaceRoot string, requestPath string, environmentFileName string, outcome *domain.ScriptOutcome) {
+	if len(outcome.EnvironmentChanges) == 0 {
+		return
+	}
+	switch {
+	case environmentFileName == "":
+		outcome.EnvironmentError = noEnvironmentMessage
+	case service.environments == nil:
+		outcome.EnvironmentError = "environment writer is not configured"
+	default:
+		err := service.environments.ApplyEnvironmentChanges(workspaceRoot, requestPath, environmentFileName, outcome.EnvironmentChanges)
+		if err != nil {
+			outcome.EnvironmentError = err.Error()
+		}
+	}
 }
 
 func mergeLayers(layers []map[string]string) map[string]string {

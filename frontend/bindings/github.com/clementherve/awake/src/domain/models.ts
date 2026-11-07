@@ -87,6 +87,16 @@ export interface Collection {
 }
 
 /**
+ * EnvironmentChange is a variable a script stores in, or removes from, the
+ * selected environment so later requests see it.
+ */
+export interface EnvironmentChange {
+    "Name": string;
+    "Value": string;
+    "Removed": boolean;
+}
+
+/**
  * Header is a request header.
  */
 export interface Header {
@@ -215,6 +225,17 @@ export interface ScriptOutcome {
     "Logs": string[] | null;
     "Tests": ScriptTest[] | null;
     "Error": string;
+
+    /**
+     * EnvironmentChanges lists, in order, the variables the script stored in
+     * the selected environment.
+     */
+    "EnvironmentChanges": EnvironmentChange[] | null;
+
+    /**
+     * EnvironmentError explains why the environment changes were not saved.
+     */
+    "EnvironmentError": string;
 }
 
 /**
