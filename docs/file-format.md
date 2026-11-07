@@ -272,6 +272,23 @@ protocol: sse
 - Streams are live sessions. Their events are kept in memory only and are
   never written to the workspace or the history database.
 
+### Path parameters
+
+A URL segment written `/:name` is a path parameter. Its value comes from
+`pathParameters`; it may hold variables, is escaped for the path, so `a/b`
+stays one segment, and a missing value stops the request instead of sending
+`:name` as is. The colon must follow a slash, so `https://` and `:8080` are
+not parameters.
+
+```yaml
+url: "{{baseUrl}}/articles/:articleId/publish"
+pathParameters:
+  - name: articleId
+    value: "{{articleId}}"
+```
+
+Local overrides of the parameters cover the path parameters too.
+
 ### Body types
 
 `none`, `json`, `text`, `xml`, `form-urlencoded`, `multipart`, `binary`.
@@ -281,6 +298,23 @@ body:
   type: json
   content: |
     {"name": "Ada"}
+```
+
+Form bodies, `form-urlencoded` and `multipart`, list their fields instead of
+a `content`. Each enabled field is encoded after its variables are resolved,
+so a value holding `&` or `=` stays one field. A form written as text by an
+earlier version, `a=1&b=2` or one `name: value` per line, is read into fields.
+
+```yaml
+body:
+  type: form-urlencoded
+  fields:
+    - name: title
+      value: "{{title}}"
+      enabled: true
+    - name: draft
+      value: "yes"
+      enabled: false
 ```
 
 Binary bodies reference a file relative to the request file. Files above the
