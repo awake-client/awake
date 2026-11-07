@@ -325,3 +325,86 @@ func TestApplyLocalChangesRejectsInvalidNames(t *testing.T) {
 		t.Fatalf("expected ErrInvalidEnvironment, got %v", err)
 	}
 }
+
+func TestCloneCopiesSharedAndLocalFiles(t *testing.T) {
+	workspaceRoot := t.TempDir()
+	writeEnvironmentFile(t, workspaceRoot, "production.yaml", "name: Production\ncolor: red\nvariables:\n  baseUrl: https://example.com\nsecretVariables:\n  - apiToken\n")
+	writeEnvironmentFile(t, workspaceRoot, "production.local.yaml", "variables:\n  cookies: a=1\n")
+
+	repository := NewRepository(workspaceRoot)
+	if err := repository.Clone("production", "production-copy", "Production copy"); err != nil {
+		t.Fatalf("clone: %v", err)
+	}
+
+	clone, err := repository.Load("production-copy")
+	if err != nil {
+		t.Fatalf("load clone: %v", err)
+	}
+	if clone.Name != "Production copy" || clone.Shared.Color != "red" || clone.Shared.Variables["baseUrl"] != "https://example.com" {
+		t.Errorf("unexpected clone: %+v", clone.Shared)
+	}
+	if len(clone.Shared.SecretVariables) != 1 || clone.Local == nil || clone.Local.Variables["cookies"] != "a=1" {
+		t.Errorf("unexpected clone details: %+v %+v", clone.Shared, clone.Local)
+	}
+
+	if err := repository.Clone("production", "production-copy", "Again"); !errors.Is(err, ErrEnvironmentExists) {
+		t.Errorf("expected ErrEnvironmentExists, got %v", err)
+	}
+}
+
+func TestRenameMovesSharedAndLocalFiles(t *testing.T) {
+	workspaceRoot := t.TempDir()
+	writeEnvironmentFile(t, workspaceRoot, "base-url.yaml", "name: Production\n")
+	writeEnvironmentFile(t, workspaceRoot, "base-url.local.yaml", "variables:\n  cookies: a=1\n")
+	writeEnvironmentFile(t, workspaceRoot, "staging.yaml", "name: Staging\n")
+
+	repository := NewRepository(workspaceRoot)
+	if err := repository.Rename("base-url", "production"); err != nil {
+		t.Fatalf("rename: %v", err)
+	}
+
+	renamed, err := repository.Load("production")
+	if err != nil {
+		t.Fatalf("load renamed environment: %v", err)
+	}
+	if renamed.Name != "Production" || renamed.Local == nil || renamed.Local.Variables["cookies"] != "a=1" {
+		t.Errorf("unexpected renamed environment: %+v %+v", renamed.Shared, renamed.Local)
+	}
+	if _, err := repository.Load("base-url"); !errors.Is(err, ErrEnvironmentNotFound) {
+		t.Errorf("expected the former file to be gone, got %v", err)
+	}
+	if err := repository.Rename("production", "staging"); !errors.Is(err, ErrEnvironmentExists) {
+		t.Errorf("expected ErrEnvironmentExists, got %v", err)
+	}
+}
+
+func TestSaveLocalVariablesReplacesTheOverrides(t *testing.T) {
+	workspaceRoot := t.TempDir()
+	writeEnvironmentFile(t, workspaceRoot, "production.yaml", "name: Production\n")
+	writeEnvironmentFile(t, workspaceRoot, "production.local.yaml", "# machine\nvariables:\n  cookies: a=1\n  stale: x\n")
+
+	repository := NewRepository(workspaceRoot)
+	if err := repository.SaveLocalVariables("production", map[string]string{"cookies": "b=2"}); err != nil {
+		t.Fatalf("save local variables: %v", err)
+	}
+
+	resolved, err := repository.Load("production")
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if resolved.Local == nil || len(resolved.Local.Variables) != 1 || resolved.Local.Variables["cookies"] != "b=2" {
+		t.Errorf("unexpected local overrides: %+v", resolved.Local)
+	}
+	content, _ := os.ReadFile(repository.LocalPath("production"))
+	if !strings.Contains(string(content), "# machine") {
+		t.Errorf("expected the comment to survive:\n%s", content)
+	}
+
+	writeEnvironmentFile(t, workspaceRoot, "staging.yaml", "name: Staging\n")
+	if err := repository.SaveLocalVariables("staging", map[string]string{}); err != nil {
+		t.Fatalf("save empty local variables: %v", err)
+	}
+	if _, err := os.Stat(repository.LocalPath("staging")); !errors.Is(err, os.ErrNotExist) {
+		t.Errorf("expected no local file for an empty list, got %v", err)
+	}
+}

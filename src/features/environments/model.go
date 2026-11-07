@@ -27,6 +27,9 @@ var (
 	ErrInvalidEnvironment = errors.New("environments: invalid environment")
 	// ErrInvalidScope is returned for a scope that is not a collection path.
 	ErrInvalidScope = errors.New("environments: invalid scope")
+	// ErrEnvironmentExists is returned when a clone would replace an existing
+	// environment.
+	ErrEnvironmentExists = errors.New("environments: environment already exists")
 )
 
 var (

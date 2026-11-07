@@ -436,3 +436,90 @@ func encodeLocalOverrides(path string, values map[string]string) ([]byte, error)
 	}
 	return yamlcodec.EncodeValue(localOverrides{Variables: values})
 }
+
+// Clone copies an environment, with its local overrides, under a new file
+// name and display name. Secret declarations are copied; their values live in
+// the keychain and are copied by the secrets feature.
+func (repository *Repository) Clone(sourceFileName string, targetFileName string, name string) error {
+	if err := validateFileName(targetFileName); err != nil {
+		return err
+	}
+	if fileExists(repository.SharedPath(targetFileName)) {
+		return ErrEnvironmentExists
+	}
+
+	source, err := repository.Load(sourceFileName)
+	if err != nil {
+		return err
+	}
+
+	shared := source.Shared
+	shared.Name = strings.TrimSpace(name)
+	if err := repository.Save(targetFileName, shared); err != nil {
+		return err
+	}
+
+	content, err := os.ReadFile(repository.LocalPath(sourceFileName))
+	if errors.Is(err, os.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("read local overrides of %s: %w", sourceFileName, err)
+	}
+	return files.WriteAtomically(repository.LocalPath(targetFileName), content)
+}
+
+// Rename moves an environment, with its local overrides, to a new file name.
+// Its secret values are keyed by file name and moved by the secrets feature.
+func (repository *Repository) Rename(fileName string, newFileName string) error {
+	if err := validateFileName(fileName); err != nil {
+		return err
+	}
+	if err := validateFileName(newFileName); err != nil {
+		return err
+	}
+	if fileName == newFileName {
+		return nil
+	}
+	if !fileExists(repository.SharedPath(fileName)) {
+		return ErrEnvironmentNotFound
+	}
+	if fileExists(repository.SharedPath(newFileName)) {
+		return ErrEnvironmentExists
+	}
+
+	if err := os.Rename(repository.SharedPath(fileName), repository.SharedPath(newFileName)); err != nil {
+		return fmt.Errorf("rename environment %s: %w", fileName, err)
+	}
+	err := os.Rename(repository.LocalPath(fileName), repository.LocalPath(newFileName))
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("rename local overrides of %s: %w", fileName, err)
+	}
+	return nil
+}
+
+// SaveLocalVariables replaces the variables of the local override file of an
+// environment, keeping its comments. No file is created for an empty list.
+func (repository *Repository) SaveLocalVariables(fileName string, values map[string]string) error {
+	if err := validateFileName(fileName); err != nil {
+		return err
+	}
+	if _, err := repository.readShared(fileName); err != nil {
+		return err
+	}
+	for name := range values {
+		if !IsVariableName(name) {
+			return fmt.Errorf("%w: %q is not a valid variable name", ErrInvalidEnvironment, name)
+		}
+	}
+
+	path := repository.LocalPath(fileName)
+	if len(values) == 0 && !fileExists(path) {
+		return nil
+	}
+	content, err := encodeLocalOverrides(path, values)
+	if err != nil {
+		return fmt.Errorf("encode local overrides of %s: %w", fileName, err)
+	}
+	return files.WriteAtomically(path, content)
+}

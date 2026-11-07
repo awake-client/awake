@@ -91,6 +91,36 @@ func (service *Service) Save(workspaceRoot string, scope string, fileName string
 	return repository.Save(fileName, environment)
 }
 
+// Clone copies an environment of a scope, with its local overrides, under a
+// new file name and display name.
+func (service *Service) Clone(workspaceRoot string, scope string, sourceFileName string, targetFileName string, name string) error {
+	repository, err := NewScopedRepository(workspaceRoot, scope)
+	if err != nil {
+		return err
+	}
+	return repository.Clone(sourceFileName, targetFileName, name)
+}
+
+// SaveLocal replaces the local overrides of an environment: values kept on
+// this machine only, which win over the shared file.
+func (service *Service) SaveLocal(workspaceRoot string, scope string, fileName string, variables map[string]string) error {
+	repository, err := NewScopedRepository(workspaceRoot, scope)
+	if err != nil {
+		return err
+	}
+	return repository.SaveLocalVariables(fileName, variables)
+}
+
+// Rename moves an environment of a scope, with its local overrides, to a new
+// file name, so the file name keeps following the display name.
+func (service *Service) Rename(workspaceRoot string, scope string, fileName string, newFileName string) error {
+	repository, err := NewScopedRepository(workspaceRoot, scope)
+	if err != nil {
+		return err
+	}
+	return repository.Rename(fileName, newFileName)
+}
+
 // Delete removes a shared environment and its local overrides.
 func (service *Service) Delete(workspaceRoot string, scope string, fileName string) error {
 	repository, err := NewScopedRepository(workspaceRoot, scope)

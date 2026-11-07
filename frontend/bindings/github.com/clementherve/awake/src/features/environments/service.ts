@@ -17,6 +17,14 @@ import { Call as $Call, CancellablePromise as $CancellablePromise } from "@wails
 import * as $models from "./models.js";
 
 /**
+ * Clone copies an environment of a scope, with its local overrides, under a
+ * new file name and display name.
+ */
+export function Clone(workspaceRoot: string, scope: string, sourceFileName: string, targetFileName: string, name: string): $CancellablePromise<void> {
+    return $Call.ByID(3690562196, workspaceRoot, scope, sourceFileName, targetFileName, name);
+}
+
+/**
  * Delete removes a shared environment and its local overrides.
  */
 export function Delete(workspaceRoot: string, scope: string, fileName: string): $CancellablePromise<void> {
@@ -46,8 +54,24 @@ export function Load(workspaceRoot: string, scope: string, fileName: string): $C
 }
 
 /**
+ * Rename moves an environment of a scope, with its local overrides, to a new
+ * file name, so the file name keeps following the display name.
+ */
+export function Rename(workspaceRoot: string, scope: string, fileName: string, newFileName: string): $CancellablePromise<void> {
+    return $Call.ByID(699417037, workspaceRoot, scope, fileName, newFileName);
+}
+
+/**
  * Save writes a shared environment file.
  */
 export function Save(workspaceRoot: string, scope: string, fileName: string, environment: $models.Environment): $CancellablePromise<void> {
     return $Call.ByID(4242816834, workspaceRoot, scope, fileName, environment);
+}
+
+/**
+ * SaveLocal replaces the local overrides of an environment: values kept on
+ * this machine only, which win over the shared file.
+ */
+export function SaveLocal(workspaceRoot: string, scope: string, fileName: string, variables: { [_ in string]?: string } | null): $CancellablePromise<void> {
+    return $Call.ByID(2364440569, workspaceRoot, scope, fileName, variables);
 }
