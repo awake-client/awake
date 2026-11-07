@@ -1,5 +1,7 @@
 package workspace
 
+import "log"
+
 // Service exposes workspace operations to the application layer.
 type Service struct{}
 
@@ -13,9 +15,19 @@ func (service *Service) Create(rootPath string, options CreateOptions) (Configur
 	return Create(rootPath, options)
 }
 
-// Open reads and validates an existing workspace.
+// Open reads and validates an existing workspace, and refreshes the editor
+// schemas of its files so they follow this version of Awake.
 func (service *Service) Open(rootPath string) (Configuration, error) {
-	return NewRepository(rootPath).Load()
+	configuration, err := NewRepository(rootPath).Load()
+	if err != nil {
+		return Configuration{}, err
+	}
+	// A workspace stays usable without editor schemas, in a read-only
+	// directory for instance, so a failure is only reported in the log.
+	if err := EnsureEditorSchemas(rootPath); err != nil {
+		log.Printf("workspace: editor schemas not updated in %s: %v", rootPath, err)
+	}
+	return configuration, nil
 }
 
 // UpdateGit replaces the git synchronization settings stored in awake.yaml.

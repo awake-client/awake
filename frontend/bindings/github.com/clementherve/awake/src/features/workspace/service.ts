@@ -22,7 +22,8 @@ export function Create(rootPath: string, options: $models.CreateOptions): $Cance
 }
 
 /**
- * Open reads and validates an existing workspace.
+ * Open reads and validates an existing workspace, and refreshes the editor
+ * schemas of its files so they follow this version of Awake.
  */
 export function Open(rootPath: string): $CancellablePromise<$models.Configuration> {
     return $Call.ByID(3752288082, rootPath);

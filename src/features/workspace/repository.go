@@ -157,6 +157,9 @@ func Create(rootPath string, options CreateOptions) (Configuration, error) {
 	if err := ensureIgnoreFile(rootPath); err != nil {
 		return Configuration{}, err
 	}
+	if err := EnsureEditorSchemas(rootPath); err != nil {
+		return Configuration{}, err
+	}
 
 	return configuration, nil
 }
