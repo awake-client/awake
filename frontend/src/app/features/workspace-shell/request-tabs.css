@@ -24,9 +24,10 @@
   display: flex;
   align-items: center;
   gap: 7px;
+  /* Tabs follow their title and only shrink (with an ellipsis) when the
+     strip runs out of room; a single tab uses the space it needs. */
   flex: 0 1 auto;
   min-width: 96px;
-  max-width: 220px;
   height: 28px;
   padding: 0 4px 0 10px;
   border: 1px solid transparent;
