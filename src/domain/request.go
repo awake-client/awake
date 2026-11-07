@@ -148,9 +148,20 @@ type ScriptTest struct {
 // EnvironmentChange is a variable a script stores in, or removes from, the
 // selected environment so later requests see it.
 type EnvironmentChange struct {
-	Name    string
-	Value   string
-	Removed bool
+	// Environment is the file name of the environment to change, or empty
+	// for the selected environment.
+	Environment string
+	Name        string
+	Value       string
+	Removed     bool
+}
+
+// EnvironmentResolver gives scripts access to environments other than the
+// selected one.
+type EnvironmentResolver interface {
+	// ResolveEnvironment finds an environment by file name or display name
+	// and returns its file name with the variables a request would see.
+	ResolveEnvironment(name string) (fileName string, variables map[string]string, err error)
 }
 
 // ScriptOutcome is the result of a pre-request or post-response script.

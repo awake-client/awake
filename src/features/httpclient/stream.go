@@ -134,7 +134,7 @@ func (service *Service) OpenStream(workspaceRoot string, requestPath string, env
 	}
 	layers := variables.Maps(labeledLayers)
 
-	layers, preRequestOutcome := service.runPreRequest(&request, layers)
+	layers, preRequestOutcome := service.runPreRequest(&request, layers, service.environmentResolver(workspaceRoot, requestPath))
 	service.saveEnvironmentChanges(workspaceRoot, requestPath, environmentFileName, &preRequestOutcome)
 
 	oauth2Token, err := service.oauth2Token(workspaceRoot, requestPath, environmentFileName, request, layers)

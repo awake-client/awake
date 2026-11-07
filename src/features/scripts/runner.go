@@ -5,7 +5,9 @@ package scripts
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"net/http"
 	"sort"
 	"strings"
 	"time"
@@ -31,7 +33,7 @@ func NewRunner() *Runner {
 // BeforeRequest runs the pre-request script. It may mutate the request and
 // the variable map; the caller applies the variable map as the highest
 // precedence layer before interpolation.
-func (runner *Runner) BeforeRequest(script string, request *domain.Request, variables map[string]string) domain.ScriptOutcome {
+func (runner *Runner) BeforeRequest(script string, request *domain.Request, variables map[string]string, environments domain.EnvironmentResolver) domain.ScriptOutcome {
 	if strings.TrimSpace(script) == "" {
 		return domain.ScriptOutcome{}
 	}
@@ -40,7 +42,8 @@ func (runner *Runner) BeforeRequest(script string, request *domain.Request, vari
 	outcome := domain.ScriptOutcome{}
 	requestObject := requestToObject(runtime, request)
 	variablesObject := variablesToObject(runtime, variables)
-	installHelper(runtime, variablesObject, &outcome)
+	installHelper(runtime, variablesObject, environments, &outcome)
+	installConsole(runtime, &outcome)
 
 	runtime.Set("request", requestObject)
 	runtime.Set("variables", variablesObject)
@@ -54,7 +57,7 @@ func (runner *Runner) BeforeRequest(script string, request *domain.Request, vari
 }
 
 // AfterResponse runs the post-response script against the response preview.
-func (runner *Runner) AfterResponse(script string, request domain.Request, response domain.ScriptResponse, variables map[string]string) domain.ScriptOutcome {
+func (runner *Runner) AfterResponse(script string, request domain.Request, response domain.ScriptResponse, variables map[string]string, environments domain.EnvironmentResolver) domain.ScriptOutcome {
 	if strings.TrimSpace(script) == "" {
 		return domain.ScriptOutcome{}
 	}
@@ -62,7 +65,8 @@ func (runner *Runner) AfterResponse(script string, request domain.Request, respo
 	runtime := goja.New()
 	outcome := domain.ScriptOutcome{}
 	variablesObject := variablesToObject(runtime, variables)
-	installHelper(runtime, variablesObject, &outcome)
+	installHelper(runtime, variablesObject, environments, &outcome)
+	installConsole(runtime, &outcome)
 
 	runtime.Set("request", requestToObject(runtime, &request))
 	runtime.Set("response", responseToObject(runtime, response))
@@ -85,17 +89,10 @@ func run(runtime *goja.Runtime, script string, timeout time.Duration, outcome *d
 	}
 }
 
-func installHelper(runtime *goja.Runtime, variablesObject *goja.Object, outcome *domain.ScriptOutcome) {
+func installHelper(runtime *goja.Runtime, variablesObject *goja.Object, environments domain.EnvironmentResolver, outcome *domain.ScriptOutcome) {
 	helper := runtime.NewObject()
 
-	_ = helper.Set("log", func(call goja.FunctionCall) goja.Value {
-		parts := make([]string, 0, len(call.Arguments))
-		for _, argument := range call.Arguments {
-			parts = append(parts, valueToString(argument))
-		}
-		outcome.Logs = append(outcome.Logs, strings.Join(parts, " "))
-		return goja.Undefined()
-	})
+	_ = helper.Set("log", logFunction(outcome, ""))
 
 	_ = helper.Set("test", func(call goja.FunctionCall) goja.Value {
 		name := "test"
@@ -154,7 +151,81 @@ func installHelper(runtime *goja.Runtime, variablesObject *goja.Object, outcome 
 	})
 	_ = helper.Set("environment", environment)
 
+	named := runtime.NewObject()
+	handles := map[string]*goja.Object{}
+	_ = named.Set("get", func(name string) *goja.Object {
+		if environments == nil {
+			panic(runtime.NewGoError(errEnvironmentsUnavailable))
+		}
+		fileName, values, err := environments.ResolveEnvironment(name)
+		if err != nil {
+			panic(runtime.NewGoError(err))
+		}
+		if handle, found := handles[fileName]; found {
+			return handle
+		}
+		handle := namedEnvironment(runtime, fileName, values, outcome)
+		handles[fileName] = handle
+		return handle
+	})
+	_ = helper.Set("environments", named)
+
 	_ = runtime.Set("awake", helper)
+}
+
+var errEnvironmentsUnavailable = errors.New("other environments are not available to this script")
+
+// namedEnvironment is the handle returned by awake.environments.get. Its
+// changes are saved like those of awake.environment but do not affect the
+// variables of the running request.
+func namedEnvironment(runtime *goja.Runtime, fileName string, values map[string]string, outcome *domain.ScriptOutcome) *goja.Object {
+	current := make(map[string]string, len(values))
+	for name, value := range values {
+		current[name] = value
+	}
+
+	handle := runtime.NewObject()
+	_ = handle.Set("name", fileName)
+	_ = handle.Set("get", func(name string) goja.Value {
+		value, found := current[name]
+		if !found {
+			return goja.Null()
+		}
+		return runtime.ToValue(value)
+	})
+	_ = handle.Set("set", func(name string, value goja.Value) {
+		text := valueToString(value)
+		current[name] = text
+		outcome.EnvironmentChanges = append(outcome.EnvironmentChanges, domain.EnvironmentChange{Environment: fileName, Name: name, Value: text})
+	})
+	_ = handle.Set("unset", func(name string) {
+		delete(current, name)
+		outcome.EnvironmentChanges = append(outcome.EnvironmentChanges, domain.EnvironmentChange{Environment: fileName, Name: name, Removed: true})
+	})
+	return handle
+}
+
+// installConsole maps console methods to the script logs, as goja provides
+// no console of its own. Warnings and errors are prefixed to stand out.
+func installConsole(runtime *goja.Runtime, outcome *domain.ScriptOutcome) {
+	console := runtime.NewObject()
+	_ = console.Set("log", logFunction(outcome, ""))
+	_ = console.Set("info", logFunction(outcome, ""))
+	_ = console.Set("debug", logFunction(outcome, ""))
+	_ = console.Set("warn", logFunction(outcome, "warning: "))
+	_ = console.Set("error", logFunction(outcome, "error: "))
+	_ = runtime.Set("console", console)
+}
+
+func logFunction(outcome *domain.ScriptOutcome, prefix string) func(goja.FunctionCall) goja.Value {
+	return func(call goja.FunctionCall) goja.Value {
+		parts := make([]string, 0, len(call.Arguments))
+		for _, argument := range call.Arguments {
+			parts = append(parts, valueToString(argument))
+		}
+		outcome.Logs = append(outcome.Logs, prefix+strings.Join(parts, " "))
+		return goja.Undefined()
+	}
 }
 
 func requestToObject(runtime *goja.Runtime, request *domain.Request) *goja.Object {
@@ -200,6 +271,15 @@ func responseToObject(runtime *goja.Runtime, response domain.ScriptResponse) *go
 		_ = headers.Set(name, strings.Join(values, ", "))
 	}
 	_ = object.Set("headers", headers)
+
+	cookies := runtime.NewObject()
+	pairs := make([]string, 0)
+	for _, cookie := range (&http.Response{Header: http.Header(response.Headers)}).Cookies() {
+		_ = cookies.Set(cookie.Name, cookie.Value)
+		pairs = append(pairs, cookie.Name+"="+cookie.Value)
+	}
+	_ = object.Set("cookies", cookies)
+	_ = object.Set("cookieHeader", strings.Join(pairs, "; "))
 
 	// json parses the body preview, throwing a JavaScript error when it is not
 	// valid JSON, like JSON.parse.

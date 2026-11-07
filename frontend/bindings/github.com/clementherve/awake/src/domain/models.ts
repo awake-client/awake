@@ -91,6 +91,11 @@ export interface Collection {
  * selected environment so later requests see it.
  */
 export interface EnvironmentChange {
+    /**
+     * Environment is the file name of the environment to change, or empty
+     * for the selected environment.
+     */
+    "Environment": string;
     "Name": string;
     "Value": string;
     "Removed": boolean;

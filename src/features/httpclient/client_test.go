@@ -502,6 +502,7 @@ func (runner *fakeScriptRunner) BeforeRequest(
 	_ string,
 	request *domain.Request,
 	variables map[string]string,
+	_ domain.EnvironmentResolver,
 ) domain.ScriptOutcome {
 	runner.preRequestCalls++
 	variables["scriptValue"] = "from-script"
@@ -523,6 +524,7 @@ func (runner *fakeScriptRunner) AfterResponse(
 	_ domain.Request,
 	response domain.ScriptResponse,
 	_ map[string]string,
+	_ domain.EnvironmentResolver,
 ) domain.ScriptOutcome {
 	runner.postResponseCalls++
 	runner.postResponse = response
@@ -626,6 +628,7 @@ func (runner *environmentScriptRunner) AfterResponse(
 	_ domain.Request,
 	_ domain.ScriptResponse,
 	_ map[string]string,
+	_ domain.EnvironmentResolver,
 ) domain.ScriptOutcome {
 	return domain.ScriptOutcome{EnvironmentChanges: []domain.EnvironmentChange{{Name: "token", Value: "abc"}}}
 }
@@ -633,6 +636,10 @@ func (runner *environmentScriptRunner) AfterResponse(
 type fakeEnvironmentWriter struct {
 	environmentFileName string
 	changes             []domain.EnvironmentChange
+}
+
+func (writer *fakeEnvironmentWriter) ResolveEnvironmentName(_ string, _ string, name string) (string, error) {
+	return name, nil
 }
 
 func (writer *fakeEnvironmentWriter) ApplyEnvironmentChanges(_ string, _ string, environmentFileName string, changes []domain.EnvironmentChange) error {

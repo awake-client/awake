@@ -61,19 +61,24 @@ type ScriptRunner interface {
 		script string,
 		request *domain.Request,
 		variables map[string]string,
+		environments domain.EnvironmentResolver,
 	) domain.ScriptOutcome
 	AfterResponse(
 		script string,
 		request domain.Request,
 		response domain.ScriptResponse,
 		variables map[string]string,
+		environments domain.EnvironmentResolver,
 	) domain.ScriptOutcome
 }
 
-// EnvironmentWriter saves the variables a script stores in the selected
-// environment. The application layer supplies the implementation so this
-// feature does not depend on the environments feature.
+// EnvironmentWriter saves the variables a script stores in an environment and
+// finds the environments a script names. The application layer supplies the
+// implementation so this feature does not depend on the environments feature.
 type EnvironmentWriter interface {
+	// ResolveEnvironmentName returns the file name of the environment visible
+	// to the request whose file name or display name is name.
+	ResolveEnvironmentName(workspaceRoot string, requestPath string, name string) (string, error)
 	ApplyEnvironmentChanges(
 		workspaceRoot string,
 		requestPath string,
@@ -150,7 +155,8 @@ func (service *Service) Send(workspaceRoot string, requestPath string, environme
 	}
 	layers := variables.Maps(labeledLayers)
 
-	layers, preRequestOutcome := service.runPreRequest(&request, layers)
+	environments := service.environmentResolver(workspaceRoot, requestPath)
+	layers, preRequestOutcome := service.runPreRequest(&request, layers, environments)
 	service.saveEnvironmentChanges(workspaceRoot, requestPath, environmentFileName, &preRequestOutcome)
 
 	oauth2Token, err := service.oauth2Token(workspaceRoot, requestPath, environmentFileName, request, layers)
@@ -196,14 +202,14 @@ func (service *Service) Send(workspaceRoot string, requestPath string, environme
 	}
 
 	response.PreRequestOutcome = preRequestOutcome
-	response.PostResponseOutcome = service.runPostResponse(request, response, layers)
+	response.PostResponseOutcome = service.runPostResponse(request, response, layers, environments)
 	service.saveEnvironmentChanges(workspaceRoot, requestPath, environmentFileName, &response.PostResponseOutcome)
 	response.HistoryWarning = service.recordHistory(workspaceRoot, requestPath, environmentFileName, request, sent, response)
 
 	return response, nil
 }
 
-func (service *Service) runPreRequest(request *domain.Request, layers []map[string]string) ([]map[string]string, domain.ScriptOutcome) {
+func (service *Service) runPreRequest(request *domain.Request, layers []map[string]string, environments domain.EnvironmentResolver) ([]map[string]string, domain.ScriptOutcome) {
 	if request.Scripts == nil || strings.TrimSpace(request.Scripts.PreRequest) == "" {
 		return layers, domain.ScriptOutcome{}
 	}
@@ -215,12 +221,12 @@ func (service *Service) runPreRequest(request *domain.Request, layers []map[stri
 	// highest precedence layer, so a variable it sets wins over the
 	// environment for this request only.
 	variables := mergeLayers(layers)
-	outcome := service.scripts.BeforeRequest(request.Scripts.PreRequest, request, variables)
+	outcome := service.scripts.BeforeRequest(request.Scripts.PreRequest, request, variables, environments)
 
 	return append(layers, variables), outcome
 }
 
-func (service *Service) runPostResponse(request domain.Request, response Response, layers []map[string]string) domain.ScriptOutcome {
+func (service *Service) runPostResponse(request domain.Request, response Response, layers []map[string]string, environments domain.EnvironmentResolver) domain.ScriptOutcome {
 	if request.Scripts == nil || strings.TrimSpace(request.Scripts.PostResponse) == "" {
 		return domain.ScriptOutcome{}
 	}
@@ -240,29 +246,75 @@ func (service *Service) runPostResponse(request domain.Request, response Respons
 			DurationMilliseconds: response.DurationMilliseconds,
 		},
 		mergeLayers(layers),
+		environments,
 	)
 }
 
 // noEnvironmentMessage explains why awake.environment changes were dropped.
-const noEnvironmentMessage = "no environment is selected, so the environment changes were not saved"
+const noEnvironmentMessage = "no environment is selected, so the changes to the selected environment were not saved"
 
 // saveEnvironmentChanges writes what a script stored with awake.environment
-// and reports a failure on the outcome rather than failing the request.
+// and awake.environments, grouped by environment, and reports a failure on
+// the outcome rather than failing the request.
 func (service *Service) saveEnvironmentChanges(workspaceRoot string, requestPath string, environmentFileName string, outcome *domain.ScriptOutcome) {
 	if len(outcome.EnvironmentChanges) == 0 {
 		return
 	}
-	switch {
-	case environmentFileName == "":
-		outcome.EnvironmentError = noEnvironmentMessage
-	case service.environments == nil:
+	if service.environments == nil {
 		outcome.EnvironmentError = "environment writer is not configured"
-	default:
-		err := service.environments.ApplyEnvironmentChanges(workspaceRoot, requestPath, environmentFileName, outcome.EnvironmentChanges)
-		if err != nil {
-			outcome.EnvironmentError = err.Error()
+		return
+	}
+
+	order := make([]string, 0)
+	groups := make(map[string][]domain.EnvironmentChange)
+	for _, change := range outcome.EnvironmentChanges {
+		target := change.Environment
+		if target == "" {
+			target = environmentFileName
+		}
+		if _, seen := groups[target]; !seen {
+			order = append(order, target)
+		}
+		groups[target] = append(groups[target], change)
+	}
+
+	failures := make([]string, 0)
+	for _, target := range order {
+		if target == "" {
+			failures = append(failures, noEnvironmentMessage)
+			continue
+		}
+		if err := service.environments.ApplyEnvironmentChanges(workspaceRoot, requestPath, target, groups[target]); err != nil {
+			failures = append(failures, fmt.Sprintf("%s: %v", target, err))
 		}
 	}
+	outcome.EnvironmentError = strings.Join(failures, "; ")
+}
+
+// environmentResolver lets scripts open other environments by name.
+func (service *Service) environmentResolver(workspaceRoot string, requestPath string) domain.EnvironmentResolver {
+	if service.environments == nil {
+		return nil
+	}
+	return scriptEnvironments{service: service, workspaceRoot: workspaceRoot, requestPath: requestPath}
+}
+
+type scriptEnvironments struct {
+	service       *Service
+	workspaceRoot string
+	requestPath   string
+}
+
+func (environments scriptEnvironments) ResolveEnvironment(name string) (string, map[string]string, error) {
+	fileName, err := environments.service.environments.ResolveEnvironmentName(environments.workspaceRoot, environments.requestPath, name)
+	if err != nil {
+		return "", nil, err
+	}
+	layers, err := environments.service.source.LoadVariableLayers(environments.workspaceRoot, environments.requestPath, fileName)
+	if err != nil {
+		return "", nil, err
+	}
+	return fileName, mergeLayers(variables.Maps(layers)), nil
 }
 
 func mergeLayers(layers []map[string]string) map[string]string {

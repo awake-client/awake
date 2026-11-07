@@ -2,7 +2,9 @@ package app
 
 import (
 	"errors"
+	"fmt"
 	"slices"
+	"strings"
 
 	"github.com/clementherve/awake/src/domain"
 	"github.com/clementherve/awake/src/features/environments"
@@ -79,4 +81,39 @@ func mostSpecificEnvironment(workspaceRoot string, requestPath string, environme
 		return scope, resolved, nil
 	}
 	return "", environments.ResolvedEnvironment{}, environments.ErrEnvironmentNotFound
+}
+
+// ResolveEnvironmentName finds an environment visible to the request, in its
+// collection or globally, by file name first and then by display name,
+// ignoring case.
+func (environmentWriter) ResolveEnvironmentName(workspaceRoot string, requestPath string, name string) (string, error) {
+	scopes := []string{""}
+	if scope := environments.ScopeOfRequest(requestPath); scope != "" {
+		scopes = append(scopes, scope)
+	}
+
+	summaries := make([]environments.Summary, 0)
+	for _, scope := range scopes {
+		repository, err := environments.NewScopedRepository(workspaceRoot, scope)
+		if err != nil {
+			return "", err
+		}
+		listed, err := repository.List()
+		if err != nil {
+			return "", err
+		}
+		summaries = append(summaries, listed...)
+	}
+
+	for _, summary := range summaries {
+		if summary.FileName == name {
+			return summary.FileName, nil
+		}
+	}
+	for _, summary := range summaries {
+		if strings.EqualFold(summary.Name, strings.TrimSpace(name)) {
+			return summary.FileName, nil
+		}
+	}
+	return "", fmt.Errorf("environment %q not found", name)
 }

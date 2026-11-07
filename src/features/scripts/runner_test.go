@@ -1,6 +1,7 @@
 package scripts
 
 import (
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -36,7 +37,7 @@ func TestBeforeRequestMutatesRequestAndVariables(t *testing.T) {
 		awake.setVariable("greeting", "hello");
 		awake.log("preparing", request.method);
 		awake.test("token is available", awake.getVariable("token") === "secret-token");
-	`, &request, variables)
+	`, &request, variables, nil)
 
 	if outcome.Error != "" {
 		t.Fatalf("unexpected script error: %s", outcome.Error)
@@ -95,7 +96,7 @@ func TestBeforeRequestReportsFailingAssertion(t *testing.T) {
 		awake.test("throws", () => { throw new Error("boom"); });
 		awake.test("returns false", () => false);
 		awake.test("returns true", () => true);
-	`, &request, map[string]string{})
+	`, &request, map[string]string{}, nil)
 
 	if len(outcome.Tests) != 4 {
 		t.Fatalf("unexpected tests: %+v", outcome.Tests)
@@ -131,7 +132,7 @@ func TestAfterResponseExposesTheResponse(t *testing.T) {
 		awake.setVariable("userName", JSON.parse(response.body).name);
 		awake.test("successful", response.status === 200);
 		awake.test("has a body", response.body.indexOf("Ada") >= 0);
-	`, domain.Request{Name: "List users"}, response, variables)
+	`, domain.Request{Name: "List users"}, response, variables, nil)
 
 	if outcome.Error != "" {
 		t.Fatalf("unexpected script error: %s", outcome.Error)
@@ -157,7 +158,7 @@ func TestRunnerInterruptsEndlessScripts(t *testing.T) {
 	request := domain.Request{Name: "List users", Method: domain.MethodGet, URL: "https://example.com"}
 
 	startedAt := time.Now()
-	outcome := runner.BeforeRequest("while (true) {}", &request, map[string]string{})
+	outcome := runner.BeforeRequest("while (true) {}", &request, map[string]string{}, nil)
 
 	if outcome.Error == "" {
 		t.Fatal("expected the script to be interrupted")
@@ -170,7 +171,7 @@ func TestRunnerInterruptsEndlessScripts(t *testing.T) {
 func TestEmptyScriptReturnsAnEmptyOutcome(t *testing.T) {
 	request := domain.Request{Name: "List users", Method: domain.MethodGet, URL: "https://example.com"}
 
-	outcome := NewRunner().BeforeRequest("  \n ", &request, map[string]string{})
+	outcome := NewRunner().BeforeRequest("  \n ", &request, map[string]string{}, nil)
 	if outcome.Error != "" || len(outcome.Logs) != 0 || len(outcome.Tests) != 0 {
 		t.Errorf("unexpected outcome: %+v", outcome)
 	}
@@ -194,7 +195,7 @@ func TestScriptsStoreEnvironmentChanges(t *testing.T) {
 		awake.environment.unset("stale");
 		awake.test("reads its own write", awake.environment.get("token") === "new");
 		awake.test("removed value reads as null", awake.environment.get("stale") === null);
-	`, request, domain.ScriptResponse{StatusCode: 200}, variables)
+	`, request, domain.ScriptResponse{StatusCode: 200}, variables, nil)
 
 	if outcome.Error != "" {
 		t.Fatalf("unexpected script error: %s", outcome.Error)
@@ -232,7 +233,7 @@ func TestSetVariableOverridesAnExistingValue(t *testing.T) {
 	request := domain.Request{Method: domain.MethodGet, URL: "https://example.com"}
 	variables := map[string]string{"token": "old"}
 
-	outcome := NewRunner().BeforeRequest(`awake.setVariable("token", "new");`, &request, variables)
+	outcome := NewRunner().BeforeRequest(`awake.setVariable("token", "new");`, &request, variables, nil)
 
 	if outcome.Error != "" {
 		t.Fatalf("unexpected script error: %s", outcome.Error)
@@ -251,13 +252,70 @@ func TestResponseJSONParsesTheBody(t *testing.T) {
 
 	outcome := NewRunner().AfterResponse(`
 		awake.test("parsed", response.json().token === "abc");
-	`, request, response, map[string]string{})
+	`, request, response, map[string]string{}, nil)
 	if outcome.Error != "" || !outcome.Tests[0].Passed {
 		t.Fatalf("unexpected outcome: %+v", outcome)
 	}
 
-	invalid := NewRunner().AfterResponse(`response.json();`, request, domain.ScriptResponse{Body: "not json"}, map[string]string{})
+	invalid := NewRunner().AfterResponse(`response.json();`, request, domain.ScriptResponse{Body: "not json"}, map[string]string{}, nil)
 	if !strings.Contains(invalid.Error, "SyntaxError") {
 		t.Errorf("expected a syntax error, got %q", invalid.Error)
+	}
+}
+
+type fakeEnvironments map[string]map[string]string
+
+func (environments fakeEnvironments) ResolveEnvironment(name string) (string, map[string]string, error) {
+	for fileName, values := range environments {
+		if strings.EqualFold(fileName, name) {
+			return fileName, values, nil
+		}
+	}
+	return "", nil, errors.New("environment not found")
+}
+
+func TestScriptsChangeNamedEnvironments(t *testing.T) {
+	request := domain.Request{Method: domain.MethodGet, URL: "https://example.com"}
+	response := domain.ScriptResponse{
+		StatusCode: 200,
+		Headers: map[string][]string{
+			"Set-Cookie": {"session=abc; Path=/; Expires=Wed, 21 Oct 2026 07:28:00 GMT", "theme=dark"},
+		},
+	}
+	environments := fakeEnvironments{"production": {"region": "eu"}}
+	variables := map[string]string{}
+
+	outcome := NewRunner().AfterResponse(`
+		const production = awake.environments.get("Production");
+		awake.test("reads", production.get("region") === "eu");
+		production.set("cookies", response.cookieHeader);
+		awake.test("reads its write", production.get("cookies") === "session=abc; theme=dark");
+		awake.test("parses cookies", response.cookies.session === "abc");
+		console.log("saved", production.name);
+		console.error("boom");
+	`, request, response, variables, environments)
+
+	if outcome.Error != "" {
+		t.Fatalf("unexpected script error: %s", outcome.Error)
+	}
+	for _, test := range outcome.Tests {
+		if !test.Passed {
+			t.Errorf("test %q failed: %s", test.Name, test.Error)
+		}
+	}
+	expected := domain.EnvironmentChange{Environment: "production", Name: "cookies", Value: "session=abc; theme=dark"}
+	if len(outcome.EnvironmentChanges) != 1 || outcome.EnvironmentChanges[0] != expected {
+		t.Errorf("unexpected changes: %+v", outcome.EnvironmentChanges)
+	}
+	if _, found := variables["cookies"]; found {
+		t.Error("a named environment must not change the running request's variables")
+	}
+	if strings.Join(outcome.Logs, "|") != "saved production|error: boom" {
+		t.Errorf("unexpected logs: %v", outcome.Logs)
+	}
+
+	missing := NewRunner().AfterResponse(`awake.environments.get("staging");`, request, response, variables, environments)
+	if !strings.Contains(missing.Error, "environment not found") {
+		t.Errorf("expected a missing environment error, got %q", missing.Error)
 	}
 }
