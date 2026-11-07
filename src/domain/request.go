@@ -5,6 +5,7 @@ package domain
 
 import (
 	"errors"
+	"net/url"
 	"strings"
 )
 
@@ -128,6 +129,70 @@ type Authentication struct {
 type Body struct {
 	Type    BodyType `yaml:"type"`
 	Content string   `yaml:"content,omitempty"`
+	// Fields holds the fields of a form body, form-urlencoded or multipart,
+	// in place of Content. Each one is encoded after its variables are
+	// resolved.
+	Fields []Parameter `yaml:"fields,omitempty"`
+}
+
+// IsForm reports whether the body is made of fields rather than text.
+func (body Body) IsForm() bool {
+	return body.Type == BodyFormURLEncoded || body.Type == BodyMultipart
+}
+
+// NormalizeForm moves a form written as text, by earlier versions or
+// imports, into fields: an encoded query such as a=1&b=2, or one field per
+// line written name: value or name=value, a leading ~ disabling it.
+func (body *Body) NormalizeForm() {
+	if !body.IsForm() || len(body.Fields) > 0 || strings.TrimSpace(body.Content) == "" {
+		return
+	}
+	body.Fields = parseFormContent(body.Content)
+	body.Content = ""
+}
+
+func parseFormContent(content string) []Parameter {
+	trimmed := strings.TrimSpace(content)
+	fields := make([]Parameter, 0)
+
+	if !strings.Contains(trimmed, "\n") && !strings.Contains(trimmed, ": ") {
+		for _, pair := range strings.Split(trimmed, "&") {
+			if pair == "" {
+				continue
+			}
+			name, value, _ := strings.Cut(pair, "=")
+			fields = append(fields, Parameter{Name: unescapeForm(name), Value: unescapeForm(value), Enabled: true})
+		}
+		return fields
+	}
+
+	for _, line := range strings.Split(trimmed, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		enabled := !strings.HasPrefix(line, "~")
+		line = strings.TrimSpace(strings.TrimPrefix(line, "~"))
+
+		separator := strings.IndexAny(line, ":=")
+		if separator <= 0 {
+			continue
+		}
+		fields = append(fields, Parameter{
+			Name:    strings.TrimSpace(line[:separator]),
+			Value:   strings.TrimSpace(line[separator+1:]),
+			Enabled: enabled,
+		})
+	}
+	return fields
+}
+
+func unescapeForm(value string) string {
+	unescaped, err := url.QueryUnescape(value)
+	if err != nil {
+		return value
+	}
+	return unescaped
 }
 
 // Scripts holds the JavaScript hooks of a request. They run inside the
@@ -214,6 +279,7 @@ func (request *Request) ApplyDefaults() {
 	if request.Body == nil {
 		request.Body = &Body{Type: BodyNone}
 	}
+	request.Body.NormalizeForm()
 }
 
 // Validate checks the required fields and the supported enumerations.

@@ -647,6 +647,15 @@ func buildBody(body *domain.Body, layers []map[string]string) (io.Reader, string
 	if body.Type == domain.BodyMultipart || body.Type == domain.BodyBinary {
 		return nil, "", fmt.Errorf("%w: %s", ErrUnsupportedBody, body.Type)
 	}
+	if body.Type == domain.BodyFormURLEncoded {
+		normalized := *body
+		normalized.NormalizeForm()
+		content, err := encodeForm(normalized.Fields, layers)
+		if err != nil {
+			return nil, "", err
+		}
+		return strings.NewReader(content), defaultContentType(body.Type), nil
+	}
 
 	content, err := interpolate(body.Content, layers)
 	if err != nil {
@@ -654,6 +663,27 @@ func buildBody(body *domain.Body, layers []map[string]string) (io.Reader, string
 	}
 
 	return strings.NewReader(content), defaultContentType(body.Type), nil
+}
+
+// encodeForm encodes the enabled fields in order, each after its variables
+// are resolved, so a value holding & or = stays one field.
+func encodeForm(fields []domain.Parameter, layers []map[string]string) (string, error) {
+	parts := make([]string, 0, len(fields))
+	for _, field := range fields {
+		if !field.Enabled || strings.TrimSpace(field.Name) == "" {
+			continue
+		}
+		name, err := interpolate(field.Name, layers)
+		if err != nil {
+			return "", err
+		}
+		value, err := interpolate(field.Value, layers)
+		if err != nil {
+			return "", err
+		}
+		parts = append(parts, url.QueryEscape(name)+"="+url.QueryEscape(value))
+	}
+	return strings.Join(parts, "&"), nil
 }
 
 func defaultContentType(bodyType domain.BodyType) string {
