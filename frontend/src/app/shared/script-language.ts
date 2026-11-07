@@ -132,7 +132,16 @@ const namedEnvironmentEntry: ApiEntry = {
   documentation:
     'An environment opened by name. Its changes are saved but do not affect the running request.',
   members: {
-    name: { type: 'property', detail: 'string', documentation: 'File name of the environment.' },
+    name: {
+      type: 'property',
+      detail: 'string',
+      documentation: 'Display name of the environment, such as "Production".',
+    },
+    fileName: {
+      type: 'property',
+      detail: 'string',
+      documentation: 'File name of the environment, without the .yaml extension.',
+    },
     ...environmentMembers('this environment'),
   },
 };
