@@ -146,6 +146,41 @@ export class TabsStore {
     }
   }
 
+  /**
+   * Closes several tabs at once. When the tab on screen is among them, the
+   * nearest remaining tab is shown instead, or the overview when none is left.
+   */
+  closeMany(paths: string[]): void {
+    const closing = new Set(paths);
+    const tabs = this.tabs();
+    if (!tabs.some((tab) => closing.has(tab.path))) {
+      return;
+    }
+
+    const activeIndex = tabs.findIndex((tab) => tab.path === this.active());
+    const remaining = tabs.filter((tab) => !closing.has(tab.path));
+    for (const path of closing) {
+      const state = this.stashes.get(path);
+      this.stashes.delete(path);
+      this.release(state);
+    }
+    this.tabs.set(remaining);
+    this.persist();
+
+    const active = this.active();
+    if (active === null || !closing.has(active)) {
+      return;
+    }
+    const next =
+      tabs.slice(activeIndex + 1).find((tab) => !closing.has(tab.path)) ??
+      [...tabs.slice(0, activeIndex)].reverse().find((tab) => !closing.has(tab.path));
+    if (next) {
+      this.open(next.path);
+    } else {
+      void this.router.navigate(['/workspace']);
+    }
+  }
+
   /** Shows the next or previous tab, wrapping around. */
   cycle(step: 1 | -1): void {
     const tabs = this.tabs();

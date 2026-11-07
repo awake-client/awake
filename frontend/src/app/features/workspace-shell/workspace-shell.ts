@@ -120,7 +120,8 @@ export class WorkspaceShell {
 
     // A request, or the settings of its collection, narrows the environments
     // offered to the global ones and those of that collection. Other pages
-    // keep the collection of the last request on screen.
+    // keep the collection of the last request on screen while a request tab
+    // is open, and go back to the global environments once none is.
     this.activeScope.set(collectionScopeOf(this.router.url));
     this.router.events
       .pipe(
@@ -128,10 +129,12 @@ export class WorkspaceShell {
         takeUntilDestroyed(this.destroyRef),
       )
       .subscribe(() => {
-        const scope = collectionScopeOf(this.router.url);
-        if (scope && scope !== this.activeScope()) {
+        const scope =
+          collectionScopeOf(this.router.url) ||
+          (this.tabs.tabs().length > 0 ? this.activeScope() : '');
+        if (scope !== this.activeScope()) {
           this.activeScope.set(scope);
-          // Each collection keeps the environment last chosen in it.
+          // Each scope keeps the environment last chosen in it.
           this.environmentStore.useScope(scope);
         }
       });
