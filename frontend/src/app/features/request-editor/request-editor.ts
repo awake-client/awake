@@ -68,6 +68,12 @@ const HTTP_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'
 /** Largest image the response panel decodes, so a huge payload stays in check. */
 const MAX_IMAGE_BYTES = 16 << 20;
 
+/** Width the response pane keeps when it sits beside the request. */
+const RESPONSE_MIN_WIDTH = 560;
+
+/** Width the request pane keeps when the response sits beside it. */
+const REQUEST_MIN_WIDTH = 360;
+
 /** Reason phrases for the statuses shown from the history. */
 const STATUS_TEXTS: Record<number, string> = {
   200: 'OK',
@@ -528,10 +534,20 @@ export class RequestEditor {
   /** Turns the handle position into the share of the editor the response takes. */
   protected resizeResponse(position: { x: number; y: number }): void {
     const rect = this.editor().nativeElement.getBoundingClientRect();
-    const ratio =
-      this.layout.editorLayout() === 'side'
-        ? (rect.right - position.x) / rect.width
-        : (rect.bottom - position.y) / rect.height;
+    const side = this.layout.editorLayout() === 'side';
+    let ratio = side
+      ? (rect.right - position.x) / rect.width
+      : (rect.bottom - position.y) / rect.height;
+
+    // Beside the request, the pane stays wide enough for its toolbar without
+    // squeezing the request pane below its own minimum.
+    if (side && rect.width > 0) {
+      const available = Math.max(0, rect.width - REQUEST_MIN_WIDTH);
+      const minimum = Math.min(RESPONSE_MIN_WIDTH, available) / rect.width;
+      const maximum = available / rect.width;
+      ratio = Math.min(Math.max(ratio, minimum), maximum);
+    }
+
     this.layout.setResponseRatio(ratio);
   }
 

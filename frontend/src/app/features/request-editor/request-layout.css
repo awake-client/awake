@@ -12,7 +12,11 @@
 
 .request-editor.side .response-section,
 .request-editor.side app-stream-panel {
-  min-width: 280px;
+  /* Keep the toolbar on one line while there is room, and never let the pane
+     push the request (min-width: 360px) off-screen. On a narrow editor the
+     response shrinks and its toolbar wraps instead. */
+  min-width: min(560px, calc(100% - 360px));
+  max-width: calc(100% - 360px);
   min-height: 0;
   border-top: none;
   border-left: 1px solid var(--color-border);
