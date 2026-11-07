@@ -26,7 +26,23 @@ through git instead of a cloud account.
 
 ## Install
 
-Download the latest build for your platform from
+macOS and Linux:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/awake-client/awake/main/install.sh | sh
+```
+
+The script downloads the latest release, verifies its SHA-256 checksum, installs
+`Awake.app` into `/Applications` (or `~/Applications`) on macOS, and adds the
+`awake` binary with an application menu entry on Linux. It takes `--version`,
+`--dir`, `--system`, `--no-path` and `--uninstall`; run
+`curl -fsSL .../install.sh | sh -s -- --help` for details.
+
+Awake needs GTK4 and WebKitGTK 6.0 on Linux (Ubuntu 24.04+, Debian 13+ or
+equivalent). macOS builds are ad-hoc signed, so the installer clears the
+quarantine flag to let Gatekeeper run them.
+
+Windows and manual downloads are available from
 [Releases](https://github.com/awake-client/awake/releases). Every `v*` tag
 publishes macOS (`arm64`, `amd64`), Linux (`amd64`, `arm64`) and Windows
 (`amd64`) builds.

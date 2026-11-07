@@ -145,7 +145,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          tar -czf "dist/${{ matrix.archive }}" -C dist "${{ matrix.binary }}"
+          # Ship the desktop entry and icon so install.sh can set up the
+          # application menu without downloading anything else.
+          cp build/appicon.png dist/awake.png
+          sed 's|^Exec=.*|Exec=awake %u|' build/linux/desktop > dist/awake.desktop
+          tar -czf "dist/${{ matrix.archive }}" -C dist \
+            "${{ matrix.binary }}" awake.png awake.desktop
+          rm -f dist/awake.png dist/awake.desktop
 
       - name: Package Windows archive
         if: matrix.goos == 'windows'
@@ -167,6 +173,13 @@ jobs:
         with:
           path: dist
           merge-multiple: true
+
+      - name: Write checksums
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd dist
+          sha256sum * > SHA256SUMS
 
       - name: Create or update the GitHub release
         shell: bash
