@@ -17,7 +17,9 @@ export type {
     HistoryEntry,
     HistoryExchange,
     Parameter,
+    PathParameter,
     Request,
+    RequestOverride,
     ScriptOutcome,
     ScriptTest,
     Scripts

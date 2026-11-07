@@ -51,6 +51,13 @@ export enum AuthenticationType {
 export interface Body {
     "Type": BodyType;
     "Content": string;
+
+    /**
+     * Fields holds the fields of a form body, form-urlencoded or multipart,
+     * in place of Content. Each one is encoded after its variables are
+     * resolved.
+     */
+    "Fields": Parameter[] | null;
 }
 
 /**
@@ -188,6 +195,14 @@ export interface Parameter {
 }
 
 /**
+ * PathParameter is the value of a :name segment of a request URL.
+ */
+export interface PathParameter {
+    "Name": string;
+    "Value": string;
+}
+
+/**
  * Protocol describes how a request exchanges data with its server.
  */
 export enum Protocol {
@@ -221,11 +236,27 @@ export interface Request {
     "URL": string;
     "Protocol": Protocol;
     "Parameters": Parameter[] | null;
+
+    /**
+     * PathParameters give the values of the :name segments of the URL.
+     */
+    "PathParameters": PathParameter[] | null;
     "Headers": Header[] | null;
     "Authentication": Authentication | null;
     "Body": Body | null;
     "Scripts": Scripts | null;
     "Documentation": string;
+}
+
+/**
+ * RequestOverride holds the parts of a request replaced on this machine only.
+ * It lives next to the request in <name>.local.yaml, which git ignores. A nil
+ * section keeps the shared one; a set section, even empty, replaces it.
+ */
+export interface RequestOverride {
+    "Parameters": Parameter[] | null;
+    "PathParameters": PathParameter[] | null;
+    "Body": Body | null;
 }
 
 /**

@@ -6,6 +6,7 @@ package domain
 import (
 	"errors"
 	"net/url"
+	"regexp"
 	"strings"
 )
 
@@ -76,11 +77,13 @@ const (
 
 // Request mirrors a request YAML file.
 type Request struct {
-	Name           string          `yaml:"name"`
-	Method         string          `yaml:"method"`
-	URL            string          `yaml:"url"`
-	Protocol       Protocol        `yaml:"protocol,omitempty"`
-	Parameters     []Parameter     `yaml:"parameters,omitempty"`
+	Name       string      `yaml:"name"`
+	Method     string      `yaml:"method"`
+	URL        string      `yaml:"url"`
+	Protocol   Protocol    `yaml:"protocol,omitempty"`
+	Parameters []Parameter `yaml:"parameters,omitempty"`
+	// PathParameters give the values of the :name segments of the URL.
+	PathParameters []PathParameter `yaml:"pathParameters,omitempty"`
 	Headers        []Header        `yaml:"headers,omitempty"`
 	Authentication *Authentication `yaml:"authentication,omitempty"`
 	Body           *Body           `yaml:"body,omitempty"`
@@ -193,6 +196,77 @@ func unescapeForm(value string) string {
 		return value
 	}
 	return unescaped
+}
+
+// PathParameter is the value of a :name segment of a request URL.
+type PathParameter struct {
+	Name  string `yaml:"name"`
+	Value string `yaml:"value"`
+}
+
+// pathParameterPattern finds the :name segments of a URL. The colon must
+// follow a slash, so a scheme or a port is never read as one.
+var pathParameterPattern = regexp.MustCompile(`/:([A-Za-z_][A-Za-z0-9_]*)`)
+
+// PathParameterNames returns the names of the :name segments of a URL, in
+// order and once each.
+func PathParameterNames(rawURL string) []string {
+	names := make([]string, 0)
+	seen := map[string]bool{}
+	for _, match := range pathParameterPattern.FindAllStringSubmatch(rawURL, -1) {
+		if !seen[match[1]] {
+			seen[match[1]] = true
+			names = append(names, match[1])
+		}
+	}
+	return names
+}
+
+// ReplacePathParameters replaces each :name segment of a URL with the
+// value resolve returns for it.
+func ReplacePathParameters(rawURL string, resolve func(name string) (string, error)) (string, error) {
+	var failure error
+	replaced := pathParameterPattern.ReplaceAllStringFunc(rawURL, func(segment string) string {
+		if failure != nil {
+			return segment
+		}
+		value, err := resolve(segment[2:])
+		if err != nil {
+			failure = err
+			return segment
+		}
+		return "/" + value
+	})
+	return replaced, failure
+}
+
+// RequestOverride holds the parts of a request replaced on this machine only.
+// It lives next to the request in <name>.local.yaml, which git ignores. A nil
+// section keeps the shared one; a set section, even empty, replaces it.
+type RequestOverride struct {
+	Parameters     *[]Parameter     `yaml:"parameters,omitempty"`
+	PathParameters *[]PathParameter `yaml:"pathParameters,omitempty"`
+	Body           *Body            `yaml:"body,omitempty"`
+}
+
+// IsEmpty reports whether the override replaces nothing.
+func (override RequestOverride) IsEmpty() bool {
+	return override.Parameters == nil && override.PathParameters == nil && override.Body == nil
+}
+
+// ApplyTo returns request with the overridden sections replaced.
+func (override RequestOverride) ApplyTo(request Request) Request {
+	if override.Parameters != nil {
+		request.Parameters = append([]Parameter(nil), (*override.Parameters)...)
+	}
+	if override.PathParameters != nil {
+		request.PathParameters = append([]PathParameter(nil), (*override.PathParameters)...)
+	}
+	if override.Body != nil {
+		body := *override.Body
+		request.Body = &body
+	}
+	return request
 }
 
 // Scripts holds the JavaScript hooks of a request. They run inside the
