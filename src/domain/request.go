@@ -151,17 +151,26 @@ type EnvironmentChange struct {
 	// Environment is the file name of the environment to change, or empty
 	// for the selected environment.
 	Environment string
-	Name        string
-	Value       string
-	Removed     bool
+	// EnvironmentName is the display name of Environment, for the interface.
+	EnvironmentName string
+	Name            string
+	Value           string
+	Removed         bool
 }
 
 // EnvironmentResolver gives scripts access to environments other than the
 // selected one.
 type EnvironmentResolver interface {
-	// ResolveEnvironment finds an environment by file name or display name
-	// and returns its file name with the variables a request would see.
-	ResolveEnvironment(name string) (fileName string, variables map[string]string, err error)
+	// ResolveEnvironment finds an environment by file name or display name.
+	ResolveEnvironment(name string) (ScriptEnvironment, error)
+}
+
+// ScriptEnvironment is an environment opened by a script, with the variables
+// a request would see in it.
+type ScriptEnvironment struct {
+	FileName  string
+	Name      string
+	Variables map[string]string
 }
 
 // ScriptOutcome is the result of a pre-request or post-response script.

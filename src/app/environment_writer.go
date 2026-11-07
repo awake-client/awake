@@ -86,7 +86,7 @@ func mostSpecificEnvironment(workspaceRoot string, requestPath string, environme
 // ResolveEnvironmentName finds an environment visible to the request, in its
 // collection or globally, by file name first and then by display name,
 // ignoring case.
-func (environmentWriter) ResolveEnvironmentName(workspaceRoot string, requestPath string, name string) (string, error) {
+func (environmentWriter) ResolveEnvironmentName(workspaceRoot string, requestPath string, name string) (string, string, error) {
 	scopes := []string{""}
 	if scope := environments.ScopeOfRequest(requestPath); scope != "" {
 		scopes = append(scopes, scope)
@@ -96,24 +96,24 @@ func (environmentWriter) ResolveEnvironmentName(workspaceRoot string, requestPat
 	for _, scope := range scopes {
 		repository, err := environments.NewScopedRepository(workspaceRoot, scope)
 		if err != nil {
-			return "", err
+			return "", "", err
 		}
 		listed, err := repository.List()
 		if err != nil {
-			return "", err
+			return "", "", err
 		}
 		summaries = append(summaries, listed...)
 	}
 
 	for _, summary := range summaries {
 		if summary.FileName == name {
-			return summary.FileName, nil
+			return summary.FileName, summary.Name, nil
 		}
 	}
 	for _, summary := range summaries {
 		if strings.EqualFold(summary.Name, strings.TrimSpace(name)) {
-			return summary.FileName, nil
+			return summary.FileName, summary.Name, nil
 		}
 	}
-	return "", fmt.Errorf("environment %q not found", name)
+	return "", "", fmt.Errorf("environment %q not found", name)
 }

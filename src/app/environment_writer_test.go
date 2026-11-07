@@ -19,13 +19,13 @@ func TestResolveEnvironmentNameMatchesFileOrDisplayName(t *testing.T) {
 		"billing SANDBOX": "sandbox",
 	}
 	for name, expected := range cases {
-		fileName, err := writer.ResolveEnvironmentName(workspaceRoot, requestPath, name)
+		fileName, _, err := writer.ResolveEnvironmentName(workspaceRoot, requestPath, name)
 		if err != nil || fileName != expected {
 			t.Errorf("%q: expected %q, got %q (%v)", name, expected, fileName, err)
 		}
 	}
 
-	if _, err := writer.ResolveEnvironmentName(workspaceRoot, requestPath, "staging"); err == nil {
+	if _, _, err := writer.ResolveEnvironmentName(workspaceRoot, requestPath, "staging"); err == nil {
 		t.Error("expected an unknown environment to fail")
 	}
 }

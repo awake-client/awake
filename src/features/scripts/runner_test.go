@@ -263,15 +263,17 @@ func TestResponseJSONParsesTheBody(t *testing.T) {
 	}
 }
 
-type fakeEnvironments map[string]map[string]string
+// fakeEnvironments resolves display names to environments, like the
+// application matches "Production" to a file with another name.
+type fakeEnvironments map[string]domain.ScriptEnvironment
 
-func (environments fakeEnvironments) ResolveEnvironment(name string) (string, map[string]string, error) {
-	for fileName, values := range environments {
-		if strings.EqualFold(fileName, name) {
-			return fileName, values, nil
+func (environments fakeEnvironments) ResolveEnvironment(name string) (domain.ScriptEnvironment, error) {
+	for displayName, environment := range environments {
+		if strings.EqualFold(displayName, name) {
+			return environment, nil
 		}
 	}
-	return "", nil, errors.New("environment not found")
+	return domain.ScriptEnvironment{}, errors.New("environment not found")
 }
 
 func TestScriptsChangeNamedEnvironments(t *testing.T) {
@@ -282,7 +284,11 @@ func TestScriptsChangeNamedEnvironments(t *testing.T) {
 			"Set-Cookie": {"session=abc; Path=/; Expires=Wed, 21 Oct 2026 07:28:00 GMT", "theme=dark"},
 		},
 	}
-	environments := fakeEnvironments{"production": {"region": "eu"}}
+	environments := fakeEnvironments{"Production": {
+		FileName:  "base-url",
+		Name:      "Production",
+		Variables: map[string]string{"region": "eu"},
+	}}
 	variables := map[string]string{}
 
 	outcome := NewRunner().AfterResponse(`
@@ -291,7 +297,7 @@ func TestScriptsChangeNamedEnvironments(t *testing.T) {
 		production.set("cookies", response.cookieHeader);
 		awake.test("reads its write", production.get("cookies") === "session=abc; theme=dark");
 		awake.test("parses cookies", response.cookies.session === "abc");
-		console.log("saved", production.name);
+		console.log("saved", production.name, production.fileName);
 		console.error("boom");
 	`, request, response, variables, environments)
 
@@ -303,14 +309,14 @@ func TestScriptsChangeNamedEnvironments(t *testing.T) {
 			t.Errorf("test %q failed: %s", test.Name, test.Error)
 		}
 	}
-	expected := domain.EnvironmentChange{Environment: "production", Name: "cookies", Value: "session=abc; theme=dark"}
+	expected := domain.EnvironmentChange{Environment: "base-url", EnvironmentName: "Production", Name: "cookies", Value: "session=abc; theme=dark"}
 	if len(outcome.EnvironmentChanges) != 1 || outcome.EnvironmentChanges[0] != expected {
 		t.Errorf("unexpected changes: %+v", outcome.EnvironmentChanges)
 	}
 	if _, found := variables["cookies"]; found {
 		t.Error("a named environment must not change the running request's variables")
 	}
-	if strings.Join(outcome.Logs, "|") != "saved production|error: boom" {
+	if strings.Join(outcome.Logs, "|") != "saved Production base-url|error: boom" {
 		t.Errorf("unexpected logs: %v", outcome.Logs)
 	}
 

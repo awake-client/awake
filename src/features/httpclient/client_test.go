@@ -638,8 +638,8 @@ type fakeEnvironmentWriter struct {
 	changes             []domain.EnvironmentChange
 }
 
-func (writer *fakeEnvironmentWriter) ResolveEnvironmentName(_ string, _ string, name string) (string, error) {
-	return name, nil
+func (writer *fakeEnvironmentWriter) ResolveEnvironmentName(_ string, _ string, name string) (string, string, error) {
+	return name, name, nil
 }
 
 func (writer *fakeEnvironmentWriter) ApplyEnvironmentChanges(_ string, _ string, environmentFileName string, changes []domain.EnvironmentChange) error {

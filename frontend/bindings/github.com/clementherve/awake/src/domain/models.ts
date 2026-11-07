@@ -96,6 +96,11 @@ export interface EnvironmentChange {
      * for the selected environment.
      */
     "Environment": string;
+
+    /**
+     * EnvironmentName is the display name of Environment, for the interface.
+     */
+    "EnvironmentName": string;
     "Name": string;
     "Value": string;
     "Removed": boolean;

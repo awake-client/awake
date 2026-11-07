@@ -157,15 +157,15 @@ func installHelper(runtime *goja.Runtime, variablesObject *goja.Object, environm
 		if environments == nil {
 			panic(runtime.NewGoError(errEnvironmentsUnavailable))
 		}
-		fileName, values, err := environments.ResolveEnvironment(name)
+		environment, err := environments.ResolveEnvironment(name)
 		if err != nil {
 			panic(runtime.NewGoError(err))
 		}
-		if handle, found := handles[fileName]; found {
+		if handle, found := handles[environment.FileName]; found {
 			return handle
 		}
-		handle := namedEnvironment(runtime, fileName, values, outcome)
-		handles[fileName] = handle
+		handle := namedEnvironment(runtime, environment, outcome)
+		handles[environment.FileName] = handle
 		return handle
 	})
 	_ = helper.Set("environments", named)
@@ -178,14 +178,18 @@ var errEnvironmentsUnavailable = errors.New("other environments are not availabl
 // namedEnvironment is the handle returned by awake.environments.get. Its
 // changes are saved like those of awake.environment but do not affect the
 // variables of the running request.
-func namedEnvironment(runtime *goja.Runtime, fileName string, values map[string]string, outcome *domain.ScriptOutcome) *goja.Object {
-	current := make(map[string]string, len(values))
-	for name, value := range values {
+func namedEnvironment(runtime *goja.Runtime, environment domain.ScriptEnvironment, outcome *domain.ScriptOutcome) *goja.Object {
+	current := make(map[string]string, len(environment.Variables))
+	for name, value := range environment.Variables {
 		current[name] = value
+	}
+	change := func(name string) domain.EnvironmentChange {
+		return domain.EnvironmentChange{Environment: environment.FileName, EnvironmentName: environment.Name, Name: name}
 	}
 
 	handle := runtime.NewObject()
-	_ = handle.Set("name", fileName)
+	_ = handle.Set("name", environment.Name)
+	_ = handle.Set("fileName", environment.FileName)
 	_ = handle.Set("get", func(name string) goja.Value {
 		value, found := current[name]
 		if !found {
@@ -196,11 +200,15 @@ func namedEnvironment(runtime *goja.Runtime, fileName string, values map[string]
 	_ = handle.Set("set", func(name string, value goja.Value) {
 		text := valueToString(value)
 		current[name] = text
-		outcome.EnvironmentChanges = append(outcome.EnvironmentChanges, domain.EnvironmentChange{Environment: fileName, Name: name, Value: text})
+		saved := change(name)
+		saved.Value = text
+		outcome.EnvironmentChanges = append(outcome.EnvironmentChanges, saved)
 	})
 	_ = handle.Set("unset", func(name string) {
 		delete(current, name)
-		outcome.EnvironmentChanges = append(outcome.EnvironmentChanges, domain.EnvironmentChange{Environment: fileName, Name: name, Removed: true})
+		removed := change(name)
+		removed.Removed = true
+		outcome.EnvironmentChanges = append(outcome.EnvironmentChanges, removed)
 	})
 	return handle
 }

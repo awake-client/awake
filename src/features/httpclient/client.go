@@ -76,9 +76,10 @@ type ScriptRunner interface {
 // finds the environments a script names. The application layer supplies the
 // implementation so this feature does not depend on the environments feature.
 type EnvironmentWriter interface {
-	// ResolveEnvironmentName returns the file name of the environment visible
-	// to the request whose file name or display name is name.
-	ResolveEnvironmentName(workspaceRoot string, requestPath string, name string) (string, error)
+	// ResolveEnvironmentName returns the file name and display name of the
+	// environment visible to the request whose file name or display name is
+	// name.
+	ResolveEnvironmentName(workspaceRoot string, requestPath string, name string) (fileName string, displayName string, err error)
 	ApplyEnvironmentChanges(
 		workspaceRoot string,
 		requestPath string,
@@ -305,16 +306,20 @@ type scriptEnvironments struct {
 	requestPath   string
 }
 
-func (environments scriptEnvironments) ResolveEnvironment(name string) (string, map[string]string, error) {
-	fileName, err := environments.service.environments.ResolveEnvironmentName(environments.workspaceRoot, environments.requestPath, name)
+func (environments scriptEnvironments) ResolveEnvironment(name string) (domain.ScriptEnvironment, error) {
+	fileName, displayName, err := environments.service.environments.ResolveEnvironmentName(environments.workspaceRoot, environments.requestPath, name)
 	if err != nil {
-		return "", nil, err
+		return domain.ScriptEnvironment{}, err
 	}
 	layers, err := environments.service.source.LoadVariableLayers(environments.workspaceRoot, environments.requestPath, fileName)
 	if err != nil {
-		return "", nil, err
+		return domain.ScriptEnvironment{}, err
 	}
-	return fileName, mergeLayers(variables.Maps(layers)), nil
+	return domain.ScriptEnvironment{
+		FileName:  fileName,
+		Name:      displayName,
+		Variables: mergeLayers(variables.Maps(layers)),
+	}, nil
 }
 
 func mergeLayers(layers []map[string]string) map[string]string {
