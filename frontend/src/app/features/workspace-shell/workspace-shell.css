@@ -159,6 +159,7 @@
 }
 
 .mode-badge {
+  flex: 0 0 auto;
   padding: 0 7px;
   border: 1px solid var(--color-border-strong);
   border-radius: 999px;
@@ -167,6 +168,7 @@
 }
 
 .update-error {
+  min-width: 0;
   max-width: 110px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -202,9 +204,9 @@
 
 .sync-chip {
   display: inline-flex;
+  flex: 0 0 auto;
   align-items: center;
   gap: 5px;
-  min-width: 0;
   height: 20px;
   padding: 0 7px;
   border-radius: 999px;

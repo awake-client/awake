@@ -12,7 +12,8 @@ interface StoredLayout {
 }
 
 const DEFAULTS: StoredLayout = { sidebarWidth: 272, editorLayout: 'stacked', responseRatio: 0.4 };
-export const SIDEBAR_WIDTH = { minimum: 200, maximum: 560, default: DEFAULTS.sidebarWidth };
+/** The minimum keeps the footer, with its sync status, readable. */
+export const SIDEBAR_WIDTH = { minimum: 264, maximum: 560, default: DEFAULTS.sidebarWidth };
 export const RESPONSE_RATIO = { minimum: 0.18, maximum: 0.82, default: DEFAULTS.responseRatio };
 
 /**
@@ -66,7 +67,9 @@ function readStorage(): StoredLayout {
     const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}') as Partial<StoredLayout>;
     return {
       sidebarWidth:
-        typeof parsed.sidebarWidth === 'number' ? parsed.sidebarWidth : DEFAULTS.sidebarWidth,
+        typeof parsed.sidebarWidth === 'number'
+          ? clamp(parsed.sidebarWidth, SIDEBAR_WIDTH.minimum, SIDEBAR_WIDTH.maximum)
+          : DEFAULTS.sidebarWidth,
       editorLayout: parsed.editorLayout === 'side' ? 'side' : 'stacked',
       responseRatio:
         typeof parsed.responseRatio === 'number' ? parsed.responseRatio : DEFAULTS.responseRatio,
