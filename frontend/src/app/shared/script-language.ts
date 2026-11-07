@@ -27,11 +27,17 @@ interface ApiEntry {
   detail: string;
   documentation: string;
   members?: Record<string, ApiEntry>;
+  /** For a method, what a call returns, so a chain can continue after it. */
+  returns?: ApiEntry;
 }
 
 const LINT_DELAY_MILLISECONDS = 300;
 const PARSE_TIMEOUT_MILLISECONDS = 200;
-const IDENTIFIER_CHAIN = /^[A-Za-z_$][\w$]*(?:\s*\.\s*[A-Za-z_$][\w$]*)*$/;
+/** Call arguments without nested parentheses, such as ("Production"). */
+const CALL_ARGUMENTS = /\((?:[^()'"`]|'[^']*'|"[^"]*")*\)/g;
+const IDENTIFIER_CHAIN = /^[A-Za-z_$][\w$]*(?:\(\))?(?:\s*\.\s*[A-Za-z_$][\w$]*(?:\(\))?)*$/;
+const CHAIN_BEFORE_CURSOR =
+  /(?:[A-Za-z_$][\w$]*(?:\((?:[^()'"`]|'[^']*'|"[^"]*")*\))?\s*\.\s*)*[A-Za-z_$]*$/;
 
 const requestEntry = (editable: boolean): ApiEntry => ({
   type: 'variable',
@@ -83,11 +89,70 @@ const responseEntry: ApiEntry = {
     },
     encoding: { type: 'property', detail: 'string', documentation: '"utf-8" or "base64".' },
     duration: { type: 'property', detail: 'number', documentation: 'Duration in milliseconds.' },
+    cookies: {
+      type: 'property',
+      detail: 'Record<string, string>',
+      documentation: 'Cookies set by the response, by name, parsed from every Set-Cookie header.',
+    },
+    cookieHeader: {
+      type: 'property',
+      detail: 'string',
+      documentation:
+        'The cookies set by the response as "name=value; other=value", ready for a Cookie request header.',
+    },
     json: {
       type: 'method',
       detail: '(): any',
       documentation: 'Parses the body as JSON. Throws when the body is not valid JSON.',
     },
+  },
+};
+
+const environmentMembers = (subject: string): Record<string, ApiEntry> => ({
+  get: {
+    type: 'method',
+    detail: '(name: string): string | null',
+    documentation: `Reads a variable of ${subject}.`,
+  },
+  set: {
+    type: 'method',
+    detail: '(name: string, value: any): void',
+    documentation: `Saves a variable in ${subject}, in its local overrides, which git ignores. A declared secret is saved in the keychain. Non-string values are stored as JSON.`,
+  },
+  unset: {
+    type: 'method',
+    detail: '(name: string): void',
+    documentation: `Removes a variable from the local overrides of ${subject}, or a secret from the keychain.`,
+  },
+});
+
+const namedEnvironmentEntry: ApiEntry = {
+  type: 'variable',
+  detail: 'NamedEnvironment',
+  documentation:
+    'An environment opened by name. Its changes are saved but do not affect the running request.',
+  members: {
+    name: { type: 'property', detail: 'string', documentation: 'File name of the environment.' },
+    ...environmentMembers('this environment'),
+  },
+};
+
+const logEntry = (documentation: string): ApiEntry => ({
+  type: 'method',
+  detail: '(...values: any[]): void',
+  documentation,
+});
+
+const consoleEntry: ApiEntry = {
+  type: 'namespace',
+  detail: 'Console',
+  documentation: 'Writes to the script logs shown with the response.',
+  members: {
+    log: logEntry('Appends a line to the script logs.'),
+    info: logEntry('Appends a line to the script logs.'),
+    debug: logEntry('Appends a line to the script logs.'),
+    warn: logEntry('Appends a line prefixed with "warning:" to the script logs.'),
+    error: logEntry('Appends a line prefixed with "error:" to the script logs.'),
   },
 };
 
@@ -119,24 +184,21 @@ const awakeEntry: ApiEntry = {
     environment: {
       type: 'namespace',
       detail: 'Environment',
-      documentation: 'The selected environment. Values set here are saved for the next requests.',
+      documentation:
+        'The selected environment. Values set here apply to this request and are saved for the next ones.',
+      members: environmentMembers('the selected environment'),
+    },
+    environments: {
+      type: 'namespace',
+      detail: 'Environments',
+      documentation: 'Any environment visible to this request, opened by name.',
       members: {
         get: {
           type: 'method',
-          detail: '(name: string): string | null',
-          documentation: 'Reads a resolved variable.',
-        },
-        set: {
-          type: 'method',
-          detail: '(name: string, value: any): void',
+          detail: '(name: string): NamedEnvironment',
           documentation:
-            'Saves a variable in the selected environment, in its local overrides, which git ignores. A declared secret is saved in the keychain. Non-string values are stored as JSON.',
-        },
-        unset: {
-          type: 'method',
-          detail: '(name: string): void',
-          documentation:
-            'Removes a variable from the local overrides, or a secret from the keychain.',
+            'Opens an environment by file name or display name, such as "production" or "Production". Throws when no environment matches.',
+          returns: namedEnvironmentEntry,
         },
       },
     },
@@ -152,6 +214,7 @@ const variablesEntry: ApiEntry = {
 function globalsFor(kind: ScriptKind): Record<string, ApiEntry> {
   const globals: Record<string, ApiEntry> = {
     awake: awakeEntry,
+    console: consoleEntry,
     request: requestEntry(kind === 'pre-request'),
     variables: variablesEntry,
   };
@@ -195,13 +258,16 @@ function apiCompletions(globals: Record<string, ApiEntry>) {
       return null;
     }
 
-    const chain = context.matchBefore(/(?:[A-Za-z_$][\w$]*\s*\.\s*)*[A-Za-z_$]*$/);
+    const chain = context.matchBefore(CHAIN_BEFORE_CURSOR);
     if (!chain || (chain.text === '' && !context.explicit)) {
       return null;
     }
 
-    const segments = chain.text.split('.').map((segment) => segment.trim());
-    const typed = segments.pop() ?? '';
+    const segments = chainSegments(chain.text.trim() === '' ? '' : chain.text + '_');
+    if (!segments) {
+      return null;
+    }
+    const typed = (segments.pop() ?? '').slice(0, -1);
     const members = segments.length === 0 ? globals : resolve(globals, segments)?.members;
     if (!members) {
       return null;
@@ -225,11 +291,31 @@ function toCompletion(name: string, entry: ApiEntry): Completion {
   };
 }
 
+/**
+ * Splits a member chain such as awake.environments.get("x").set into its
+ * segments, calls ending in "()". Returns null for anything more complex.
+ */
+function chainSegments(text: string): string[] | null {
+  if (text === '') {
+    return [''];
+  }
+  const simplified = text.replace(CALL_ARGUMENTS, '()');
+  if (!IDENTIFIER_CHAIN.test(simplified)) {
+    return null;
+  }
+  return simplified.split('.').map((segment) => segment.trim());
+}
+
 function resolve(globals: Record<string, ApiEntry>, path: string[]): ApiEntry | undefined {
   let members: Record<string, ApiEntry> | undefined = globals;
   let entry: ApiEntry | undefined;
   for (const segment of path) {
-    entry = members && Object.hasOwn(members, segment) ? members[segment] : undefined;
+    const called = segment.endsWith('()');
+    const name = called ? segment.slice(0, -2) : segment;
+    entry = members && Object.hasOwn(members, name) ? members[name] : undefined;
+    if (entry && called) {
+      entry = entry.returns;
+    }
     if (!entry) {
       return undefined;
     }
@@ -307,13 +393,8 @@ function unknownMember(
   if (!property || property.name !== 'PropertyName') {
     return null;
   }
-  const text = state.sliceDoc(node.from, node.to);
-  if (!IDENTIFIER_CHAIN.test(text)) {
-    return null;
-  }
-
-  const segments = text.split('.').map((segment) => segment.trim());
-  if (declared.has(segments[0])) {
+  const segments = chainSegments(state.sliceDoc(node.from, node.to));
+  if (!segments || declared.has(segments[0].replace('()', ''))) {
     return null;
   }
   const name = segments.pop() ?? '';
@@ -385,12 +466,11 @@ function apiTooltip(view: EditorView, position: number, globals: Record<string, 
   }
 
   const expression = node.name === 'PropertyName' && node.parent ? node.parent : node;
-  const text = view.state.sliceDoc(expression.from, expression.to);
-  if (!IDENTIFIER_CHAIN.test(text)) {
+  const path = chainSegments(view.state.sliceDoc(expression.from, expression.to));
+  const entry = path ? resolve(globals, path) : undefined;
+  if (!path || !entry) {
     return null;
   }
-  const path = text.split('.').map((segment) => segment.trim());
-  const entry = resolve(globals, path);
   if (!entry) {
     return null;
   }

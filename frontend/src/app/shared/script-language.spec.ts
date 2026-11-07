@@ -42,4 +42,24 @@ describe('diagnoseScript', () => {
       [],
     );
   });
+
+  it('follows calls into named environments', () => {
+    const valid = `
+      const production = awake.environments.get('Production');
+      awake.environments.get("Production").set('cookies', response.cookieHeader);
+      console.log(response.cookies.session, production.name);
+    `;
+    expect(diagnoseScript(valid, 'post-response')).toEqual([]);
+
+    const [diagnostic] = diagnoseScript(
+      'awake.environments.get("Production").sett("a", "b");',
+      'post-response',
+    );
+    expect(diagnostic.message).toContain('Did you mean "set"?');
+  });
+
+  it('knows the console', () => {
+    const [diagnostic] = diagnoseScript('console.wrn("x");', 'pre-request');
+    expect(diagnostic.message).toContain('Did you mean "warn"?');
+  });
 });
