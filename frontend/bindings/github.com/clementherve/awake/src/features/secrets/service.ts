@@ -16,10 +16,26 @@ import { Call as $Call, CancellablePromise as $CancellablePromise } from "@wails
 import * as $models from "./models.js";
 
 /**
+ * CopySecrets copies the stored secret values of an environment to another
+ * one of the same scope, such as a clone. Values never cross the bridge.
+ */
+export function CopySecrets(workspaceRoot: string, scope: string, sourceFileName: string, targetFileName: string): $CancellablePromise<void> {
+    return $Call.ByID(1062758116, workspaceRoot, scope, sourceFileName, targetFileName);
+}
+
+/**
  * DeleteSecret removes a declared secret from the keychain.
  */
 export function DeleteSecret(workspaceRoot: string, scope: string, environmentFileName: string, name: string): $CancellablePromise<void> {
     return $Call.ByID(644374385, workspaceRoot, scope, environmentFileName, name);
+}
+
+/**
+ * MoveSecrets transfers the stored secret values of an environment renamed
+ * from formerFileName to fileName.
+ */
+export function MoveSecrets(workspaceRoot: string, scope: string, formerFileName: string, fileName: string): $CancellablePromise<void> {
+    return $Call.ByID(1727098964, workspaceRoot, scope, formerFileName, fileName);
 }
 
 /**

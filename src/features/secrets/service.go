@@ -30,3 +30,15 @@ func (service *Service) SetSecret(workspaceRoot string, scope string, environmen
 func (service *Service) DeleteSecret(workspaceRoot string, scope string, environmentFileName string, name string) error {
 	return service.repository.Delete(workspaceRoot, scope, environmentFileName, name)
 }
+
+// CopySecrets copies the stored secret values of an environment to another
+// one of the same scope, such as a clone. Values never cross the bridge.
+func (service *Service) CopySecrets(workspaceRoot string, scope string, sourceFileName string, targetFileName string) error {
+	return service.repository.Copy(workspaceRoot, scope, sourceFileName, targetFileName)
+}
+
+// MoveSecrets transfers the stored secret values of an environment renamed
+// from formerFileName to fileName.
+func (service *Service) MoveSecrets(workspaceRoot string, scope string, formerFileName string, fileName string) error {
+	return service.repository.Move(workspaceRoot, scope, formerFileName, fileName)
+}

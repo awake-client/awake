@@ -7,6 +7,8 @@ import (
 	"testing"
 
 	"github.com/clementherve/awake/src/features/workspace"
+
+	"github.com/clementherve/awake/src/features/environments"
 )
 
 type fakeKeychain struct {
@@ -192,5 +194,56 @@ func TestKeychainSeparatesCollectionScopes(t *testing.T) {
 
 	if _, err := repository.Values(workspaceRoot, "../outside", "development"); err == nil {
 		t.Fatal("expected an invalid scope to be rejected")
+	}
+}
+
+func TestCopyStoresTheSecretsOfAClone(t *testing.T) {
+	workspaceRoot := createTestWorkspace(t)
+	keychain := newFakeKeychain()
+	repository := NewRepository(keychain)
+	if err := repository.Set(workspaceRoot, "", "development", "apiToken", "secret-value"); err != nil {
+		t.Fatalf("set secret: %v", err)
+	}
+	if err := environments.NewRepository(workspaceRoot).Clone("development", "development-copy", "Development copy"); err != nil {
+		t.Fatalf("clone environment: %v", err)
+	}
+
+	if err := repository.Copy(workspaceRoot, "", "development", "development-copy"); err != nil {
+		t.Fatalf("copy secrets: %v", err)
+	}
+
+	values, err := repository.Values(workspaceRoot, "", "development-copy")
+	if err != nil {
+		t.Fatalf("secret values: %v", err)
+	}
+	if values["apiToken"] != "secret-value" {
+		t.Errorf("expected the copied secret, got %v", values)
+	}
+}
+
+func TestMoveFollowsARenamedEnvironment(t *testing.T) {
+	workspaceRoot := createTestWorkspace(t)
+	keychain := newFakeKeychain()
+	repository := NewRepository(keychain)
+	if err := repository.Set(workspaceRoot, "", "development", "apiToken", "secret-value"); err != nil {
+		t.Fatalf("set secret: %v", err)
+	}
+	if err := environments.NewRepository(workspaceRoot).Rename("development", "dev"); err != nil {
+		t.Fatalf("rename environment: %v", err)
+	}
+
+	if err := repository.Move(workspaceRoot, "", "development", "dev"); err != nil {
+		t.Fatalf("move secrets: %v", err)
+	}
+
+	values, err := repository.Values(workspaceRoot, "", "dev")
+	if err != nil {
+		t.Fatalf("secret values: %v", err)
+	}
+	if values["apiToken"] != "secret-value" {
+		t.Errorf("expected the moved secret, got %v", values)
+	}
+	if len(keychain.values) != 1 {
+		t.Errorf("expected the former entry to be removed, got %v", keychain.values)
 	}
 }
