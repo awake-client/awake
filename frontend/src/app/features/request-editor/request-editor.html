@@ -360,34 +360,37 @@
           }
 
           @case ('scripts') {
-            <div class="form-panel">
+            <div class="scripts-panel">
               <p class="panel-note">
                 JavaScript hooks run inside the application. A failing script does not abort the
                 request; its error is reported with the response. The runtime is interrupted after
-                five seconds.
+                five seconds. Use <code>awake.environment.set(name, value)</code> to save a value,
+                such as a token, in the selected environment.
               </p>
 
-              <label class="field field-grow">
-                <span class="field-label">Pre-request script</span>
-                <textarea
-                  class="input script-content"
-                  [ngModel]="preRequestScript()"
-                  (ngModelChange)="preRequestScript.set($event)"
-                  spellcheck="false"
+              <section class="script-field">
+                <h3 class="field-label">Pre-request script</h3>
+                <app-code-editor
+                  class="script-editor"
+                  lang="javascript"
+                  scriptKind="pre-request"
+                  [value]="preRequestScript()"
                   placeholder="request.headers['X-Request-Id'] = 'abc-123';"
-                ></textarea>
-              </label>
+                  (valueChange)="preRequestScript.set($event)"
+                />
+              </section>
 
-              <label class="field field-grow">
-                <span class="field-label">Post-response script</span>
-                <textarea
-                  class="input script-content"
-                  [ngModel]="postResponseScript()"
-                  (ngModelChange)="postResponseScript.set($event)"
-                  spellcheck="false"
-                  placeholder="awake.test('successful', response.status === 200);"
-                ></textarea>
-              </label>
+              <section class="script-field">
+                <h3 class="field-label">Post-response script</h3>
+                <app-code-editor
+                  class="script-editor"
+                  lang="javascript"
+                  scriptKind="post-response"
+                  [value]="postResponseScript()"
+                  placeholder="awake.environment.set('token', response.json().access_token);"
+                  (valueChange)="postResponseScript.set($event)"
+                />
+              </section>
             </div>
           }
 

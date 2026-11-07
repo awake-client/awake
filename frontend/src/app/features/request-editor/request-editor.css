@@ -304,8 +304,7 @@
 }
 
 .body-content,
-.documentation,
-.script-content {
+.documentation {
   flex: 1;
   min-height: 180px;
   resize: none;
@@ -315,6 +314,39 @@
 
 .documentation {
   font-family: var(--font-sans);
+}
+
+/* Scripts scroll as a whole, so each editor keeps a usable height however
+   short the request pane is. */
+.scripts-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-height: 0;
+  height: 100%;
+  overflow-y: auto;
+}
+
+.scripts-panel code {
+  font-family: var(--font-mono);
+  font-size: 0.95em;
+}
+
+.script-field {
+  display: flex;
+  flex: 1 0 auto;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 180px;
+}
+
+.script-field h3 {
+  margin: 0;
+}
+
+.script-editor {
+  flex: 1;
+  min-height: 150px;
 }
 
 .panel-note {
