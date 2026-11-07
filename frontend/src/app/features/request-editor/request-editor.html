@@ -598,7 +598,12 @@
                         }}</span>
                         <code>{{ change.Name }}</code>
                         @if (change.Environment) {
-                          <span class="script-environment-target">in {{ change.Environment }}</span>
+                          <span
+                            class="script-environment-target"
+                            [title]="change.Environment + '.yaml'"
+                          >
+                            in {{ change.EnvironmentName || change.Environment }}
+                          </span>
                         }
                       </li>
                     }
