@@ -582,6 +582,22 @@
                 @if (entry.outcome.Logs?.length) {
                   <pre class="script-logs">{{ entry.outcome.Logs.join('\n') }}</pre>
                 }
+                @if (entry.outcome.EnvironmentError) {
+                  <p class="editor-message error">
+                    Environment not updated: {{ entry.outcome.EnvironmentError }}
+                  </p>
+                } @else if (entry.outcome.EnvironmentChanges?.length) {
+                  <ul class="script-environment">
+                    @for (change of entry.outcome.EnvironmentChanges; track $index) {
+                      <li>
+                        <span class="script-test-state">{{
+                          change.Removed ? 'UNSET' : 'SAVED'
+                        }}</span>
+                        <code>{{ change.Name }}</code>
+                      </li>
+                    }
+                  </ul>
+                }
               </article>
             }
           </div>

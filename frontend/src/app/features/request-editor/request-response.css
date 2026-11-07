@@ -144,7 +144,8 @@
   font-size: var(--text-base);
 }
 
-.script-tests {
+.script-tests,
+.script-environment {
   margin: 0;
   padding: 0;
   list-style: none;
@@ -153,8 +154,10 @@
   gap: 4px;
 }
 
-.script-tests li {
+.script-tests li,
+.script-environment li {
   display: flex;
+  align-items: baseline;
   gap: 8px;
   font-size: var(--text-base);
 }
@@ -237,4 +240,10 @@
   font-size: var(--text-xs);
   line-height: 20px;
   white-space: nowrap;
+}
+
+.script-environment code {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--color-text-strong);
 }

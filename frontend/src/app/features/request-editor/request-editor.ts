@@ -609,7 +609,13 @@ export class RequestEditor {
       if (!exchange || this.requestPath() !== path || this.response() || this.isSending()) {
         return;
       }
-      const emptyOutcome = { Logs: null, Tests: null, Error: '' };
+      const emptyOutcome = {
+        Logs: null,
+        Tests: null,
+        Error: '',
+        EnvironmentChanges: null,
+        EnvironmentError: '',
+      };
       this.response.set({
         ID: '',
         StatusCode: entry.StatusCode,
@@ -977,6 +983,10 @@ function describeError(error: unknown): string {
 function hasScriptContent(outcome: ScriptOutcome | null | undefined): boolean {
   return Boolean(
     outcome &&
-    (outcome.Error || (outcome.Logs?.length ?? 0) > 0 || (outcome.Tests?.length ?? 0) > 0),
+    (outcome.Error ||
+      outcome.EnvironmentError ||
+      (outcome.Logs?.length ?? 0) > 0 ||
+      (outcome.Tests?.length ?? 0) > 0 ||
+      (outcome.EnvironmentChanges?.length ?? 0) > 0),
   );
 }
