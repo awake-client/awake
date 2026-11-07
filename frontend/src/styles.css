@@ -179,6 +179,13 @@ body {
   box-sizing: border-box;
 }
 
+/* The virtual scroll content wrapper is absolutely positioned and sizes to its
+   widest row, which lets long names overflow the sidebar and hides their
+   ellipsis. Pin it to the viewport so rows truncate where they should. */
+.tree-viewport .cdk-virtual-scroll-content-wrapper {
+  width: 100%;
+}
+
 button,
 input,
 select,

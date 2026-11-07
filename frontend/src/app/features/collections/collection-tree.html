@@ -134,7 +134,7 @@
         }
       }
 
-      <span class="entry-name">{{ row.entry.Name }}</span>
+      <span class="entry-name" [title]="row.entry.Name">{{ row.entry.Name }}</span>
 
       <span class="row-actions" [class.pinned]="rowMenu()?.row?.entry?.Path === row.entry.Path">
         @if (!isRequest(row)) {
