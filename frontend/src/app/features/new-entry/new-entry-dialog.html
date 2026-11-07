@@ -135,7 +135,9 @@
             [ngModel]="environmentScope()"
             (ngModelChange)="environmentScope.set($event)"
           >
-            <option value="" [selected]="environmentScope() === ''">Global — every collection</option>
+            <option value="" [selected]="environmentScope() === ''">
+              Global — every collection
+            </option>
             @for (collection of collectionScopes(); track collection.path) {
               <option [value]="collection.path" [selected]="environmentScope() === collection.path">
                 {{ collection.label }} only
@@ -209,42 +211,43 @@
         </div>
       }
 
-
-      <div class="options">
-        <button
-          type="button"
-          class="options-toggle"
-          [attr.aria-expanded]="showOptions()"
-          (click)="showOptions.set(!showOptions())"
-        >
-          <app-icon name="chevron-right" [size]="13" [class.open]="showOptions()" />
-          Options
-        </button>
-        @if (showOptions()) {
-          <label class="field">
-            <span class="field-label">
-              {{
-                kind() === 'request' || kind() === 'environment' ? 'File name' : 'Directory name'
-              }}
-            </span>
-            <div class="file-name">
-              <input
-                class="input mono"
-                type="text"
-                name="fileName"
-                [ngModel]="fileNameValue()"
-                (ngModelChange)="updateFileName($event)"
-                spellcheck="false"
-                autocomplete="off"
-              />
-              @if (kind() === 'request' || kind() === 'environment') {
-                <span class="file-extension">.yaml</span>
-              }
-            </div>
-            <span class="field-hint mono">{{ targetPath() }}</span>
-          </label>
-        }
-      </div>
+      @if (kind() === 'environment') {
+        <span class="field-hint mono">{{ targetPath() }}</span>
+      } @else {
+        <div class="options">
+          <button
+            type="button"
+            class="options-toggle"
+            [attr.aria-expanded]="showOptions()"
+            (click)="showOptions.set(!showOptions())"
+          >
+            <app-icon name="chevron-right" [size]="13" [class.open]="showOptions()" />
+            Options
+          </button>
+          @if (showOptions()) {
+            <label class="field">
+              <span class="field-label">
+                {{ kind() === 'request' ? 'File name' : 'Directory name' }}
+              </span>
+              <div class="file-name">
+                <input
+                  class="input mono"
+                  type="text"
+                  name="fileName"
+                  [ngModel]="fileNameValue()"
+                  (ngModelChange)="updateFileName($event)"
+                  spellcheck="false"
+                  autocomplete="off"
+                />
+                @if (kind() === 'request') {
+                  <span class="file-extension">.yaml</span>
+                }
+              </div>
+              <span class="field-hint mono">{{ targetPath() }}</span>
+            </label>
+          }
+        </div>
+      }
 
       @if (errorMessage(); as message) {
         <p class="error">{{ message }}</p>

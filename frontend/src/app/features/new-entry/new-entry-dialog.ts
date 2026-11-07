@@ -8,6 +8,7 @@ import {
   viewChild,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { slugify } from '@shared/slug';
 import { Router } from '@angular/router';
 import * as EnvironmentsService from '@bindings/github.com/clementherve/awake/src/features/environments/service';
 import * as CollectionsService from '@bindings/github.com/clementherve/awake/src/features/collections/service';
@@ -181,7 +182,8 @@ export class NewEntryDialog {
 
   /** File or directory name, derived from the name until edited. */
   protected readonly fileNameValue = computed(() =>
-    this.fileNameEdited() ? this.fileName() : slugify(this.name()),
+    // An environment file always follows its display name.
+    this.fileNameEdited() && this.kind() !== 'environment' ? this.fileName() : slugify(this.name()),
   );
 
   protected readonly slug = computed(() => slugify(this.fileNameValue()));
@@ -525,15 +527,6 @@ export class NewEntryDialog {
       field.setSelectionRange(field.value.length, field.value.length);
     });
   }
-}
-
-function slugify(value: string): string {
-  return value
-    .normalize('NFKD')
-    .replace(/[̀-ͯ]/g, '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
 }
 
 function describeError(error: unknown): string {
