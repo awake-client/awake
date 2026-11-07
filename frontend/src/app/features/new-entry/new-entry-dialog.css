@@ -48,7 +48,7 @@
   width: 32px;
   height: 32px;
   border-radius: var(--radius-md);
-  background: var(--color-accent-gradient);
+  background: var(--color-accent);
   color: var(--color-on-accent);
 }
 

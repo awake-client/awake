@@ -73,7 +73,7 @@
 }
 
 .menu-item:hover:not(:disabled) {
-  background: var(--color-accent-gradient);
+  background: var(--color-accent);
   color: var(--color-on-accent);
 }
 

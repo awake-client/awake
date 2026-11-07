@@ -252,7 +252,7 @@ input:focus {
 .primary-button {
   border: 1px solid transparent;
   border-radius: var(--radius-md);
-  background: var(--color-accent-gradient);
+  background: var(--color-accent);
   color: var(--color-on-accent);
   padding: 7px 14px;
   font-size: var(--text-base);

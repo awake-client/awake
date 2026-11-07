@@ -138,7 +138,7 @@ code {
   align-self: flex-start;
   border: 1px solid transparent;
   border-radius: var(--radius-md);
-  background: var(--color-accent-gradient);
+  background: var(--color-accent);
   color: var(--color-on-accent);
   font-weight: 600;
   font-size: var(--text-base);
