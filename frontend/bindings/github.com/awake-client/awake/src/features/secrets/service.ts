@@ -20,14 +20,14 @@ import * as $models from "./models.js";
  * one of the same scope, such as a clone. Values never cross the bridge.
  */
 export function CopySecrets(workspaceRoot: string, scope: string, sourceFileName: string, targetFileName: string): $CancellablePromise<void> {
-    return $Call.ByID(1062758116, workspaceRoot, scope, sourceFileName, targetFileName);
+    return $Call.ByID(3295813379, workspaceRoot, scope, sourceFileName, targetFileName);
 }
 
 /**
  * DeleteSecret removes a declared secret from the keychain.
  */
 export function DeleteSecret(workspaceRoot: string, scope: string, environmentFileName: string, name: string): $CancellablePromise<void> {
-    return $Call.ByID(644374385, workspaceRoot, scope, environmentFileName, name);
+    return $Call.ByID(3002779492, workspaceRoot, scope, environmentFileName, name);
 }
 
 /**
@@ -35,19 +35,19 @@ export function DeleteSecret(workspaceRoot: string, scope: string, environmentFi
  * from formerFileName to fileName.
  */
 export function MoveSecrets(workspaceRoot: string, scope: string, formerFileName: string, fileName: string): $CancellablePromise<void> {
-    return $Call.ByID(1727098964, workspaceRoot, scope, formerFileName, fileName);
+    return $Call.ByID(1598484387, workspaceRoot, scope, formerFileName, fileName);
 }
 
 /**
  * SecretStates reports which declared secrets of an environment are stored.
  */
 export function SecretStates(workspaceRoot: string, scope: string, environmentFileName: string): $CancellablePromise<$models.SecretState[] | null> {
-    return $Call.ByID(1514445124, workspaceRoot, scope, environmentFileName);
+    return $Call.ByID(3690800109, workspaceRoot, scope, environmentFileName);
 }
 
 /**
  * SetSecret stores or replaces the value of a declared secret.
  */
 export function SetSecret(workspaceRoot: string, scope: string, environmentFileName: string, name: string, value: string): $CancellablePromise<void> {
-    return $Call.ByID(1712484682, workspaceRoot, scope, environmentFileName, name, value);
+    return $Call.ByID(3324662237, workspaceRoot, scope, environmentFileName, name, value);
 }

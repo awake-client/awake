@@ -21,7 +21,7 @@ import * as $models from "./models.js";
  * environments of each collection.
  */
 export function Export(workspaceRoot: string, destinationPath: string, format: $models.Format, options: $models.ExportOptions): $CancellablePromise<$models.ExportResult> {
-    return $Call.ByID(1927045816, workspaceRoot, destinationPath, format, options);
+    return $Call.ByID(3502346905, workspaceRoot, destinationPath, format, options);
 }
 
 /**
@@ -29,5 +29,5 @@ export function Export(workspaceRoot: string, destinationPath: string, format: $
  * collections of a workspace. An empty format is detected from the file.
  */
 export function Import(workspaceRoot: string, sourcePath: string, format: $models.Format): $CancellablePromise<$models.ImportResult> {
-    return $Call.ByID(3693732551, workspaceRoot, sourcePath, format);
+    return $Call.ByID(3594296730, workspaceRoot, sourcePath, format);
 }

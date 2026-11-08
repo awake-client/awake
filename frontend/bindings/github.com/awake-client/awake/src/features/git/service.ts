@@ -18,49 +18,49 @@ import * as $models from "./models.js";
  * Commit stages every change and creates a commit.
  */
 export function Commit(workspaceRoot: string, message: string): $CancellablePromise<string> {
-    return $Call.ByID(2035362796, workspaceRoot, message);
+    return $Call.ByID(3792708437, workspaceRoot, message);
 }
 
 /**
  * ConflictVersions returns the base, local and incoming content of a path.
  */
 export function ConflictVersions(workspaceRoot: string, path: string): $CancellablePromise<$models.ConflictVersions> {
-    return $Call.ByID(1047423446, workspaceRoot, path);
+    return $Call.ByID(1935595119, workspaceRoot, path);
 }
 
 /**
  * HasConflicts reports whether the index contains unmerged paths.
  */
 export function HasConflicts(workspaceRoot: string): $CancellablePromise<boolean> {
-    return $Call.ByID(2187254398, workspaceRoot);
+    return $Call.ByID(112073715, workspaceRoot);
 }
 
 /**
  * Initialize creates a repository in the workspace.
  */
 export function Initialize(workspaceRoot: string, initialBranch: string): $CancellablePromise<void> {
-    return $Call.ByID(291624475, workspaceRoot, initialBranch);
+    return $Call.ByID(1002262062, workspaceRoot, initialBranch);
 }
 
 /**
  * IsRepository reports whether the workspace is tracked by git.
  */
 export function IsRepository(workspaceRoot: string): $CancellablePromise<boolean> {
-    return $Call.ByID(4070758133, workspaceRoot);
+    return $Call.ByID(2200130308, workspaceRoot);
 }
 
 /**
  * Pull fetches and merges the upstream branch.
  */
 export function Pull(workspaceRoot: string): $CancellablePromise<$models.PullResult> {
-    return $Call.ByID(4200102734, workspaceRoot);
+    return $Call.ByID(1345407863, workspaceRoot);
 }
 
 /**
  * Push publishes the current branch, setting its upstream on the first push.
  */
 export function Push(workspaceRoot: string): $CancellablePromise<void> {
-    return $Call.ByID(4962509, workspaceRoot);
+    return $Call.ByID(1375270412, workspaceRoot);
 }
 
 /**
@@ -68,14 +68,14 @@ export function Push(workspaceRoot: string): $CancellablePromise<void> {
  * string when the workspace has not been linked to one yet.
  */
 export function RemoteURL(workspaceRoot: string): $CancellablePromise<string> {
-    return $Call.ByID(1919248500, workspaceRoot);
+    return $Call.ByID(3272528639, workspaceRoot);
 }
 
 /**
  * ResolveWith writes content to a conflicted path and marks it resolved.
  */
 export function ResolveWith(workspaceRoot: string, path: string, content: string): $CancellablePromise<void> {
-    return $Call.ByID(2829661019, workspaceRoot, path, content);
+    return $Call.ByID(629429260, workspaceRoot, path, content);
 }
 
 /**
@@ -83,21 +83,21 @@ export function ResolveWith(workspaceRoot: string, path: string, content: string
  * origin is moved to the new URL.
  */
 export function SetRemote(workspaceRoot: string, url: string): $CancellablePromise<void> {
-    return $Call.ByID(1132744185, workspaceRoot, url);
+    return $Call.ByID(2054496558, workspaceRoot, url);
 }
 
 /**
  * Stage adds paths to the index.
  */
 export function Stage(workspaceRoot: string, paths: string[] | null): $CancellablePromise<void> {
-    return $Call.ByID(718647197, workspaceRoot, paths);
+    return $Call.ByID(2692407718, workspaceRoot, paths);
 }
 
 /**
  * Status returns the branch and work tree changes.
  */
 export function Status(workspaceRoot: string): $CancellablePromise<$models.Status> {
-    return $Call.ByID(2949771487, workspaceRoot);
+    return $Call.ByID(634129658, workspaceRoot);
 }
 
 /**
@@ -107,5 +107,5 @@ export function Status(workspaceRoot: string): $CancellablePromise<$models.Statu
  * commits are ahead of the upstream branch, so it is safe to call on a timer.
  */
 export function Synchronize(workspaceRoot: string, commit: boolean, pull: boolean, push: boolean): $CancellablePromise<$models.SyncResult> {
-    return $Call.ByID(4267651757, workspaceRoot, commit, pull, push);
+    return $Call.ByID(1956249478, workspaceRoot, commit, pull, push);
 }

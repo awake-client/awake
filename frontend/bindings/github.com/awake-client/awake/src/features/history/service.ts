@@ -18,21 +18,21 @@ import * as domain$0 from "../../domain/models.js";
  * Clear removes every history entry of a workspace.
  */
 export function Clear(workspaceRoot: string): $CancellablePromise<void> {
-    return $Call.ByID(538965482, workspaceRoot);
+    return $Call.ByID(4283224001, workspaceRoot);
 }
 
 /**
  * ClearForRequest removes every execution of one request.
  */
 export function ClearForRequest(workspaceRoot: string, requestPath: string): $CancellablePromise<void> {
-    return $Call.ByID(1469389374, workspaceRoot, requestPath);
+    return $Call.ByID(1742204349, workspaceRoot, requestPath);
 }
 
 /**
  * Delete removes one history entry and its payload.
  */
 export function Delete(workspaceRoot: string, identifier: number): $CancellablePromise<void> {
-    return $Call.ByID(2773241314, workspaceRoot, identifier);
+    return $Call.ByID(2529299527, workspaceRoot, identifier);
 }
 
 /**
@@ -40,7 +40,7 @@ export function Delete(workspaceRoot: string, identifier: number): $CancellableP
  * received, when they were recorded.
  */
 export function Entry(workspaceRoot: string, identifier: number): $CancellablePromise<domain$0.HistoryEntry> {
-    return $Call.ByID(2535066891, workspaceRoot, identifier);
+    return $Call.ByID(3889016704, workspaceRoot, identifier);
 }
 
 /**
@@ -48,21 +48,21 @@ export function Entry(workspaceRoot: string, identifier: number): $CancellablePr
  * the first page and the last seen identifier for the next one.
  */
 export function List(workspaceRoot: string, limit: number, beforeID: number): $CancellablePromise<domain$0.HistoryEntry[] | null> {
-    return $Call.ByID(1745316297, workspaceRoot, limit, beforeID);
+    return $Call.ByID(2404960148, workspaceRoot, limit, beforeID);
 }
 
 /**
  * ListForRequest returns the executions of one request, newest first.
  */
 export function ListForRequest(workspaceRoot: string, requestPath: string, limit: number, beforeID: number): $CancellablePromise<domain$0.HistoryEntry[] | null> {
-    return $Call.ByID(1263670069, workspaceRoot, requestPath, limit, beforeID);
+    return $Call.ByID(969500468, workspaceRoot, requestPath, limit, beforeID);
 }
 
 /**
  * Record appends an executed request to the history.
  */
 export function Record(workspaceRoot: string, entry: domain$0.HistoryEntry): $CancellablePromise<void> {
-    return $Call.ByID(3540955524, workspaceRoot, entry);
+    return $Call.ByID(3793502793, workspaceRoot, entry);
 }
 
 /**
@@ -70,5 +70,5 @@ export function Record(workspaceRoot: string, entry: domain$0.HistoryEntry): $Ca
  * or under a folder path, are attached to the new location.
  */
 export function RenameRequests(workspaceRoot: string, $from: string, to: string): $CancellablePromise<void> {
-    return $Call.ByID(3792007221, workspaceRoot, $from, to);
+    return $Call.ByID(1989441520, workspaceRoot, $from, to);
 }

@@ -21,21 +21,21 @@ import * as $models from "./models.js";
  * new file name and display name.
  */
 export function Clone(workspaceRoot: string, scope: string, sourceFileName: string, targetFileName: string, name: string): $CancellablePromise<void> {
-    return $Call.ByID(3690562196, workspaceRoot, scope, sourceFileName, targetFileName, name);
+    return $Call.ByID(1459457781, workspaceRoot, scope, sourceFileName, targetFileName, name);
 }
 
 /**
  * Delete removes a shared environment and its local overrides.
  */
 export function Delete(workspaceRoot: string, scope: string, fileName: string): $CancellablePromise<void> {
-    return $Call.ByID(1376967396, workspaceRoot, scope, fileName);
+    return $Call.ByID(3698020771, workspaceRoot, scope, fileName);
 }
 
 /**
  * List returns the environments of a scope.
  */
 export function List(workspaceRoot: string, scope: string): $CancellablePromise<$models.Summary[] | null> {
-    return $Call.ByID(2773757599, workspaceRoot, scope);
+    return $Call.ByID(4013900800, workspaceRoot, scope);
 }
 
 /**
@@ -43,14 +43,14 @@ export function List(workspaceRoot: string, scope: string): $CancellablePromise<
  * every collection, so the interface can offer each name once.
  */
 export function ListAll(workspaceRoot: string): $CancellablePromise<$models.ScopedSummary[] | null> {
-    return $Call.ByID(2129357130, workspaceRoot);
+    return $Call.ByID(2155282771, workspaceRoot);
 }
 
 /**
  * Load returns an environment with its local overrides applied.
  */
 export function Load(workspaceRoot: string, scope: string, fileName: string): $CancellablePromise<$models.ResolvedEnvironment> {
-    return $Call.ByID(1121922383, workspaceRoot, scope, fileName);
+    return $Call.ByID(904810612, workspaceRoot, scope, fileName);
 }
 
 /**
@@ -58,14 +58,14 @@ export function Load(workspaceRoot: string, scope: string, fileName: string): $C
  * file name, so the file name keeps following the display name.
  */
 export function Rename(workspaceRoot: string, scope: string, fileName: string, newFileName: string): $CancellablePromise<void> {
-    return $Call.ByID(699417037, workspaceRoot, scope, fileName, newFileName);
+    return $Call.ByID(1618639738, workspaceRoot, scope, fileName, newFileName);
 }
 
 /**
  * Save writes a shared environment file.
  */
 export function Save(workspaceRoot: string, scope: string, fileName: string, environment: $models.Environment): $CancellablePromise<void> {
-    return $Call.ByID(4242816834, workspaceRoot, scope, fileName, environment);
+    return $Call.ByID(1066246037, workspaceRoot, scope, fileName, environment);
 }
 
 /**
@@ -73,5 +73,5 @@ export function Save(workspaceRoot: string, scope: string, fileName: string, env
  * this machine only, which win over the shared file.
  */
 export function SaveLocal(workspaceRoot: string, scope: string, fileName: string, variables: { [_ in string]?: string } | null): $CancellablePromise<void> {
-    return $Call.ByID(2364440569, workspaceRoot, scope, fileName, variables);
+    return $Call.ByID(3161276824, workspaceRoot, scope, fileName, variables);
 }

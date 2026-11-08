@@ -18,7 +18,7 @@ import * as $models from "./models.js";
  * Agents reports the supported agents and whether they are installed.
  */
 export function Agents(): $CancellablePromise<$models.AgentStatus[] | null> {
-    return $Call.ByID(1329281055);
+    return $Call.ByID(2505205426);
 }
 
 /**
@@ -29,7 +29,7 @@ export function Agents(): $CancellablePromise<$models.AgentStatus[] | null> {
  * The model is only used by OpenCode; an empty value keeps its configured one.
  */
 export function Chat(workspaceRoot: string, agent: string, model: string, message: string, history: $models.ChatMessage[] | null): $CancellablePromise<$models.ChatReply> {
-    return $Call.ByID(3445766235, workspaceRoot, agent, model, message, history);
+    return $Call.ByID(1708934762, workspaceRoot, agent, model, message, history);
 }
 
 /**
@@ -37,14 +37,14 @@ export function Chat(workspaceRoot: string, agent: string, model: string, messag
  * them. An empty list means OpenCode is missing or could not answer.
  */
 export function OpenCodeModels(): $CancellablePromise<string[] | null> {
-    return $Call.ByID(1519195242);
+    return $Call.ByID(1692303719);
 }
 
 /**
  * Status reports whether Claude Code is installed, and its version.
  */
 export function Status(): $CancellablePromise<$models.Status> {
-    return $Call.ByID(487940511);
+    return $Call.ByID(604974278);
 }
 
 /**
@@ -53,5 +53,5 @@ export function Status(): $CancellablePromise<$models.Status> {
  * can neither read nor change files, nor run commands.
  */
 export function SuggestMerge(workspaceRoot: string, path: string, base: string, local: string, incoming: string): $CancellablePromise<$models.Suggestion> {
-    return $Call.ByID(2385529847, workspaceRoot, path, base, local, incoming);
+    return $Call.ByID(1653561270, workspaceRoot, path, base, local, incoming);
 }

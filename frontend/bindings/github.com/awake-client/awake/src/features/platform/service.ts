@@ -15,5 +15,5 @@ import { Call as $Call, CancellablePromise as $CancellablePromise } from "@wails
  * windows.
  */
 export function Name(): $CancellablePromise<string> {
-    return $Call.ByID(2525576903);
+    return $Call.ByID(2568874380);
 }

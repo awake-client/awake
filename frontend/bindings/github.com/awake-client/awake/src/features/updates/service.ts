@@ -15,26 +15,26 @@ import { Call as $Call, CancellablePromise as $CancellablePromise } from "@wails
  * background. Progress and errors appear in that window.
  */
 export function CheckForUpdates(): $CancellablePromise<void> {
-    return $Call.ByID(943203562);
+    return $Call.ByID(3456239477);
 }
 
 /**
  * CurrentVersion returns the running version.
  */
 export function CurrentVersion(): $CancellablePromise<string> {
-    return $Call.ByID(2573385396);
+    return $Call.ByID(1708266441);
 }
 
 /**
  * Ready reports whether an update is installed and waits for a restart.
  */
 export function Ready(): $CancellablePromise<boolean> {
-    return $Call.ByID(2748182214);
+    return $Call.ByID(628072909);
 }
 
 /**
  * State reports the updater lifecycle phase.
  */
 export function State(): $CancellablePromise<string> {
-    return $Call.ByID(659290168);
+    return $Call.ByID(4198909939);
 }

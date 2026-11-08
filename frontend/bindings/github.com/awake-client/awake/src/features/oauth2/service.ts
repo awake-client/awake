@@ -20,14 +20,14 @@ import * as $models from "./models.js";
  * contacts the token endpoint directly.
  */
 export function Authorize(workspaceRoot: string, requestPath: string, environmentFileName: string): $CancellablePromise<$models.Status> {
-    return $Call.ByID(795888363, workspaceRoot, requestPath, environmentFileName);
+    return $Call.ByID(4160072770, workspaceRoot, requestPath, environmentFileName);
 }
 
 /**
  * Clear forgets the cached token of a request.
  */
 export function Clear(workspaceRoot: string, requestPath: string, environmentFileName: string): $CancellablePromise<void> {
-    return $Call.ByID(3115513821, workspaceRoot, requestPath, environmentFileName);
+    return $Call.ByID(1711597488, workspaceRoot, requestPath, environmentFileName);
 }
 
 /**
@@ -35,5 +35,5 @@ export function Clear(workspaceRoot: string, requestPath: string, environmentFil
  * endpoint.
  */
 export function Status(workspaceRoot: string, requestPath: string, environmentFileName: string): $CancellablePromise<$models.Status> {
-    return $Call.ByID(915169202, workspaceRoot, requestPath, environmentFileName);
+    return $Call.ByID(4267321769, workspaceRoot, requestPath, environmentFileName);
 }

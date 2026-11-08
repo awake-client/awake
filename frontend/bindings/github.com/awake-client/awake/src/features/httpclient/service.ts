@@ -18,7 +18,7 @@ import * as $models from "./models.js";
  * Close releases a stored response and its temporary file.
  */
 export function Close(identifier: string): $CancellablePromise<void> {
-    return $Call.ByID(2939854244, identifier);
+    return $Call.ByID(1431391161, identifier);
 }
 
 /**
@@ -26,7 +26,7 @@ export function Close(identifier: string): $CancellablePromise<void> {
  * released.
  */
 export function CloseStream(identifier: string): $CancellablePromise<void> {
-    return $Call.ByID(2611765148, identifier);
+    return $Call.ByID(3852522529, identifier);
 }
 
 /**
@@ -34,7 +34,7 @@ export function CloseStream(identifier: string): $CancellablePromise<void> {
  * fresh value each time a request is sent.
  */
 export function DynamicVariables(): $CancellablePromise<$models.DynamicVariable[] | null> {
-    return $Call.ByID(1815998542);
+    return $Call.ByID(2811182145);
 }
 
 /**
@@ -42,14 +42,14 @@ export function DynamicVariables(): $CancellablePromise<$models.DynamicVariable[
  * stays open until CloseStream or ReleaseStream is called.
  */
 export function OpenStream(workspaceRoot: string, requestPath: string, environmentFileName: string): $CancellablePromise<$models.Stream> {
-    return $Call.ByID(175550392, workspaceRoot, requestPath, environmentFileName);
+    return $Call.ByID(555946223, workspaceRoot, requestPath, environmentFileName);
 }
 
 /**
  * ReadChunk returns a slice of a stored response body.
  */
 export function ReadChunk(identifier: string, offset: number, length: number): $CancellablePromise<$models.Chunk> {
-    return $Call.ByID(2709038073, identifier, offset, length);
+    return $Call.ByID(1827086556, identifier, offset, length);
 }
 
 /**
@@ -57,14 +57,14 @@ export function ReadChunk(identifier: string, offset: number, length: number): $
  * NextIndex of the previous page, and zero for the first read.
  */
 export function ReadStreamEvents(identifier: string, fromIndex: number): $CancellablePromise<$models.StreamEventPage> {
-    return $Call.ByID(1083302581, identifier, fromIndex);
+    return $Call.ByID(3861041794, identifier, fromIndex);
 }
 
 /**
  * ReleaseStream stops a stream and forgets its events.
  */
 export function ReleaseStream(identifier: string): $CancellablePromise<void> {
-    return $Call.ByID(3546862221, identifier);
+    return $Call.ByID(1626945424, identifier);
 }
 
 /**
@@ -72,14 +72,14 @@ export function ReleaseStream(identifier: string): $CancellablePromise<void> {
  * environment, as the interface shows them while editing.
  */
 export function ResolveVariables(workspaceRoot: string, requestPath: string, environmentFileName: string): $CancellablePromise<$models.ResolvedVariable[] | null> {
-    return $Call.ByID(2861235029, workspaceRoot, requestPath, environmentFileName);
+    return $Call.ByID(4070238426, workspaceRoot, requestPath, environmentFileName);
 }
 
 /**
  * Send executes a request and streams its body to the response store.
  */
 export function Send(workspaceRoot: string, requestPath: string, environmentFileName: string): $CancellablePromise<$models.Response> {
-    return $Call.ByID(3813540462, workspaceRoot, requestPath, environmentFileName);
+    return $Call.ByID(954432629, workspaceRoot, requestPath, environmentFileName);
 }
 
 /**
@@ -87,5 +87,5 @@ export function Send(workspaceRoot: string, requestPath: string, environmentFile
  * base64 for binary payloads.
  */
 export function SendStreamMessage(identifier: string, message: string, encoding: string): $CancellablePromise<void> {
-    return $Call.ByID(931444429, identifier, message, encoding);
+    return $Call.ByID(199065076, identifier, message, encoding);
 }

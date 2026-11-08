@@ -22,28 +22,28 @@ import * as $models from "./models.js";
  * CreateCollection creates a collection directory with its metadata file.
  */
 export function CreateCollection(workspaceRoot: string, relativePath: string, collection: domain$0.Collection): $CancellablePromise<void> {
-    return $Call.ByID(3066481014, workspaceRoot, relativePath, collection);
+    return $Call.ByID(2708719075, workspaceRoot, relativePath, collection);
 }
 
 /**
  * CreateFolder creates a folder inside an existing collection or folder.
  */
 export function CreateFolder(workspaceRoot: string, relativePath: string, name: string): $CancellablePromise<void> {
-    return $Call.ByID(1910914286, workspaceRoot, relativePath, name);
+    return $Call.ByID(4052019407, workspaceRoot, relativePath, name);
 }
 
 /**
  * CreateRequest writes a new request file.
  */
 export function CreateRequest(workspaceRoot: string, relativePath: string, request: domain$0.Request): $CancellablePromise<void> {
-    return $Call.ByID(2710430451, workspaceRoot, relativePath, request);
+    return $Call.ByID(356158900, workspaceRoot, relativePath, request);
 }
 
 /**
  * Delete removes a request, or a folder or collection with its content.
  */
 export function Delete(workspaceRoot: string, relativePath: string): $CancellablePromise<void> {
-    return $Call.ByID(3599059989, workspaceRoot, relativePath);
+    return $Call.ByID(1520938344, workspaceRoot, relativePath);
 }
 
 /**
@@ -51,7 +51,7 @@ export function Delete(workspaceRoot: string, relativePath: string): $Cancellabl
  * collections of the workspace.
  */
 export function List(workspaceRoot: string, relativePath: string): $CancellablePromise<$models.Entry[] | null> {
-    return $Call.ByID(136442726, workspaceRoot, relativePath);
+    return $Call.ByID(2708037475, workspaceRoot, relativePath);
 }
 
 /**
@@ -59,14 +59,14 @@ export function List(workspaceRoot: string, relativePath: string): $CancellableP
  * directory has no collection file.
  */
 export function LoadCollection(workspaceRoot: string, relativePath: string): $CancellablePromise<domain$0.Collection> {
-    return $Call.ByID(503560914, workspaceRoot, relativePath);
+    return $Call.ByID(1059055795, workspaceRoot, relativePath);
 }
 
 /**
  * LoadRequest returns a request with defaults applied.
  */
 export function LoadRequest(workspaceRoot: string, relativePath: string): $CancellablePromise<domain$0.Request> {
-    return $Call.ByID(3399377391, workspaceRoot, relativePath);
+    return $Call.ByID(2785782628, workspaceRoot, relativePath);
 }
 
 /**
@@ -74,7 +74,7 @@ export function LoadRequest(workspaceRoot: string, relativePath: string): $Cance
  * machine, empty when there are none.
  */
 export function LoadRequestOverride(workspaceRoot: string, relativePath: string): $CancellablePromise<domain$0.RequestOverride> {
-    return $Call.ByID(3447045183, workspaceRoot, relativePath);
+    return $Call.ByID(4262048908, workspaceRoot, relativePath);
 }
 
 /**
@@ -82,7 +82,7 @@ export function LoadRequestOverride(workspaceRoot: string, relativePath: string)
  * returns its new path.
  */
 export function Move(workspaceRoot: string, relativePath: string, targetDirectory: string): $CancellablePromise<string> {
-    return $Call.ByID(4074981479, workspaceRoot, relativePath, targetDirectory);
+    return $Call.ByID(2925460898, workspaceRoot, relativePath, targetDirectory);
 }
 
 /**
@@ -90,26 +90,26 @@ export function Move(workspaceRoot: string, relativePath: string, targetDirector
  * or removes them when the override is empty.
  */
 export function SaveRequestOverride(workspaceRoot: string, relativePath: string, override: domain$0.RequestOverride): $CancellablePromise<void> {
-    return $Call.ByID(4258051352, workspaceRoot, relativePath, override);
+    return $Call.ByID(2408051491, workspaceRoot, relativePath, override);
 }
 
 /**
  * SearchRequests returns requests matching every word of the query.
  */
 export function SearchRequests(workspaceRoot: string, query: string, limit: number): $CancellablePromise<$models.Entry[] | null> {
-    return $Call.ByID(2739524308, workspaceRoot, query, limit);
+    return $Call.ByID(2533406621, workspaceRoot, query, limit);
 }
 
 /**
  * UpdateCollection replaces the metadata of an existing collection.
  */
 export function UpdateCollection(workspaceRoot: string, relativePath: string, collection: domain$0.Collection): $CancellablePromise<void> {
-    return $Call.ByID(43110235, workspaceRoot, relativePath, collection);
+    return $Call.ByID(762326378, workspaceRoot, relativePath, collection);
 }
 
 /**
  * UpdateRequest replaces the content of an existing request file.
  */
 export function UpdateRequest(workspaceRoot: string, relativePath: string, request: domain$0.Request): $CancellablePromise<void> {
-    return $Call.ByID(3449007932, workspaceRoot, relativePath, request);
+    return $Call.ByID(831004087, workspaceRoot, relativePath, request);
 }

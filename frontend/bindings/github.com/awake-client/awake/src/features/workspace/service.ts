@@ -18,7 +18,7 @@ import * as $models from "./models.js";
  * Create initializes a workspace and returns its configuration.
  */
 export function Create(rootPath: string, options: $models.CreateOptions): $CancellablePromise<$models.Configuration> {
-    return $Call.ByID(3187998046, rootPath, options);
+    return $Call.ByID(1127120251, rootPath, options);
 }
 
 /**
@@ -26,19 +26,19 @@ export function Create(rootPath: string, options: $models.CreateOptions): $Cance
  * schemas of its files so they follow this version of Awake.
  */
 export function Open(rootPath: string): $CancellablePromise<$models.Configuration> {
-    return $Call.ByID(3752288082, rootPath);
+    return $Call.ByID(1095345239, rootPath);
 }
 
 /**
  * UpdateColor stores the color of the workspace in awake.yaml.
  */
 export function UpdateColor(rootPath: string, color: string): $CancellablePromise<$models.Configuration> {
-    return $Call.ByID(3658605154, rootPath, color);
+    return $Call.ByID(1514972253, rootPath, color);
 }
 
 /**
  * UpdateGit replaces the git synchronization settings stored in awake.yaml.
  */
 export function UpdateGit(rootPath: string, git: $models.GitConfiguration): $CancellablePromise<$models.Configuration> {
-    return $Call.ByID(3190673329, rootPath, git);
+    return $Call.ByID(2425600298, rootPath, git);
 }
