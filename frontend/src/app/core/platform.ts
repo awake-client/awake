@@ -9,3 +9,15 @@ export async function detectPlatform(): Promise<void> {
   const platform = await PlatformService.Name();
   document.documentElement.dataset['platform'] = platform;
 }
+
+/**
+ * Reports whether the host is macOS, from the platform detected at startup.
+ * Falls back to the browser when the backend is not available, as in tests.
+ */
+export function isMacPlatform(): boolean {
+  const platform = document.documentElement.dataset['platform'];
+  if (platform) {
+    return platform === 'darwin';
+  }
+  return /mac/i.test(navigator.userAgent);
+}
