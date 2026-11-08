@@ -65,7 +65,7 @@ export class InteropPanel {
     }
     if (this.exportSplit()) {
       return this.exportFormat() === Format.FormatPostman
-        ? 'Directory that receives one collection per collection, and its environments.'
+        ? 'Directory that receives one Postman collection per Awake collection, plus environments.'
         : 'Directory that receives one OpenAPI document per collection.';
     }
     if (this.exportFormat() === Format.FormatPostman) {
