@@ -48,14 +48,14 @@ jobs:
             goarch: arm64
             tags: production,purego
             binary: awake
-            archive: awake-macos-arm64.zip
+            archive: awake-darwin-arm64.zip
           - name: macOS amd64
             os: macos-latest
             goos: darwin
             goarch: amd64
             tags: production,purego
             binary: awake
-            archive: awake-macos-amd64.zip
+            archive: awake-darwin-amd64.zip
           - name: Linux amd64
             os: ubuntu-latest
             goos: linux

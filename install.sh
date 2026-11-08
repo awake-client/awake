@@ -205,7 +205,7 @@ resolve_version() {
 
 asset_name() {
   case "$OS" in
-    darwin) printf 'awake-macos-%s.zip' "$ARCH" ;;
+    darwin) printf 'awake-darwin-%s.zip' "$ARCH" ;;
     linux) printf 'awake-linux-%s.tar.gz' "$ARCH" ;;
   esac
 }
@@ -530,12 +530,23 @@ trap 'rm -rf "$TMP_DIR"' EXIT INT TERM
 resolve_version
 
 ASSET="$(asset_name)"
+DOWNLOADED="$ASSET"
 RELEASE_URL="https://github.com/$REPOSITORY/releases/download/$VERSION"
 
 say "Installing $APP_NAME $VERSION ($OS/$ARCH)"
 
-download "$RELEASE_URL/$ASSET" "$TMP_DIR/$ASSET"
-verify_checksum "$TMP_DIR/$ASSET" "$ASSET"
+if ! download "$RELEASE_URL/$ASSET" "$TMP_DIR/$ASSET"; then
+  # Releases up to v0.0.6 named the macOS archives awake-macos-<arch>.zip.
+  if [ "$OS" = darwin ]; then
+    DOWNLOADED="awake-macos-$ARCH.zip"
+    say "No $ASSET in $VERSION; trying $DOWNLOADED"
+    download "$RELEASE_URL/$DOWNLOADED" "$TMP_DIR/$ASSET" ||
+      die "could not download $ASSET or $DOWNLOADED from $RELEASE_URL"
+  else
+    die "could not download $ASSET from $RELEASE_URL"
+  fi
+fi
+verify_checksum "$TMP_DIR/$ASSET" "$DOWNLOADED"
 
 mkdir -p "$TMP_DIR/extract"
 
