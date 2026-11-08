@@ -8,20 +8,30 @@ describe('LayoutStore URL height', () => {
     expect(TestBed.inject(LayoutStore).urlHeight()).toBeNull();
   });
 
-  it('keeps a chosen height within its bounds', () => {
+  it('keeps a chosen height on a whole line', () => {
     const store = TestBed.inject(LayoutStore);
 
-    store.setUrlHeight(10);
+    // A height in the middle of a line, such as the one an earlier version
+    // could save, would cut the line in half.
+    store.setUrlHeight(47);
     expect(store.urlHeight()).toBe(URL_HEIGHT.minimum);
+    store.setUrlHeight(50);
+    expect(store.urlHeight()).toBe(URL_HEIGHT.minimum + 20);
     store.setUrlHeight(10_000);
     expect(store.urlHeight()).toBe(URL_HEIGHT.maximum);
+  });
+
+  it('reads a height saved before line snapping on a whole line', () => {
+    localStorage.setItem('awake.layout', JSON.stringify({ urlHeight: 47 }));
+
+    expect(TestBed.inject(LayoutStore).urlHeight()).toBe(URL_HEIGHT.minimum);
   });
 
   it('remembers the chosen height and forgets it on reset', () => {
     const store = TestBed.inject(LayoutStore);
 
     store.setUrlHeight(120);
-    expect(JSON.parse(localStorage.getItem('awake.layout') ?? '{}').urlHeight).toBe(120);
+    expect(JSON.parse(localStorage.getItem('awake.layout') ?? '{}').urlHeight).toBe(118);
 
     store.resetUrlHeight();
     expect(store.urlHeight()).toBeNull();

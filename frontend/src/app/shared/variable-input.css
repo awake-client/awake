@@ -61,6 +61,10 @@ input {
   will-change: transform;
 }
 
+.highlight-clip {
+  min-width: 0;
+}
+
 input,
 textarea {
   position: relative;
@@ -98,16 +102,22 @@ textarea::selection {
 
 /* A multiline field wraps its value and grows with it. The drawing layer
    follows both scroll axes, and the line height and vertical padding must
-   match the field exactly. */
+   match the field exactly. The clip box stops at the content box, so a line
+   never peeks into the padding. */
 :host(.multiline) {
   height: auto;
   min-height: var(--control-height);
 }
 
 :host(.multiline) .highlight {
-  align-items: flex-start;
+  align-items: stretch;
   padding-top: 9px;
   padding-bottom: 9px;
+}
+
+:host(.multiline) .highlight-clip {
+  flex: 1;
+  overflow: hidden;
 }
 
 :host(.multiline) .highlight-text {

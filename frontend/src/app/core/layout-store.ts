@@ -1,4 +1,5 @@
 import { Injectable, signal } from '@angular/core';
+import { snapUrlLines, URL_FIELD_MAXIMUM, URL_FIELD_ONE_LINE } from '@shared/url-field';
 
 const STORAGE_KEY = 'awake.layout';
 
@@ -22,7 +23,7 @@ const DEFAULTS: StoredLayout = {
 /** The minimum keeps the footer, with its sync status, readable. */
 export const SIDEBAR_WIDTH = { minimum: 264, maximum: 560, default: DEFAULTS.sidebarWidth };
 export const RESPONSE_RATIO = { minimum: 0.18, maximum: 0.82, default: DEFAULTS.responseRatio };
-export const URL_HEIGHT = { minimum: 38, maximum: 260 };
+export const URL_HEIGHT = { minimum: URL_FIELD_ONE_LINE, maximum: URL_FIELD_MAXIMUM };
 
 /**
  * Personal layout preferences: the sidebar width, whether the response sits
@@ -50,7 +51,7 @@ export class LayoutStore {
 
   /** Gives the URL field a height the user chose; null fits its content. */
   setUrlHeight(height: number): void {
-    this.urlHeight.set(clamp(Math.round(height), URL_HEIGHT.minimum, URL_HEIGHT.maximum));
+    this.urlHeight.set(snapUrlLines(height));
     this.persist();
   }
 
@@ -94,10 +95,7 @@ function readStorage(): StoredLayout {
       editorLayout: parsed.editorLayout === 'side' ? 'side' : 'stacked',
       responseRatio:
         typeof parsed.responseRatio === 'number' ? parsed.responseRatio : DEFAULTS.responseRatio,
-      urlHeight:
-        typeof parsed.urlHeight === 'number'
-          ? clamp(parsed.urlHeight, URL_HEIGHT.minimum, URL_HEIGHT.maximum)
-          : null,
+      urlHeight: typeof parsed.urlHeight === 'number' ? snapUrlLines(parsed.urlHeight) : null,
     };
   } catch {
     return { ...DEFAULTS };

@@ -12,6 +12,7 @@ import {
   viewChild,
 } from '@angular/core';
 import { VariableInfo, VariableStore } from '@core/variable-store';
+import { snapUrlLines, URL_FIELD } from './url-field';
 
 /** A run of text drawn behind the field, highlighted when it is a reference. */
 interface Segment {
@@ -104,15 +105,6 @@ interface PendingReference {
 
 const PENDING_PATTERN = /\{\{\s*(\$?[A-Za-z0-9_]*)$/;
 const MAX_SUGGESTIONS = 8;
-/** Height of one line of a multiline field, so wrapping matches the drawing. */
-const MULTILINE_LINE_HEIGHT = 20;
-const MULTILINE_PADDING = 9;
-
-/** Rounds a height to the nearest number of whole lines of a multiline field. */
-export function snapToLines(height: number): number {
-  const lines = Math.max(1, Math.round((height - 2 * MULTILINE_PADDING) / MULTILINE_LINE_HEIGHT));
-  return lines * MULTILINE_LINE_HEIGHT + 2 * MULTILINE_PADDING;
-}
 
 /**
  * Single-line field aware of `{{variables}}`. References are colored by
@@ -135,13 +127,15 @@ export function snapToLines(height: number): number {
   },
   template: `
     <div class="highlight" aria-hidden="true">
-      <div
-        class="highlight-text"
-        [style.transform]="'translate(' + -scrollLeft() + 'px, ' + -scrollTop() + 'px)'"
-      >
-        @for (segment of segments(); track $index) {
-          <span [class]="segment.state">{{ segment.text }}</span>
-        }
+      <div class="highlight-clip">
+        <div
+          class="highlight-text"
+          [style.transform]="'translate(' + -scrollLeft() + 'px, ' + -scrollTop() + 'px)'"
+        >
+          @for (segment of segments(); track $index) {
+            <span [class]="segment.state">{{ segment.text }}</span>
+          }
+        </div>
       </div>
     </div>
     @if (multiline()) {
@@ -494,7 +488,7 @@ export class VariableInput {
     // scrollHeight never reports less than the current box, so the height is
     // reset first: a field widened back would otherwise keep its old height.
     const scrollTop = field.scrollTop;
-    const maximum = MULTILINE_LINE_HEIGHT * this.maxLines() + 2 * MULTILINE_PADDING;
+    const maximum = URL_FIELD.lineHeight * this.maxLines() + 2 * URL_FIELD.padding;
     field.style.height = 'auto';
     const scrollHeight = field.scrollHeight;
     if (scrollHeight === 0) {
@@ -523,9 +517,9 @@ export class VariableInput {
     document.body.style.cursor = 'row-resize';
 
     // Heights snap to whole lines, and only a line change is reported.
-    let lastHeight = snapToLines(startHeight);
+    let lastHeight = snapUrlLines(startHeight);
     const move = (moveEvent: PointerEvent) => {
-      const height = snapToLines(startHeight + (moveEvent.clientY - startY));
+      const height = snapUrlLines(startHeight + (moveEvent.clientY - startY));
       if (height !== lastHeight) {
         lastHeight = height;
         this.heightChange.emit(height);
