@@ -12,7 +12,7 @@ import {
   viewChild,
 } from '@angular/core';
 import { VariableInfo, VariableStore } from '@core/variable-store';
-import { snapUrlLines, URL_FIELD, URL_FIELD_ONE_LINE } from './url-field';
+import { snapUrlLines, URL_FIELD, URL_FIELD_MAXIMUM, URL_FIELD_ONE_LINE } from './url-field';
 
 /** A run of text drawn behind the field, highlighted when it is a reference. */
 interface Segment {
@@ -180,7 +180,7 @@ const MAX_SUGGESTIONS = 8;
         (blur)="close(); stopFollowingScroll()"
       />
     }
-    @if (resizable()) {
+    @if (canResize()) {
       <span
         class="resize-grip"
         role="separator"
@@ -250,11 +250,17 @@ export class VariableInput {
 
   protected readonly scrollLeft = signal(0);
   protected readonly scrollTop = signal(0);
+  /** Height the value needs at the current width, in whole lines. */
+  private readonly neededHeight = signal(URL_FIELD_ONE_LINE);
   /** A field showing one line does not wrap: it scrolls sideways. */
   protected readonly singleLine = computed(() => {
     const chosen = this.height();
     return this.multiline() && chosen !== null && chosen <= URL_FIELD_ONE_LINE;
   });
+  /** The grip only helps when the value wraps past one line. */
+  protected readonly canResize = computed(
+    () => this.resizable() && this.multiline() && this.neededHeight() > URL_FIELD_ONE_LINE,
+  );
   private scrollFrame: number | null = null;
 
   constructor() {
@@ -477,48 +483,55 @@ export class VariableInput {
   }
 
   /** Grows the field up to its maximum number of lines, then scrolls. A
-   * height chosen by the user wins over the content. */
+   * height chosen by the user wins over the content, but never exceeds the
+   * lines the value actually needs. */
   private resize(): void {
     const field = this.multiLineField()?.nativeElement;
     if (!field || !this.multiline()) {
       return;
     }
 
-    const chosen = this.height();
+    const scrollTop = field.scrollTop;
+    const scrollLeft = field.scrollLeft;
+    const needed = this.measureNeededHeight(field);
+    this.neededHeight.set(needed);
+
     const single = this.singleLine();
-    if (!single && field.scrollLeft !== 0) {
-      // Back to wrapping: the URL can no longer scroll sideways.
+    const chosen = this.height();
+    const automatic = URL_FIELD.lineHeight * this.maxLines() + 2 * URL_FIELD.padding;
+    const height = chosen === null ? Math.min(needed, automatic) : Math.min(chosen, needed);
+
+    field.style.height = `${height}px`;
+    // One line never wraps, so a long URL scrolls sideways like a field.
+    field.style.overflowX = single ? 'auto' : 'hidden';
+    field.style.overflowY = !single && height < needed ? 'auto' : 'hidden';
+
+    if (single) {
+      field.scrollTop = 0;
+      this.scrollTop.set(0);
+      // Keeps the sideways position the caret just scrolled to.
+      field.scrollLeft = scrollLeft;
+      this.scrollLeft.set(field.scrollLeft);
+    } else {
       field.scrollLeft = 0;
       this.scrollLeft.set(0);
+      field.scrollTop = Math.min(scrollTop, Math.max(0, needed - height));
+      this.scrollTop.set(field.scrollTop);
     }
-    if (chosen !== null) {
-      field.style.height = `${chosen}px`;
-      // One line never wraps, so a long URL scrolls sideways like a field.
-      field.style.overflowX = single ? 'auto' : 'hidden';
-      field.style.overflowY = !single && field.scrollHeight > chosen ? 'auto' : 'hidden';
-      if (single) {
-        field.scrollTop = 0;
-        this.scrollTop.set(0);
-      }
-      return;
-    }
+  }
 
-    // scrollHeight never reports less than the current box, so the height is
-    // reset first: a field widened back would otherwise keep its old height.
-    const scrollTop = field.scrollTop;
-    const maximum = URL_FIELD.lineHeight * this.maxLines() + 2 * URL_FIELD.padding;
+  /** Height the whole value needs, wrapping it as the field would. The field
+   * is measured on one line when it scrolls sideways, so wrapping is forced
+   * for the measurement and undone right after. */
+  private measureNeededHeight(field: HTMLTextAreaElement): number {
+    const height = field.style.height;
+    const whiteSpace = field.style.whiteSpace;
     field.style.height = 'auto';
-    field.style.overflowX = 'hidden';
-    const scrollHeight = field.scrollHeight;
-    if (scrollHeight === 0) {
-      // Hidden or unmeasurable: let the stylesheet set the height.
-      field.style.height = '';
-      field.style.overflowY = 'hidden';
-      return;
-    }
-    field.style.height = `${Math.min(scrollHeight, maximum)}px`;
-    field.style.overflowY = scrollHeight > maximum ? 'auto' : 'hidden';
-    field.scrollTop = scrollTop;
+    field.style.whiteSpace = 'pre-wrap';
+    const needed = field.scrollHeight;
+    field.style.height = height;
+    field.style.whiteSpace = whiteSpace;
+    return needed > 0 ? needed : URL_FIELD_ONE_LINE;
   }
 
   /** Turns a drag of the grip into a height, relative to where it started.
@@ -535,10 +548,11 @@ export class VariableInput {
     grip.setPointerCapture(event.pointerId);
     document.body.style.cursor = 'row-resize';
 
-    // Heights snap to whole lines, and only a line change is reported.
+    // A drag stops at the lines the value needs, so no empty line is added.
+    const maximum = Math.min(this.neededHeight(), URL_FIELD_MAXIMUM);
     let lastHeight = snapUrlLines(startHeight);
     const move = (moveEvent: PointerEvent) => {
-      const height = snapUrlLines(startHeight + (moveEvent.clientY - startY));
+      const height = Math.min(snapUrlLines(startHeight + (moveEvent.clientY - startY)), maximum);
       if (height !== lastHeight) {
         lastHeight = height;
         this.heightChange.emit(height);
