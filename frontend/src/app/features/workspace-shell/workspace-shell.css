@@ -47,11 +47,6 @@
   justify-content: flex-end;
 }
 
-
-
-
-
-
 .search-trigger {
   display: flex;
   align-items: center;
@@ -249,20 +244,4 @@
   flex: 1;
   min-height: 0;
   overflow: hidden;
-}
-
-
-/* The active environment color runs along the top of the work area. */
-.sheet {
-  position: relative;
-}
-
-.sheet[data-color]::before {
-  content: '';
-  position: absolute;
-  inset: 0 0 auto;
-  z-index: 10;
-  height: 2px;
-  background: var(--entity-color);
-  pointer-events: none;
 }
