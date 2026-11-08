@@ -144,12 +144,12 @@ function relativeTime(date: Date | null, now: number): string {
   }
   const minutes = Math.floor((now - date.getTime()) / 60_000);
   if (minutes < 1) {
-    return 'just now';
+    return 'now';
   }
   if (minutes < 60) {
-    return `${minutes} min ago`;
+    return `${minutes} min`;
   }
-  return `${Math.floor(minutes / 60)} h ago`;
+  return `${Math.floor(minutes / 60)} h`;
 }
 
 function describeResult(pulled: boolean, pushed: boolean): string {
