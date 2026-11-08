@@ -2,21 +2,20 @@ package interop
 
 import (
 	"encoding/json"
+	"sort"
+	"strings"
 
 	"github.com/clementherve/awake/src/domain"
 )
 
-// WritePostman renders collections as a Postman collection, version 2.1.
+// WritePostman renders collections as a Postman collection, version 2.1. Each
+// Awake collection becomes a folder of the document.
 func WritePostman(collections []Collection) ([]byte, error) {
 	variables := map[string]string{}
 	items := make([]any, 0, len(collections))
 
 	for _, collection := range collections {
-		for name, value := range collection.Variables {
-			if _, exists := variables[name]; !exists {
-				variables[name] = value
-			}
-		}
+		addPostmanVariables(variables, collection.Variables)
 
 		folder := map[string]any{
 			"name": collection.Name,
@@ -28,6 +27,37 @@ func WritePostman(collections []Collection) ([]byte, error) {
 		items = append(items, folder)
 	}
 
+	name := "Awake export"
+	if len(collections) == 1 && strings.TrimSpace(collections[0].Name) != "" {
+		name = collections[0].Name
+	}
+
+	return encodePostman(name, items, variables)
+}
+
+// WritePostmanCollection renders one collection as a Postman collection, with
+// its requests at the root instead of in a folder of the same name.
+func WritePostmanCollection(collection Collection) ([]byte, error) {
+	variables := map[string]string{}
+	addPostmanVariables(variables, collection.Variables)
+
+	name := strings.TrimSpace(collection.Name)
+	if name == "" {
+		name = "Awake export"
+	}
+
+	return encodePostman(name, postmanItems(collection.Requests, collection.Folders), variables)
+}
+
+func addPostmanVariables(variables map[string]string, collectionVariables map[string]string) {
+	for name, value := range collectionVariables {
+		if _, exists := variables[name]; !exists {
+			variables[name] = value
+		}
+	}
+}
+
+func encodePostman(name string, items []any, variables map[string]string) ([]byte, error) {
 	postmanVariables := make([]any, 0, len(variables))
 	for name, value := range variables {
 		postmanVariables = append(postmanVariables, map[string]any{
@@ -39,11 +69,60 @@ func WritePostman(collections []Collection) ([]byte, error) {
 
 	document := map[string]any{
 		"info": map[string]any{
-			"name":   "Awake export",
+			"name":   name,
 			"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
 		},
 		"item":     items,
 		"variable": postmanVariables,
+	}
+
+	encoded, err := json.MarshalIndent(document, "", "  ")
+	if err != nil {
+		return nil, err
+	}
+
+	return append(encoded, '\n'), nil
+}
+
+// WritePostmanEnvironment renders an environment as a Postman environment
+// document. Secret variables keep their name but not their value, as Postman
+// does when it exports them.
+func WritePostmanEnvironment(environment Environment) ([]byte, error) {
+	secrets := make(map[string]bool, len(environment.SecretVariables))
+	for _, name := range environment.SecretVariables {
+		secrets[name] = true
+	}
+
+	names := make([]string, 0, len(environment.Variables))
+	for name := range environment.Variables {
+		if !secrets[name] {
+			names = append(names, name)
+		}
+	}
+	sort.Strings(names)
+
+	values := make([]any, 0, len(names)+len(environment.SecretVariables))
+	for _, name := range names {
+		values = append(values, map[string]any{
+			"key":     name,
+			"value":   environment.Variables[name],
+			"type":    "default",
+			"enabled": true,
+		})
+	}
+	for _, name := range environment.SecretVariables {
+		values = append(values, map[string]any{
+			"key":     name,
+			"value":   "",
+			"type":    "secret",
+			"enabled": true,
+		})
+	}
+
+	document := map[string]any{
+		"name":                    environment.Name,
+		"values":                  values,
+		"_postman_variable_scope": "environment",
 	}
 
 	encoded, err := json.MarshalIndent(document, "", "  ")

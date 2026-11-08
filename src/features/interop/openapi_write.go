@@ -9,12 +9,18 @@ import (
 )
 
 // WriteOpenAPI renders collections as an OpenAPI 3.1 YAML document. Requests
-// grouped in Awake collections become tagged operations.
+// grouped in Awake collections become tagged operations. A single collection
+// names the document after itself.
 func WriteOpenAPI(collections []Collection) ([]byte, error) {
+	title := "Awake export"
+	if len(collections) == 1 && strings.TrimSpace(collections[0].Name) != "" {
+		title = collections[0].Name
+	}
+
 	document := map[string]any{
 		"openapi": "3.1.0",
 		"info": map[string]any{
-			"title":   "Awake export",
+			"title":   title,
 			"version": "1.0.0",
 		},
 		"servers": []any{
@@ -37,6 +43,11 @@ func WriteOpenAPI(collections []Collection) ([]byte, error) {
 		return nil, err
 	}
 	return encoded, nil
+}
+
+// WriteOpenAPICollection renders one collection as an OpenAPI 3.1 document.
+func WriteOpenAPICollection(collection Collection) ([]byte, error) {
+	return WriteOpenAPI([]Collection{collection})
 }
 
 func writeOpenAPIOperation(paths map[string]any, reserved map[string]map[string]bool, tag string, request Request) {

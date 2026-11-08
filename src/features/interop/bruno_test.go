@@ -162,3 +162,64 @@ func TestWriteBrunoDirectoryWritesTheManifestBrunoNeeds(t *testing.T) {
 		}
 	}
 }
+
+func TestWriteBrunoDirectoryExportsEnvironments(t *testing.T) {
+	collection := Collection{
+		Name: "Platform",
+		Environments: []Environment{{
+			Name:            "Production",
+			Variables:       map[string]string{"baseUrl": "https://api.example.com"},
+			SecretVariables: []string{"token"},
+		}},
+		Requests: []Request{{
+			Name: "Status",
+			Request: domain.Request{
+				Name:   "Status",
+				Method: domain.MethodGet,
+				URL:    "{{baseUrl}}/status",
+			},
+		}},
+	}
+
+	destination := t.TempDir()
+	written, err := WriteBrunoDirectory(destination, []Collection{collection})
+	if err != nil {
+		t.Fatalf("write bruno directory: %v", err)
+	}
+
+	environmentPath := filepath.Join(destination, "platform", "environments", "production.bru")
+	found := false
+	for _, path := range written {
+		if path == environmentPath {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected %s in %v", environmentPath, written)
+	}
+
+	content, err := os.ReadFile(environmentPath)
+	if err != nil {
+		t.Fatalf("read environment: %v", err)
+	}
+	if !strings.Contains(string(content), "baseUrl: https://api.example.com") ||
+		!strings.Contains(string(content), "token,") {
+		t.Errorf("unexpected environment file:\n%s", content)
+	}
+
+	decoded, err := ReadBrunoDirectory(destination)
+	if err != nil {
+		t.Fatalf("read bruno directory: %v", err)
+	}
+	if len(decoded[0].Environments) != 1 {
+		t.Fatalf("expected one environment, got %+v", decoded[0].Environments)
+	}
+	environment := decoded[0].Environments[0]
+	if environment.Variables["baseUrl"] != "https://api.example.com" {
+		t.Errorf("unexpected environment variables: %+v", environment.Variables)
+	}
+	if len(environment.SecretVariables) != 1 || environment.SecretVariables[0] != "token" {
+		t.Errorf("unexpected secret variables: %+v", environment.SecretVariables)
+	}
+}

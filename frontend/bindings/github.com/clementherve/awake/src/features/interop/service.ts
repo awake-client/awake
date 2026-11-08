@@ -16,10 +16,12 @@ import * as $models from "./models.js";
 
 /**
  * Export writes the workspace collections to destinationPath. OpenAPI and
- * Postman produce one file; Bruno produces a directory.
+ * Postman produce one file, or one file per collection when options asks for
+ * it; Bruno produces a directory. Postman and Bruno also write the
+ * environments of each collection.
  */
-export function Export(workspaceRoot: string, destinationPath: string, format: $models.Format): $CancellablePromise<$models.ExportResult> {
-    return $Call.ByID(1927045816, workspaceRoot, destinationPath, format);
+export function Export(workspaceRoot: string, destinationPath: string, format: $models.Format, options: $models.ExportOptions): $CancellablePromise<$models.ExportResult> {
+    return $Call.ByID(1927045816, workspaceRoot, destinationPath, format, options);
 }
 
 /**

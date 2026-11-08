@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/clementherve/awake/src/domain"
@@ -39,7 +40,13 @@ func WriteBrunoDirectory(destination string, collections []Collection) ([]string
 		}
 		written = append(written, configurationPath)
 
-		paths, err := writeBrunoFolder(collectionDirectory, collection.Requests, collection.Folders)
+		paths, err := writeBrunoEnvironments(collectionDirectory, collection.Environments)
+		if err != nil {
+			return nil, err
+		}
+		written = append(written, paths...)
+
+		paths, err = writeBrunoFolder(collectionDirectory, collection.Requests, collection.Folders)
 		if err != nil {
 			return nil, err
 		}
@@ -47,6 +54,49 @@ func WriteBrunoDirectory(destination string, collections []Collection) ([]string
 	}
 
 	return written, nil
+}
+
+// writeBrunoEnvironments writes the environments of a collection into its
+// environments directory, one .bru file each.
+func writeBrunoEnvironments(collectionDirectory string, environments []Environment) ([]string, error) {
+	written := make([]string, 0, len(environments))
+	used := map[string]int{}
+
+	for _, environment := range environments {
+		directory := filepath.Join(collectionDirectory, brunoEnvironmentDirectory)
+		if err := os.MkdirAll(directory, 0o755); err != nil {
+			return nil, fmt.Errorf("create bruno environments directory: %w", err)
+		}
+
+		fileName := uniqueName(used, slugify(environment.Name), "environment") + brunoExtension
+		destinationPath := filepath.Join(directory, fileName)
+		if err := os.WriteFile(destinationPath, []byte(brunoEnvironmentFile(environment)), 0o644); err != nil {
+			return nil, fmt.Errorf("write bruno environment: %w", err)
+		}
+		written = append(written, destinationPath)
+	}
+
+	return written, nil
+}
+
+func brunoEnvironmentFile(environment Environment) string {
+	var builder strings.Builder
+
+	builder.WriteString("vars {\n")
+	for _, name := range sortedNames(environment.Variables) {
+		builder.WriteString("  " + name + ": " + environment.Variables[name] + "\n")
+	}
+	builder.WriteString("}\n")
+
+	if len(environment.SecretVariables) > 0 {
+		builder.WriteString("\nvars:secret [\n")
+		for _, name := range environment.SecretVariables {
+			builder.WriteString("  " + name + ",\n")
+		}
+		builder.WriteString("]\n")
+	}
+
+	return builder.String()
 }
 
 func writeBrunoFolder(directory string, requests []Request, folders []Folder) ([]string, error) {
@@ -262,6 +312,15 @@ func bodyType(body *domain.Body) domain.BodyType {
 		return domain.BodyNone
 	}
 	return body.Type
+}
+
+func sortedNames(values map[string]string) []string {
+	names := make([]string, 0, len(values))
+	for name := range values {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return names
 }
 
 func indent(value string) string {

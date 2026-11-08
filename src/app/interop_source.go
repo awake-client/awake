@@ -72,10 +72,59 @@ func (interopAdapter) LoadCollections(workspaceRoot string) ([]interop.Collectio
 			return nil, err
 		}
 
+		environments, err := loadCollectionEnvironments(workspaceRoot, entry.Path)
+		if err != nil {
+			return nil, err
+		}
+		snapshot.Environments = environments
+
 		snapshots = append(snapshots, snapshot)
 	}
 
 	return snapshots, nil
+}
+
+// loadCollectionEnvironments reads the environments of a collection, merged
+// with their local overrides. Secret variables keep their name and lose their
+// value, so an export never writes a secret.
+func loadCollectionEnvironments(workspaceRoot string, scope string) ([]interop.Environment, error) {
+	repository, err := environments.NewScopedRepository(workspaceRoot, scope)
+	if err != nil {
+		return nil, err
+	}
+
+	summaries, err := repository.List()
+	if err != nil {
+		return nil, err
+	}
+
+	loaded := make([]interop.Environment, 0, len(summaries))
+	for _, summary := range summaries {
+		resolved, err := repository.Load(summary.FileName)
+		if err != nil {
+			return nil, err
+		}
+
+		variables := map[string]string{}
+		for _, layer := range resolved.Layers() {
+			for name, value := range layer {
+				variables[name] = value
+			}
+		}
+
+		secrets := resolved.SecretNames()
+		for _, name := range secrets {
+			delete(variables, name)
+		}
+
+		loaded = append(loaded, interop.Environment{
+			Name:            resolved.Name,
+			Variables:       variables,
+			SecretVariables: secrets,
+		})
+	}
+
+	return loaded, nil
 }
 
 func collectRequests(

@@ -82,7 +82,8 @@
         <h2>Export</h2>
       </header>
       <p class="card-hint">
-        Snapshots every request of the workspace. Existing files at the destination are replaced.
+        Snapshots every request of the workspace. Postman and Bruno also export environments.
+        Existing files at the destination are replaced.
       </p>
 
       <div class="field">
@@ -101,6 +102,32 @@
           }
         </div>
       </div>
+
+      @if (exportSupportsSplit()) {
+        <div class="field">
+          <span class="field-label">Layout</span>
+          <div class="format-picker" role="radiogroup" aria-label="Export layout">
+            <button
+              type="button"
+              role="radio"
+              [class.selected]="!exportSplit()"
+              [attr.aria-checked]="!exportSplit()"
+              (click)="setExportSplit(false)"
+            >
+              Single file
+            </button>
+            <button
+              type="button"
+              role="radio"
+              [class.selected]="exportSplit()"
+              [attr.aria-checked]="exportSplit()"
+              (click)="setExportSplit(true)"
+            >
+              One file per collection
+            </button>
+          </div>
+        </div>
+      }
 
       <div class="field">
         <span class="field-label">{{

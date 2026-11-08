@@ -28,6 +28,15 @@ type CollectionSnapshot struct {
 	Variables      map[string]string
 	Authentication *domain.Authentication
 	Requests       []RequestSnapshot
+	Environments   []Environment
+}
+
+// ExportOptions tunes how an export is written.
+type ExportOptions struct {
+	// SplitCollections writes one document per collection instead of one
+	// document for the whole workspace. Bruno always writes one directory per
+	// collection.
+	SplitCollections bool
 }
 
 // RequestSnapshot is a request read from a workspace. RelativePath is relative
@@ -107,8 +116,10 @@ func (service *Service) Import(workspaceRoot string, sourcePath string, format F
 }
 
 // Export writes the workspace collections to destinationPath. OpenAPI and
-// Postman produce one file; Bruno produces a directory.
-func (service *Service) Export(workspaceRoot string, destinationPath string, format Format) (ExportResult, error) {
+// Postman produce one file, or one file per collection when options asks for
+// it; Bruno produces a directory. Postman and Bruno also write the
+// environments of each collection.
+func (service *Service) Export(workspaceRoot string, destinationPath string, format Format, options ExportOptions) (ExportResult, error) {
 	snapshots, err := service.source.LoadCollections(workspaceRoot)
 	if err != nil {
 		return ExportResult{}, err
@@ -124,6 +135,9 @@ func (service *Service) Export(workspaceRoot string, destinationPath string, for
 
 	switch format {
 	case FormatOpenAPI:
+		if options.SplitCollections {
+			return writeExportDocuments(destinationPath, ".yaml", collections, WriteOpenAPICollection)
+		}
 		content, err := WriteOpenAPI(collections)
 		if err != nil {
 			return ExportResult{}, err
@@ -131,11 +145,7 @@ func (service *Service) Export(workspaceRoot string, destinationPath string, for
 		return writeExportFile(destinationPath, ".yaml", content)
 
 	case FormatPostman:
-		content, err := WritePostman(collections)
-		if err != nil {
-			return ExportResult{}, err
-		}
-		return writeExportFile(destinationPath, ".json", content)
+		return exportPostman(destinationPath, collections, options)
 
 	case FormatBruno:
 		paths, err := WriteBrunoDirectory(destinationPath, collections)
@@ -147,6 +157,42 @@ func (service *Service) Export(workspaceRoot string, destinationPath string, for
 	default:
 		return ExportResult{}, ErrUnsupportedFormat
 	}
+}
+
+func exportPostman(destinationPath string, collections []Collection, options ExportOptions) (ExportResult, error) {
+	if options.SplitCollections {
+		result, err := writeExportDocuments(destinationPath, ".postman.json", collections, WritePostmanCollection)
+		if err != nil {
+			return result, err
+		}
+
+		paths, err := writePostmanEnvironments(filepath.Join(destinationPath, "environments"), collections)
+		if err != nil {
+			return ExportResult{}, err
+		}
+		result.Paths = append(result.Paths, paths...)
+		return result, nil
+	}
+
+	content, err := WritePostman(collections)
+	if err != nil {
+		return ExportResult{}, err
+	}
+	result, err := writeExportFile(destinationPath, ".json", content)
+	if err != nil {
+		return result, err
+	}
+
+	// Environments are separate documents in Postman, so they sit in a
+	// folder of their own beside the collection file.
+	exportPath := result.Paths[0]
+	environmentDirectory := strings.TrimSuffix(exportPath, filepath.Ext(exportPath)) + ".environments"
+	paths, err := writePostmanEnvironments(environmentDirectory, collections)
+	if err != nil {
+		return ExportResult{}, err
+	}
+	result.Paths = append(result.Paths, paths...)
+	return result, nil
 }
 
 func readCollections(sourcePath string, format Format) ([]Collection, error) {
@@ -307,6 +353,7 @@ func snapshotCollection(snapshot CollectionSnapshot) Collection {
 		Documentation:  snapshot.Documentation,
 		Variables:      snapshot.Variables,
 		Authentication: snapshot.Authentication,
+		Environments:   snapshot.Environments,
 		Folders:        []Folder{},
 	}
 
@@ -390,4 +437,68 @@ func writeExportFile(destinationPath string, extension string, content []byte) (
 	}
 
 	return ExportResult{Paths: []string{destinationPath}}, nil
+}
+
+// writeExportDocuments writes one document per collection into destination.
+func writeExportDocuments(
+	destination string,
+	extension string,
+	collections []Collection,
+	write func(Collection) ([]byte, error),
+) (ExportResult, error) {
+	if err := os.MkdirAll(destination, 0o755); err != nil {
+		return ExportResult{}, fmt.Errorf("create export directory: %w", err)
+	}
+
+	written := make([]string, 0, len(collections))
+	used := map[string]int{}
+
+	for _, collection := range collections {
+		content, err := write(collection)
+		if err != nil {
+			return ExportResult{}, err
+		}
+
+		fileName := uniqueName(used, slugify(collection.Name), "collection") + extension
+		destinationPath := filepath.Join(destination, fileName)
+		if err := files.WriteAtomically(destinationPath, content); err != nil {
+			return ExportResult{}, err
+		}
+		written = append(written, destinationPath)
+	}
+
+	return ExportResult{Paths: written}, nil
+}
+
+// writePostmanEnvironments writes the environments of every collection in the
+// Postman environment format, prefixed by their collection to stay apart.
+func writePostmanEnvironments(directory string, collections []Collection) ([]string, error) {
+	written := make([]string, 0)
+	used := map[string]int{}
+
+	for _, collection := range collections {
+		for _, environment := range collection.Environments {
+			content, err := WritePostmanEnvironment(environment)
+			if err != nil {
+				return nil, fmt.Errorf("write postman environment %s: %w", environment.Name, err)
+			}
+
+			if err := os.MkdirAll(directory, 0o755); err != nil {
+				return nil, fmt.Errorf("create postman environments directory: %w", err)
+			}
+
+			fileName := uniqueName(
+				used,
+				slugify(collection.Name+"-"+environment.Name),
+				"environment",
+			) + ".postman_environment.json"
+			destinationPath := filepath.Join(directory, fileName)
+			if err := files.WriteAtomically(destinationPath, content); err != nil {
+				return nil, err
+			}
+			written = append(written, destinationPath)
+		}
+	}
+
+	return written, nil
 }

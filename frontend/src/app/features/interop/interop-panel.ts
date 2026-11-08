@@ -1,6 +1,9 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import * as InteropService from '@bindings/github.com/clementherve/awake/src/features/interop/service';
-import { Format } from '@bindings/github.com/clementherve/awake/src/features/interop/models';
+import {
+  ExportOptions,
+  Format,
+} from '@bindings/github.com/clementherve/awake/src/features/interop/models';
 import { notifyCollectionsChanged } from '@core/collection-events';
 import { chooseDirectory, chooseFile, chooseSaveFile } from '@core/dialogs';
 import { WorkspaceStore } from '@core/workspace-store';
@@ -37,6 +40,8 @@ export class InteropPanel {
   protected readonly importError = signal<string | null>(null);
 
   protected readonly exportFormat = signal<Format>(Format.FormatOpenAPI);
+  /** Writes one document per collection instead of one unified document. */
+  protected readonly exportSplit = signal(false);
   protected readonly exportPath = signal('');
   protected readonly isExporting = signal(false);
   protected readonly exportMessage = signal<string | null>(null);
@@ -55,14 +60,18 @@ export class InteropPanel {
   });
 
   protected readonly exportHint = computed(() => {
-    switch (this.exportFormat()) {
-      case Format.FormatBruno:
-        return 'Directory that receives the .bru files.';
-      case Format.FormatPostman:
-        return 'File that receives the Postman collection.';
-      default:
-        return 'File that receives the OpenAPI document.';
+    if (this.exportFormat() === Format.FormatBruno) {
+      return 'Directory that receives one folder per collection, with their environments.';
     }
+    if (this.exportSplit()) {
+      return this.exportFormat() === Format.FormatPostman
+        ? 'Directory that receives one collection per collection, and its environments.'
+        : 'Directory that receives one OpenAPI document per collection.';
+    }
+    if (this.exportFormat() === Format.FormatPostman) {
+      return 'File that receives the collection. Environments go to a .environments folder beside it.';
+    }
+    return 'File that receives the OpenAPI document.';
   });
 
   constructor() {
@@ -73,7 +82,13 @@ export class InteropPanel {
   }
 
   protected readonly importIsDirectory = computed(() => this.importFormat() === Format.FormatBruno);
-  protected readonly exportIsDirectory = computed(() => this.exportFormat() === Format.FormatBruno);
+  /** OpenAPI and Postman can split by collection; Bruno always does. */
+  protected readonly exportSupportsSplit = computed(
+    () => this.exportFormat() !== Format.FormatBruno,
+  );
+  protected readonly exportIsDirectory = computed(
+    () => this.exportFormat() === Format.FormatBruno || this.exportSplit(),
+  );
 
   protected selectImportFormat(format: Format): void {
     this.importFormat.set(format);
@@ -98,12 +113,15 @@ export class InteropPanel {
     }
   }
 
-  /** Opens a folder chooser for Bruno, a save dialog for the other formats. */
+  /** Opens a folder chooser for a directory export, a save dialog otherwise. */
   protected async browseExport(): Promise<void> {
     const format = this.exportFormat();
     const path = this.exportIsDirectory()
       ? await chooseDirectory({
-          title: 'Choose where to write the Bruno collection',
+          title:
+            format === Format.FormatBruno
+              ? 'Choose where to write the Bruno collections'
+              : 'Choose where to write the collections',
           buttonText: 'Export here',
         })
       : await chooseSaveFile({
@@ -119,6 +137,15 @@ export class InteropPanel {
 
   protected selectExportFormat(format: Format): void {
     this.exportFormat.set(format);
+    if (format === Format.FormatBruno) {
+      // Bruno always writes one directory per collection.
+      this.exportSplit.set(false);
+    }
+  }
+
+  protected setExportSplit(split: boolean): void {
+    this.exportSplit.set(split);
+    this.exportError.set(null);
   }
 
   protected async importDocument(): Promise<void> {
@@ -175,6 +202,9 @@ export class InteropPanel {
         workspaceRoot,
         destinationPath,
         this.exportFormat(),
+        {
+          SplitCollections: this.exportSplit(),
+        } as ExportOptions,
       );
 
       const paths = result.Paths ?? [];

@@ -11,6 +11,7 @@ export {
 } from "./models.js";
 
 export type {
+    ExportOptions,
     ExportResult,
     ImportResult
 } from "./models.js";

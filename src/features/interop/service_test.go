@@ -1,6 +1,7 @@
 package interop
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -99,7 +100,7 @@ func TestExportOpenAPIWritesAFile(t *testing.T) {
 	})
 
 	destination := filepath.Join(t.TempDir(), "export")
-	result, err := service.Export(t.TempDir(), destination, FormatOpenAPI)
+	result, err := service.Export(t.TempDir(), destination, FormatOpenAPI, ExportOptions{})
 	if err != nil {
 		t.Fatalf("export: %v", err)
 	}
@@ -254,4 +255,169 @@ func TestImportBrunoSkipsRequestsItCannotRead(t *testing.T) {
 		!strings.Contains(warnings, "Player/Broken.bru skipped") {
 		t.Errorf("unexpected warnings:\n%s", warnings)
 	}
+}
+
+func exportTestSource() fakeSource {
+	return fakeSource{collections: []CollectionSnapshot{
+		{
+			Name: "Platform",
+			Requests: []RequestSnapshot{{
+				RelativePath: "status.yaml",
+				Request: domain.Request{
+					Name:   "Status",
+					Method: domain.MethodGet,
+					URL:    "{{baseUrl}}/status",
+				},
+			}},
+			Environments: []Environment{{
+				Name:            "Production",
+				Variables:       map[string]string{"baseUrl": "https://api.example.com"},
+				SecretVariables: []string{"token"},
+			}},
+		},
+		{
+			Name: "Billing",
+			Requests: []RequestSnapshot{{
+				RelativePath: "invoices.yaml",
+				Request: domain.Request{
+					Name:   "List invoices",
+					Method: domain.MethodGet,
+					URL:    "{{baseUrl}}/invoices",
+				},
+			}},
+		},
+	}}
+}
+
+func TestExportOpenAPISplitWritesOneFilePerCollection(t *testing.T) {
+	service := NewService(newFakeWriter(), exportTestSource())
+	destination := filepath.Join(t.TempDir(), "export")
+
+	result, err := service.Export(t.TempDir(), destination, FormatOpenAPI, ExportOptions{SplitCollections: true})
+	if err != nil {
+		t.Fatalf("export: %v", err)
+	}
+
+	expected := []string{
+		filepath.Join(destination, "platform.yaml"),
+		filepath.Join(destination, "billing.yaml"),
+	}
+	if strings.Join(result.Paths, ",") != strings.Join(expected, ",") {
+		t.Fatalf("unexpected paths: %v", result.Paths)
+	}
+
+	content, err := os.ReadFile(expected[0])
+	if err != nil {
+		t.Fatalf("read export: %v", err)
+	}
+	collections, err := ReadOpenAPI(content)
+	if err != nil {
+		t.Fatalf("read exported openapi: %v", err)
+	}
+	if len(collections) != 1 || collections[0].Name != "Platform" {
+		t.Errorf("unexpected exported collection: %+v", collections)
+	}
+}
+
+func TestExportPostmanWritesEnvironmentsNextToTheDocument(t *testing.T) {
+	service := NewService(newFakeWriter(), exportTestSource())
+	destination := filepath.Join(t.TempDir(), "awake.postman.json")
+
+	result, err := service.Export(t.TempDir(), destination, FormatPostman, ExportOptions{})
+	if err != nil {
+		t.Fatalf("export: %v", err)
+	}
+
+	environmentPath := filepath.Join(filepath.Dir(destination), "awake.postman.environments", "platform-production.postman_environment.json")
+	if !containsPath(result.Paths, environmentPath) {
+		t.Fatalf("expected %s in %v", environmentPath, result.Paths)
+	}
+
+	environment := readPostmanEnvironment(t, environmentPath)
+	if environment.Name != "Production" {
+		t.Errorf("unexpected environment name %q", environment.Name)
+	}
+
+	values := map[string]postmanEnvironmentValue{}
+	for _, value := range environment.Values {
+		values[value.Key] = value
+	}
+	if values["baseUrl"].Value != "https://api.example.com" || values["baseUrl"].Type != "default" {
+		t.Errorf("unexpected baseUrl value: %+v", values["baseUrl"])
+	}
+	if values["token"].Type != "secret" || values["token"].Value != "" {
+		t.Errorf("unexpected secret value: %+v", values["token"])
+	}
+}
+
+func TestExportPostmanSplitWritesOneFilePerCollection(t *testing.T) {
+	service := NewService(newFakeWriter(), exportTestSource())
+	destination := filepath.Join(t.TempDir(), "export")
+
+	result, err := service.Export(t.TempDir(), destination, FormatPostman, ExportOptions{SplitCollections: true})
+	if err != nil {
+		t.Fatalf("export: %v", err)
+	}
+
+	expected := []string{
+		filepath.Join(destination, "platform.postman.json"),
+		filepath.Join(destination, "billing.postman.json"),
+		filepath.Join(destination, "environments", "platform-production.postman_environment.json"),
+	}
+	for _, path := range expected {
+		if !containsPath(result.Paths, path) {
+			t.Errorf("expected %s in %v", path, result.Paths)
+		}
+	}
+
+	content, err := os.ReadFile(expected[0])
+	if err != nil {
+		t.Fatalf("read export: %v", err)
+	}
+	collections, err := ReadPostman(content)
+	if err != nil {
+		t.Fatalf("read exported postman: %v", err)
+	}
+	if len(collections) != 1 || collections[0].Name != "Platform" {
+		t.Errorf("unexpected exported collection: %+v", collections)
+	}
+	if len(collections[0].Folders) != 0 || len(collections[0].Requests) != 1 {
+		t.Errorf("expected requests at the root, got %+v", collections[0])
+	}
+}
+
+type postmanEnvironmentFile struct {
+	Name   string                    `json:"name"`
+	Values []postmanEnvironmentValue `json:"values"`
+}
+
+type postmanEnvironmentValue struct {
+	Key     string `json:"key"`
+	Value   string `json:"value"`
+	Type    string `json:"type"`
+	Enabled bool   `json:"enabled"`
+}
+
+func readPostmanEnvironment(t *testing.T, path string) postmanEnvironmentFile {
+	t.Helper()
+
+	content, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read postman environment: %v", err)
+	}
+
+	var environment postmanEnvironmentFile
+	if err := json.Unmarshal(content, &environment); err != nil {
+		t.Fatalf("parse postman environment: %v", err)
+	}
+	return environment
+}
+
+func containsPath(paths []string, path string) bool {
+	for _, candidate := range paths {
+		if candidate == path {
+			return true
+		}
+	}
+	return false
 }
