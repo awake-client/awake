@@ -44,6 +44,9 @@ type brunoFolderBuilder struct {
 	requests []Request
 	folders  map[string]*brunoFolderBuilder
 	order    []string
+	// names overrides the display name of a directory, from its folder.bru,
+	// keyed by the directory path relative to the collection root.
+	names map[string]string
 }
 
 // ReadBrunoDirectory parses a Bruno collection directory, either the original
@@ -187,9 +190,15 @@ func readBrunoCollection(root string) (Collection, error) {
 		return Collection{}, fmt.Errorf("read %s: %w", configurationPath, err)
 	}
 
+	folderNames, err := readBrunoFolderNames(root)
+	if err != nil {
+		return Collection{}, err
+	}
+
 	builder := &brunoFolderBuilder{
 		name:    collection.Name,
 		folders: map[string]*brunoFolderBuilder{},
+		names:   folderNames,
 	}
 
 	skipped := map[string][]string{}
@@ -258,6 +267,57 @@ func readBrunoCollection(root string) (Collection, error) {
 	}
 
 	return collection, nil
+}
+
+// readBrunoFolderNames reads the display names declared by folder.bru files,
+// keyed by their directory relative to the collection root. A missing folder
+// file is fine: the directory name is used then.
+func readBrunoFolderNames(root string) (map[string]string, error) {
+	names := map[string]string{}
+	ignored := map[string]bool{"node_modules": true, ".git": true}
+
+	err := filepath.WalkDir(root, func(filePath string, entry os.DirEntry, walkError error) error {
+		if walkError != nil {
+			return walkError
+		}
+		if entry.IsDir() {
+			if filePath != root && ignored[entry.Name()] {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if entry.Name() != brunoFolderFileName {
+			return nil
+		}
+
+		content, err := os.ReadFile(filePath)
+		if err != nil {
+			return fmt.Errorf("read bruno folder %s: %w", filePath, err)
+		}
+		relativeDirectory, err := filepath.Rel(root, filepath.Dir(filePath))
+		if err != nil {
+			return err
+		}
+		if name := brunoFolderName(string(content)); name != "" {
+			names[filepath.ToSlash(relativeDirectory)] = name
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("read bruno folders: %w", err)
+	}
+
+	return names, nil
+}
+
+// brunoFolderName reads the name of a folder.bru meta block.
+func brunoFolderName(content string) string {
+	for _, block := range parseBrunoBlocks(content) {
+		if block.Name == "meta" {
+			return keyValue(block.Lines, "name")
+		}
+	}
+	return ""
 }
 
 // readBrunoEnvironments parses the .bru files of a collection's environments
@@ -361,11 +421,22 @@ func (builder *brunoFolderBuilder) add(relativeDirectory string, request Request
 
 	segments := strings.Split(filepath.ToSlash(relativeDirectory), "/")
 	current := builder
+	prefix := ""
 	for _, segment := range segments {
+		if prefix == "" {
+			prefix = segment
+		} else {
+			prefix += "/" + segment
+		}
+
 		next, found := current.folders[segment]
 		if !found {
+			name := segment
+			if declared := builder.names[prefix]; declared != "" {
+				name = declared
+			}
 			next = &brunoFolderBuilder{
-				name:    segment,
+				name:    name,
 				folders: map[string]*brunoFolderBuilder{},
 			}
 			current.folders[segment] = next

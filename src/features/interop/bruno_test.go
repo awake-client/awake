@@ -1,6 +1,9 @@
 package interop
 
 import (
+	"encoding/json"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -107,8 +110,8 @@ func TestBrunoDirectoryRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("write bruno directory: %v", err)
 	}
-	if len(written) != 3 {
-		t.Fatalf("expected 3 files, got %d: %v", len(written), written)
+	if len(written) != 5 {
+		t.Fatalf("expected 5 files, got %d: %v", len(written), written)
 	}
 
 	decoded, err := ReadBrunoDirectory(destination)
@@ -124,7 +127,38 @@ func TestBrunoDirectoryRoundTrip(t *testing.T) {
 	if len(decoded[0].Requests) != 1 || len(decoded[0].Folders) != 1 {
 		t.Fatalf("unexpected tree: %+v", decoded[0])
 	}
+	if decoded[0].Folders[0].Name != "Users" {
+		t.Errorf("expected the folder.bru name, got %q", decoded[0].Folders[0].Name)
+	}
 	if decoded[0].Folders[0].Requests[0].Request.Body.Type != domain.BodyJSON {
 		t.Errorf("unexpected body: %+v", decoded[0].Folders[0].Requests[0].Request.Body)
+	}
+}
+
+// Regression: Bruno ignored an export because Awake wrote no bruno.json, and
+// Bruno only opens a directory that holds this manifest.
+func TestWriteBrunoDirectoryWritesTheManifestBrunoNeeds(t *testing.T) {
+	destination := t.TempDir()
+	collections := []Collection{{Name: "Platform"}, {Name: "Billing"}}
+	if _, err := WriteBrunoDirectory(destination, collections); err != nil {
+		t.Fatalf("write bruno directory: %v", err)
+	}
+
+	for directory, name := range map[string]string{"platform": "Platform", "billing": "Billing"} {
+		content, err := os.ReadFile(filepath.Join(destination, directory, brunoManifestFileName))
+		if err != nil {
+			t.Fatalf("read manifest of %s: %v", name, err)
+		}
+
+		var manifest map[string]any
+		if err := json.Unmarshal(content, &manifest); err != nil {
+			t.Fatalf("parse manifest of %s: %v", name, err)
+		}
+		if manifest["name"] != name {
+			t.Errorf("expected manifest name %q, got %v", name, manifest["name"])
+		}
+		if manifest["type"] != "collection" {
+			t.Errorf("expected a collection manifest, got %v", manifest["type"])
+		}
 	}
 }

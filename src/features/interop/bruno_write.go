@@ -1,6 +1,7 @@
 package interop
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -25,6 +26,12 @@ func WriteBrunoDirectory(destination string, collections []Collection) ([]string
 		if err := os.MkdirAll(collectionDirectory, 0o755); err != nil {
 			return nil, fmt.Errorf("create collection directory: %w", err)
 		}
+
+		manifestPath := filepath.Join(collectionDirectory, brunoManifestFileName)
+		if err := os.WriteFile(manifestPath, []byte(brunoManifestFile(collection.Name)), 0o644); err != nil {
+			return nil, fmt.Errorf("write bruno manifest: %w", err)
+		}
+		written = append(written, manifestPath)
 
 		configurationPath := filepath.Join(collectionDirectory, brunoCollectionFileName)
 		if err := os.WriteFile(configurationPath, []byte(collectionFile(collection)), 0o644); err != nil {
@@ -56,12 +63,18 @@ func writeBrunoFolder(directory string, requests []Request, folders []Folder) ([
 	}
 
 	usedFolders := map[string]int{}
-	for _, folder := range folders {
+	for index, folder := range folders {
 		folderName := uniqueName(usedFolders, slugify(folder.Name), "folder")
 		folderDirectory := filepath.Join(directory, folderName)
 		if err := os.MkdirAll(folderDirectory, 0o755); err != nil {
 			return nil, fmt.Errorf("create folder directory: %w", err)
 		}
+
+		folderFilePath := filepath.Join(folderDirectory, brunoFolderFileName)
+		if err := os.WriteFile(folderFilePath, []byte(folderFile(folder.Name, index+1)), 0o644); err != nil {
+			return nil, fmt.Errorf("write folder file: %w", err)
+		}
+		written = append(written, folderFilePath)
 
 		paths, err := writeBrunoFolder(folderDirectory, folder.Requests, folder.Folders)
 		if err != nil {
@@ -71,6 +84,36 @@ func writeBrunoFolder(directory string, requests []Request, folders []Folder) ([
 	}
 
 	return written, nil
+}
+
+// brunoManifestFile is the bruno.json Bruno reads to recognise a directory as
+// a collection. Bruno requires a name and the collection type, and refuses a
+// directory without this manifest.
+func brunoManifestFile(name string) string {
+	manifest := struct {
+		Version string   `json:"version"`
+		Name    string   `json:"name"`
+		Type    string   `json:"type"`
+		Ignore  []string `json:"ignore"`
+	}{
+		Version: "1",
+		Name:    name,
+		Type:    "collection",
+		Ignore:  []string{"node_modules", ".git"},
+	}
+
+	content, err := json.MarshalIndent(manifest, "", "  ")
+	if err != nil {
+		return fmt.Sprintf(
+			`{"version": "1", "name": %q, "type": "collection", "ignore": ["node_modules", ".git"]}`+"\n",
+			name,
+		)
+	}
+	return string(content) + "\n"
+}
+
+func folderFile(name string, sequence int) string {
+	return fmt.Sprintf("meta {\n  name: %s\n  seq: %d\n}\n", name, sequence)
 }
 
 func collectionFile(collection Collection) string {
