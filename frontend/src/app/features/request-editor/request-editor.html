@@ -121,8 +121,8 @@
             class="url-input"
             [bare]="true"
             [url]="true"
-            [value]="url()"
-            (valueChange)="url.set($event)"
+            [value]="urlInput()"
+            (valueChange)="updateUrl($event)"
             placeholder="https://api.example.com/users"
             ariaLabel="Request URL"
           />
@@ -149,12 +149,6 @@
           {{ sendLabel() }}
         </button>
       </div>
-      @if (resolvedUrl(); as resolved) {
-        <p class="resolved-url" title="URL sent, with variables and parameters filled in">
-          <span class="resolved-arrow" aria-hidden="true">→</span>
-          <span class="resolved-text">{{ resolved }}</span>
-        </p>
-      }
     </header>
 
     @if (errorMessage(); as message) {

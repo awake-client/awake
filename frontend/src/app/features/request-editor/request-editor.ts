@@ -48,6 +48,7 @@ import {
   replaceUrlPlaceholders,
   urlPlaceholders,
 } from '@shared/path-parameters';
+import { composeUrlQuery, mergeUrlParameters, parseUrlQuery } from '@shared/url-query';
 import { VariableStore } from '@core/variable-store';
 import { WorkspaceStore } from '@core/workspace-store';
 import { AuthEditor } from '@shared/auth-editor';
@@ -209,6 +210,11 @@ export class RequestEditor {
   protected readonly method = signal<string>('GET');
   protected readonly protocol = signal<Protocol>(Protocol.ProtocolHTTP);
   protected readonly url = signal('');
+  /**
+   * Text of the URL field: the base URL of the request plus the query
+   * parameters of the version on screen, so a parameter always shows there.
+   */
+  protected readonly urlInput = signal('');
   protected readonly documentation = signal('');
   protected readonly parameters = signal<Parameter[]>([]);
   protected readonly headers = signal<Header[]>([]);
@@ -252,6 +258,12 @@ export class RequestEditor {
   /** The parameters and body shown, local when a local override is open. */
   protected readonly shownParameters = computed(() =>
     this.parametersSource() === 'local' ? (this.localParameters() ?? []) : this.parameters(),
+  );
+  /** The parameters a change of the URL field or of their list edits. */
+  private readonly parametersBeingEdited = computed(() =>
+    this.parametersSource() === 'local' && this.localParameters() !== null
+      ? (this.localParameters() ?? [])
+      : this.parameters(),
   );
   protected readonly shownBody = computed(() =>
     this.bodySource() === 'local' ? (this.localBody() ?? emptyBody()) : this.body(),
@@ -337,6 +349,8 @@ export class RequestEditor {
 
   private readonly snapshot = signal('');
   private readonly overrideSnapshot = signal('');
+  /** What the URL field last wrote, to keep its text as typed. */
+  private urlFieldEdit: { url: string; parameters: Parameter[] } | null = null;
   private responseNextOffset = 0;
 
   private readonly draft = computed<Request>(() => ({
@@ -462,7 +476,7 @@ export class RequestEditor {
    * as a compact warning in the URL bar. The resolved URL is in its tooltip.
    */
   protected readonly missingVariables = computed(() => {
-    const references = this.variableStore.references(this.url());
+    const references = this.variableStore.references(this.urlInput());
     const missing = [
       ...new Set(
         references.filter((reference) => !reference.variable).map((reference) => reference.name),
@@ -516,6 +530,21 @@ export class RequestEditor {
     // Load what an inheriting request receives from its collection.
     effect(() => {
       void this.loadCollection(this.collectionPath());
+    });
+
+    // The URL field always shows the query parameters of the version on
+    // screen. When the field itself is the source of the change, its text is
+    // kept as typed so the caret does not jump.
+    effect(() => {
+      const url = this.url();
+      const parameters = this.parametersBeingEdited();
+      const fromField =
+        this.urlFieldEdit?.url === url && this.urlFieldEdit.parameters === parameters;
+      if (fromField) {
+        this.urlFieldEdit = null;
+        return;
+      }
+      this.urlInput.set(composeUrlQuery(url, parameters));
     });
 
     // Confirmations such as "Saved" fade after a moment.
@@ -901,6 +930,25 @@ export class RequestEditor {
 
   protected addParameter(): void {
     this.editParameters((parameters) => [...parameters, { Name: '', Value: '', Enabled: true }]);
+  }
+
+  /**
+   * Reads the URL field: its query entries become the parameters of the
+   * version being edited, so adding one there updates the list and vice versa.
+   * A whole :name value stays in the URL as a path parameter.
+   */
+  protected updateUrl(value: string): void {
+    this.urlInput.set(value);
+
+    const parsed = parseUrlQuery(value);
+    this.url.set(parsed.url);
+
+    // Disabled and still unnamed rows are not in the URL; keep them.
+    const retained = this.parametersBeingEdited().filter(
+      (parameter) => !parameter.Enabled || parameter.Name.trim() === '',
+    );
+    this.editParameters(() => mergeUrlParameters(parsed.parameters, retained));
+    this.urlFieldEdit = { url: this.url(), parameters: this.parametersBeingEdited() };
   }
 
   protected updateParameter(
@@ -1331,9 +1379,12 @@ export class RequestEditor {
     this.name.set(request.Name);
     this.method.set(request.Method || 'GET');
     this.protocol.set(normalizeProtocol(request.Protocol));
-    this.url.set(request.URL);
+    // The query belongs to the parameters list; the URL only keeps the
+    // :name placeholders and its fragment.
+    const parsedUrl = parseUrlQuery(request.URL);
+    this.url.set(parsedUrl.url);
     this.documentation.set(request.Documentation ?? '');
-    this.parameters.set(request.Parameters ?? []);
+    this.parameters.set(mergeUrlParameters(parsedUrl.parameters, request.Parameters ?? []));
     this.pathParameters.set(request.PathParameters ?? []);
     this.headers.set(request.Headers ?? []);
     this.authentication.set({
@@ -1349,6 +1400,12 @@ export class RequestEditor {
     this.postResponseScript.set(request.Scripts?.PostResponse ?? '');
     this.activeTab.set('parameters');
     this.snapshot.set(JSON.stringify(this.draft()));
+    if (parsedUrl.url !== request.URL) {
+      // The query moved to the parameters list. The file still holds both, so
+      // it is marked changed to save the normalized layout before sending,
+      // which would otherwise append the query twice.
+      this.snapshot.set(JSON.stringify({ ...this.draft(), URL: request.URL }));
+    }
     void this.refreshOAuth2Status();
   }
 

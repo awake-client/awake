@@ -190,6 +190,10 @@ documentation: |
 | `scripts` | object | JavaScript hooks |
 | `documentation` | string | Free-form notes |
 
+The editor keeps the query of `url` and `parameters` in sync: a query written
+in the URL field is saved as `parameters`, and the parameters are shown in the
+URL field. A whole `:name` value stays in `url` as a path parameter.
+
 ### Scripts
 
 A request may attach two JavaScript hooks. They run inside the application
