@@ -9,12 +9,20 @@ interface StoredLayout {
   sidebarWidth: number;
   editorLayout: EditorLayout;
   responseRatio: number;
+  /** Manual height of the request URL field, or null to fit its content. */
+  urlHeight: number | null;
 }
 
-const DEFAULTS: StoredLayout = { sidebarWidth: 272, editorLayout: 'stacked', responseRatio: 0.4 };
+const DEFAULTS: StoredLayout = {
+  sidebarWidth: 272,
+  editorLayout: 'stacked',
+  responseRatio: 0.4,
+  urlHeight: null,
+};
 /** The minimum keeps the footer, with its sync status, readable. */
 export const SIDEBAR_WIDTH = { minimum: 264, maximum: 560, default: DEFAULTS.sidebarWidth };
 export const RESPONSE_RATIO = { minimum: 0.18, maximum: 0.82, default: DEFAULTS.responseRatio };
+export const URL_HEIGHT = { minimum: 38, maximum: 260 };
 
 /**
  * Personal layout preferences: the sidebar width, whether the response sits
@@ -28,6 +36,7 @@ export class LayoutStore {
   readonly sidebarWidth = signal(this.stored.sidebarWidth);
   readonly editorLayout = signal<EditorLayout>(this.stored.editorLayout);
   readonly responseRatio = signal(this.stored.responseRatio);
+  readonly urlHeight = signal<number | null>(this.stored.urlHeight);
 
   setSidebarWidth(width: number): void {
     this.sidebarWidth.set(clamp(Math.round(width), SIDEBAR_WIDTH.minimum, SIDEBAR_WIDTH.maximum));
@@ -36,6 +45,17 @@ export class LayoutStore {
 
   setResponseRatio(ratio: number): void {
     this.responseRatio.set(clamp(ratio, RESPONSE_RATIO.minimum, RESPONSE_RATIO.maximum));
+    this.persist();
+  }
+
+  /** Gives the URL field a height the user chose; null fits its content. */
+  setUrlHeight(height: number): void {
+    this.urlHeight.set(clamp(Math.round(height), URL_HEIGHT.minimum, URL_HEIGHT.maximum));
+    this.persist();
+  }
+
+  resetUrlHeight(): void {
+    this.urlHeight.set(null);
     this.persist();
   }
 
@@ -49,6 +69,7 @@ export class LayoutStore {
       sidebarWidth: this.sidebarWidth(),
       editorLayout: this.editorLayout(),
       responseRatio: this.responseRatio(),
+      urlHeight: this.urlHeight(),
     };
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(layout));
@@ -73,6 +94,10 @@ function readStorage(): StoredLayout {
       editorLayout: parsed.editorLayout === 'side' ? 'side' : 'stacked',
       responseRatio:
         typeof parsed.responseRatio === 'number' ? parsed.responseRatio : DEFAULTS.responseRatio,
+      urlHeight:
+        typeof parsed.urlHeight === 'number'
+          ? clamp(parsed.urlHeight, URL_HEIGHT.minimum, URL_HEIGHT.maximum)
+          : null,
     };
   } catch {
     return { ...DEFAULTS };

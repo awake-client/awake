@@ -122,8 +122,12 @@
             [bare]="true"
             [url]="true"
             [multiline]="true"
+            [resizable]="true"
+            [height]="layout.urlHeight()"
             [value]="urlInput()"
             (valueChange)="updateUrl($event)"
+            (heightChange)="layout.setUrlHeight($event)"
+            (resetHeight)="layout.resetUrlHeight()"
             placeholder="https://api.example.com/users"
             ariaLabel="Request URL"
           />

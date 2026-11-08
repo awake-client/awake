@@ -134,6 +134,40 @@ textarea::selection {
   display: none;
 }
 
+/* A grip at the bottom of a resizable field. Faint at rest so its presence
+   is discoverable, clear under the pointer. */
+.resize-grip {
+  position: absolute;
+  right: 3px;
+  bottom: 0;
+  z-index: 3;
+  width: 18px;
+  height: 12px;
+  cursor: row-resize;
+  touch-action: none;
+  opacity: 0.3;
+  transition: opacity 120ms ease;
+  --wails-draggable: no-drag;
+}
+
+.resize-grip::after {
+  content: '';
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  bottom: 4px;
+  height: 1px;
+  background: var(--color-text-subtle);
+  box-shadow:
+    0 -3px 0 var(--color-text-subtle),
+    0 -6px 0 var(--color-text-subtle);
+}
+
+.resize-grip:hover,
+:host(:hover) .resize-grip {
+  opacity: 0.85;
+}
+
 /* Reference states ---------------------------------------------------------- */
 
 .defined,

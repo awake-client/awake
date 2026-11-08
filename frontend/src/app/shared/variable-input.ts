@@ -108,6 +108,12 @@ const MAX_SUGGESTIONS = 8;
 const MULTILINE_LINE_HEIGHT = 20;
 const MULTILINE_PADDING = 9;
 
+/** Rounds a height to the nearest number of whole lines of a multiline field. */
+export function snapToLines(height: number): number {
+  const lines = Math.max(1, Math.round((height - 2 * MULTILINE_PADDING) / MULTILINE_LINE_HEIGHT));
+  return lines * MULTILINE_LINE_HEIGHT + 2 * MULTILINE_PADDING;
+}
+
 /**
  * Single-line field aware of `{{variables}}`. References are colored by
  * state (defined, missing, secret, dynamic), typing `{{` opens a list of the
@@ -179,6 +185,17 @@ const MULTILINE_PADDING = 9;
         (blur)="close(); stopFollowingScroll()"
       />
     }
+    @if (resizable()) {
+      <span
+        class="resize-grip"
+        role="separator"
+        aria-orientation="horizontal"
+        aria-label="Resize the URL field"
+        title="Drag to resize, double click to reset"
+        (pointerdown)="startResize($event)"
+        (dblclick)="resetHeight.emit()"
+      ></span>
+    }
     @if (isOpen()) {
       <ul
         class="suggestions"
@@ -226,7 +243,15 @@ export class VariableInput {
   readonly multiline = input(false);
   /** Number of lines shown before a multiline field scrolls. */
   readonly maxLines = input(3);
+  /** A height the user chose, in pixels; null fits the content. */
+  readonly height = input<number | null>(null);
+  /** Shows a grip that resizes the field vertically. */
+  readonly resizable = input(false);
   readonly valueChange = output<string>();
+  /** New height while the user drags the grip. */
+  readonly heightChange = output<number>();
+  /** Asked for the content height again, on a double click of the grip. */
+  readonly resetHeight = output<void>();
 
   protected readonly scrollLeft = signal(0);
   protected readonly scrollTop = signal(0);
@@ -237,6 +262,7 @@ export class VariableInput {
     // its content. A wrapped value changes height when the pane is resized.
     afterRenderEffect(() => {
       this.value();
+      this.height();
       if (this.multiline()) {
         this.resize();
       }
@@ -450,22 +476,70 @@ export class VariableInput {
     this.syncScroll();
   }
 
-  /** Grows the field up to its maximum number of lines, then scrolls. */
+  /** Grows the field up to its maximum number of lines, then scrolls. A
+   * height chosen by the user wins over the content. */
   private resize(): void {
     const field = this.multiLineField()?.nativeElement;
     if (!field || !this.multiline()) {
       return;
     }
 
-    // scrollHeight already counts the content hidden below the visible box,
-    // so the field keeps its scroll position while it grows.
-    const maximum = MULTILINE_LINE_HEIGHT * this.maxLines() + 2 * MULTILINE_PADDING;
-    const scrollHeight = field.scrollHeight;
-    const height = `${Math.min(scrollHeight, maximum)}px`;
-    if (field.style.height !== height) {
-      field.style.height = height;
+    const chosen = this.height();
+    if (chosen !== null) {
+      field.style.height = `${chosen}px`;
+      field.style.overflowY = field.scrollHeight > chosen ? 'auto' : 'hidden';
+      return;
     }
+
+    // scrollHeight never reports less than the current box, so the height is
+    // reset first: a field widened back would otherwise keep its old height.
+    const scrollTop = field.scrollTop;
+    const maximum = MULTILINE_LINE_HEIGHT * this.maxLines() + 2 * MULTILINE_PADDING;
+    field.style.height = 'auto';
+    const scrollHeight = field.scrollHeight;
+    if (scrollHeight === 0) {
+      // Hidden or unmeasurable: let the stylesheet set the height.
+      field.style.height = '';
+      field.style.overflowY = 'hidden';
+      return;
+    }
+    field.style.height = `${Math.min(scrollHeight, maximum)}px`;
     field.style.overflowY = scrollHeight > maximum ? 'auto' : 'hidden';
+    field.scrollTop = scrollTop;
+  }
+
+  /** Turns a drag of the grip into a height, relative to where it started.
+   * Heights snap to whole lines, so the field never cuts a line in half. */
+  protected startResize(event: PointerEvent): void {
+    if (event.button !== 0) {
+      return;
+    }
+    event.preventDefault();
+
+    const grip = event.currentTarget as HTMLElement;
+    const startY = event.clientY;
+    const startHeight = this.host.nativeElement.getBoundingClientRect().height;
+    grip.setPointerCapture(event.pointerId);
+    document.body.style.cursor = 'row-resize';
+
+    // Heights snap to whole lines, and only a line change is reported.
+    let lastHeight = snapToLines(startHeight);
+    const move = (moveEvent: PointerEvent) => {
+      const height = snapToLines(startHeight + (moveEvent.clientY - startY));
+      if (height !== lastHeight) {
+        lastHeight = height;
+        this.heightChange.emit(height);
+      }
+    };
+    const stop = () => {
+      document.body.style.cursor = '';
+      grip.removeEventListener('pointermove', move);
+      grip.removeEventListener('pointerup', stop);
+      grip.removeEventListener('pointercancel', stop);
+    };
+    grip.addEventListener('pointermove', move);
+    grip.addEventListener('pointerup', stop);
+    grip.addEventListener('pointercancel', stop);
   }
 
   protected syncScroll(): void {
