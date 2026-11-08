@@ -9,9 +9,9 @@
 			"ProductVersion": "0.1.0",
 			"CompanyName": "Clement Herve",
 			"FileDescription": "Git-native API client",
-			"LegalCopyright": "© 2026, My Company",
+			"LegalCopyright": "(c) 2026, Clement Herve",
 			"ProductName": "Awake",
-			"Comments": "This is a comment"
+			"Comments": "Git-native API client"
 		}
 	}
 }

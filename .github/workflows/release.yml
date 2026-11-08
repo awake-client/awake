@@ -158,10 +158,71 @@ jobs:
         shell: pwsh
         run: Compress-Archive -Path "dist/${{ matrix.binary }}" -DestinationPath "dist/${{ matrix.archive }}"
 
+      - name: Install NSIS
+        if: matrix.goos == 'windows'
+        shell: pwsh
+        run: choco install nsis --no-progress -y
+
+      - name: Download WebView2 bootstrapper
+        if: matrix.goos == 'windows'
+        shell: pwsh
+        run: |
+          $bootstrapper = "build/windows/nsis/MicrosoftEdgeWebview2Setup.exe"
+          Invoke-WebRequest -UseBasicParsing `
+            -Uri "https://go.microsoft.com/fwlink/p/?LinkId=2124703" `
+            -OutFile $bootstrapper
+          $size = (Get-Item $bootstrapper).Length
+          if ($size -lt 1MB) {
+            throw "WebView2 bootstrapper download looks invalid ($size bytes)"
+          }
+
+      - name: Build Windows installer
+        if: matrix.goos == 'windows'
+        shell: pwsh
+        env:
+          VERSION: ${{ github.ref_name }}
+        run: |
+          $version = $env:VERSION -replace '^v', ''
+          $numeric = if ($version -match '^(\d+\.\d+\.\d+)') { $Matches[1] } else { '0.1.0' }
+
+          $makensis = (Get-Command makensis -ErrorAction SilentlyContinue).Source
+          if (-not $makensis) {
+            $makensis = @(
+              'C:\Program Files (x86)\NSIS\makensis.exe',
+              'C:\Program Files\NSIS\makensis.exe'
+            ) | Where-Object { Test-Path $_ } | Select-Object -First 1
+          }
+          if (-not $makensis) { throw 'makensis not found after installing NSIS' }
+
+          New-Item -ItemType Directory -Force -Path bin | Out-Null
+          Push-Location build/windows/nsis
+          try {
+            & $makensis `
+              "-DARG_WAILS_AMD64_BINARY=$env:GITHUB_WORKSPACE\dist\${{ matrix.binary }}" `
+              "-DINFO_PRODUCTVERSION=$numeric" `
+              "-DWAILS_INSTALL_SCOPE=user" `
+              "-DREQUEST_EXECUTION_LEVEL=user" `
+              project.nsi
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          } finally {
+            Pop-Location
+          }
+
+          Copy-Item -Path "bin/awake-amd64-installer.exe" `
+            -Destination "dist/awake-windows-amd64-installer.exe" -Force
+
       - uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.name }}
           path: dist/${{ matrix.archive }}
+          if-no-files-found: error
+
+      - name: Upload Windows installer
+        if: matrix.goos == 'windows'
+        uses: actions/upload-artifact@v7
+        with:
+          name: Windows amd64 installer
+          path: dist/awake-windows-amd64-installer.exe
           if-no-files-found: error
 
   publish:
