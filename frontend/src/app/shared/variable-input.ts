@@ -12,7 +12,7 @@ import {
   viewChild,
 } from '@angular/core';
 import { VariableInfo, VariableStore } from '@core/variable-store';
-import { snapUrlLines, URL_FIELD } from './url-field';
+import { snapUrlLines, URL_FIELD, URL_FIELD_ONE_LINE } from './url-field';
 
 /** A run of text drawn behind the field, highlighted when it is a reference. */
 interface Segment {
@@ -124,6 +124,7 @@ const MAX_SUGGESTIONS = 8;
     '[class.mono]': 'mono()',
     '[class.masked]': 'masked()',
     '[class.multiline]': 'multiline()',
+    '[class.single-line]': 'singleLine()',
   },
   template: `
     <div class="highlight" aria-hidden="true">
@@ -249,6 +250,11 @@ export class VariableInput {
 
   protected readonly scrollLeft = signal(0);
   protected readonly scrollTop = signal(0);
+  /** A field showing one line does not wrap: it scrolls sideways. */
+  protected readonly singleLine = computed(() => {
+    const chosen = this.height();
+    return this.multiline() && chosen !== null && chosen <= URL_FIELD_ONE_LINE;
+  });
   private scrollFrame: number | null = null;
 
   constructor() {
@@ -479,9 +485,21 @@ export class VariableInput {
     }
 
     const chosen = this.height();
+    const single = this.singleLine();
+    if (!single && field.scrollLeft !== 0) {
+      // Back to wrapping: the URL can no longer scroll sideways.
+      field.scrollLeft = 0;
+      this.scrollLeft.set(0);
+    }
     if (chosen !== null) {
       field.style.height = `${chosen}px`;
-      field.style.overflowY = field.scrollHeight > chosen ? 'auto' : 'hidden';
+      // One line never wraps, so a long URL scrolls sideways like a field.
+      field.style.overflowX = single ? 'auto' : 'hidden';
+      field.style.overflowY = !single && field.scrollHeight > chosen ? 'auto' : 'hidden';
+      if (single) {
+        field.scrollTop = 0;
+        this.scrollTop.set(0);
+      }
       return;
     }
 
@@ -490,6 +508,7 @@ export class VariableInput {
     const scrollTop = field.scrollTop;
     const maximum = URL_FIELD.lineHeight * this.maxLines() + 2 * URL_FIELD.padding;
     field.style.height = 'auto';
+    field.style.overflowX = 'hidden';
     const scrollHeight = field.scrollHeight;
     if (scrollHeight === 0) {
       // Hidden or unmeasurable: let the stylesheet set the height.
