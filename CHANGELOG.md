@@ -1,0 +1,25 @@
+# Changelog
+
+All notable changes to this project are documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [Unreleased]
+
+### Added
+
+- Git-native workspaces: collections, requests and environments stored as plain
+  YAML files with reviewable diffs and ordinary git history.
+- HTTP, SSE and WebSocket requests with parameters, headers, bodies, request
+  scripts, and basic, bearer, API key and OAuth 2 authentication.
+- Shared environments with local overrides; secret values are stored in the
+  operating system keychain.
+- Coding-agent integration for Claude Code and OpenCode.
+- Import and export for Bruno, OpenCollection, OpenAPI and Postman.
+- Virtualized collection tree, SQLite index, search, command palette, request
+  history, and light and dark themes.
+- In-app update checker backed by GitHub Releases.
+- macOS and Linux installers, plus a Windows NSIS installer and portable archive.
+
+[Unreleased]: https://github.com/awake-client/awake/commits/main
