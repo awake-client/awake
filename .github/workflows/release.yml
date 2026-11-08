@@ -96,7 +96,7 @@ jobs:
         shell: bash
         run: |
           go run github.com/wailsapp/wails/v3/cmd/wails3@v3.1.0 generate bindings \
-            -f '-tags production -trimpath -buildvcs=false' \
+            -f "-tags ${{ matrix.tags }} -trimpath -buildvcs=false" \
             -clean=true -ts -i
 
       - name: Build frontend
