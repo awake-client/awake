@@ -28,6 +28,13 @@
   padding-top: 6px;
 }
 
+/* macOS hides the traffic lights in fullscreen, so nothing needs their inset:
+   the workspace selector moves to the left edge and the bar re-centres. */
+:host-context(html[data-platform='darwin'][data-fullscreen='true']) .titlebar {
+  padding-left: 16px;
+  padding-top: 0;
+}
+
 .titlebar a,
 .titlebar button,
 .titlebar label,
