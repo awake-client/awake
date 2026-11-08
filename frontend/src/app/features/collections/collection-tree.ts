@@ -18,6 +18,7 @@ import {
 } from '@core/collection-events';
 import { Confirmation } from '@core/confirmation';
 import { Prompt } from '@core/prompt';
+import { Shortcuts } from '@core/shortcuts';
 import { TabsStore } from '@core/tabs-store';
 import { Icon } from '@shared/icon';
 
@@ -69,6 +70,7 @@ export class CollectionTree {
   private readonly confirmation = inject(Confirmation);
   private readonly prompt = inject(Prompt);
   private readonly tabsStore = inject(TabsStore);
+  protected readonly shortcuts = inject(Shortcuts);
 
   readonly workspaceRoot = input('');
   readonly requestSelected = output<string>();

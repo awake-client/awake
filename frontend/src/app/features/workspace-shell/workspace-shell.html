@@ -6,7 +6,7 @@
   <button type="button" class="search-trigger" (click)="openCommandPalette()">
     <app-icon name="search" [size]="14" />
     <span>Search requests</span>
-    <kbd>⌘P</kbd>
+    <kbd>{{ shortcuts.key('P') }}</kbd>
   </button>
 
   <div class="titlebar-end">

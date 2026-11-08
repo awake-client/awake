@@ -9,6 +9,7 @@ import {
   OAuth2GrantType,
 } from '@bindings/github.com/clementherve/awake/src/domain/models';
 import { notifyCollectionsChanged } from '@core/collection-events';
+import { Shortcuts } from '@core/shortcuts';
 import { VariableStore } from '@core/variable-store';
 import { WorkspaceStore } from '@core/workspace-store';
 import { AuthEditor } from '@shared/auth-editor';
@@ -41,6 +42,7 @@ export class CollectionSettings {
   private readonly route = inject(ActivatedRoute);
   private readonly workspaceStore = inject(WorkspaceStore);
   private readonly variableStore = inject(VariableStore);
+  protected readonly shortcuts = inject(Shortcuts);
 
   protected readonly collectionPath = signal('');
   protected readonly tab = signal<SettingsTab>('overview');

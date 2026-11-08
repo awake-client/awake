@@ -211,7 +211,7 @@
       <button type="button" role="menuitem" class="menu-item" (click)="duplicateFromRowMenu()">
         <app-icon name="layers" [size]="14" />
         Duplicate
-        <kbd>⌘D</kbd>
+        <kbd>{{ shortcuts.key('D') }}</kbd>
       </button>
       <hr class="menu-separator" />
     }

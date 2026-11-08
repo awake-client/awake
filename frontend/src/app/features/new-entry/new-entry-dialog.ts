@@ -25,6 +25,7 @@ import {
 } from '@core/collection-events';
 import { EnvironmentStore } from '@core/environment-store';
 import { TabsStore } from '@core/tabs-store';
+import { Shortcuts } from '@core/shortcuts';
 import { WorkspaceStore } from '@core/workspace-store';
 import { ColorPicker } from '@shared/color-picker';
 import { Icon, IconName } from '@shared/icon';
@@ -100,6 +101,7 @@ export class NewEntryDialog {
 
   protected readonly requestTypes = REQUEST_TYPES;
   protected readonly httpMethods = HTTP_METHODS;
+  protected readonly shortcuts = inject(Shortcuts);
 
   protected readonly kind = signal<CreationKind>('request');
   protected readonly folders = signal<FolderOption[]>([]);

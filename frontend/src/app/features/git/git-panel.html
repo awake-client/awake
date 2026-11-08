@@ -339,7 +339,9 @@
                 placeholder="Describe your changes, for example: add the invoices endpoints"
               ></textarea>
               <div class="commit-actions">
-                <span class="hint">All changes are included. ⌘↵ to commit.</span>
+                <span class="hint">
+                  All changes are included. {{ shortcuts.key(shortcuts.enter) }} to commit.
+                </span>
                 <button
                   type="button"
                   class="btn"

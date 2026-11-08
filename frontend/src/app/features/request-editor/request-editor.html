@@ -14,14 +14,19 @@
           <span class="saved-badge">{{ message }}</span>
         }
         @if (isDirty()) {
-          <span class="dirty-badge" title="Unsaved changes (⌘S to save)"> Unsaved </span>
+          <span
+            class="dirty-badge"
+            [title]="'Unsaved changes (' + shortcuts.key('S') + ' to save)'"
+          >
+            Unsaved
+          </span>
         }
         <button
           type="button"
           class="btn btn-sm save-button"
           [disabled]="!isDirty() || isSaving()"
           (click)="save()"
-          title="Save request (⌘S)"
+          [title]="'Save request (' + shortcuts.key('S') + ')'"
         >
           <app-icon name="save" [size]="13" />
           {{ isSaving() ? 'Saving…' : 'Save' }}
@@ -148,7 +153,7 @@
           class="btn btn-primary send-button"
           [disabled]="isLoading() || isSending()"
           (click)="send()"
-          title="Send request (⌘↵)"
+          [title]="'Send request (' + shortcuts.key(shortcuts.enter) + ')'"
         >
           <app-icon name="send" [size]="14" />
           {{ sendLabel() }}

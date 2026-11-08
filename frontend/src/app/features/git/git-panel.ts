@@ -9,6 +9,7 @@ import * as AssistantService from '@bindings/github.com/clementherve/awake/src/f
 import * as WorkspaceService from '@bindings/github.com/clementherve/awake/src/features/workspace/service';
 import { notifyCollectionsChanged } from '@core/collection-events';
 import { GitSync } from '@core/git-sync';
+import { Shortcuts } from '@core/shortcuts';
 import { WorkspaceStore } from '@core/workspace-store';
 import { CodeEditor, CodeLanguage } from '@shared/code-editor';
 import { Icon } from '@shared/icon';
@@ -42,6 +43,7 @@ interface ChangeKind {
 export class GitPanel {
   private readonly workspaceStore = inject(WorkspaceStore);
   protected readonly gitSync = inject(GitSync);
+  protected readonly shortcuts = inject(Shortcuts);
 
   protected readonly syncIntervals = SYNC_INTERVALS;
   protected readonly isRepository = signal<boolean | null>(null);

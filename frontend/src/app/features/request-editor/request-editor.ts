@@ -42,6 +42,7 @@ import {
 } from '@core/collection-events';
 import { LayoutStore, RESPONSE_RATIO } from '@core/layout-store';
 import { StashedEditorState, TabsStore } from '@core/tabs-store';
+import { Shortcuts } from '@core/shortcuts';
 import { emptyBody, isFormBody, parseFormContent } from '@shared/form-body';
 import {
   pathParameterNames,
@@ -159,6 +160,7 @@ export class RequestEditor {
   private readonly tabsStore = inject(TabsStore);
   private readonly editor = viewChild.required<ElementRef<HTMLElement>>('editor');
   protected readonly layout = inject(LayoutStore);
+  protected readonly shortcuts = inject(Shortcuts);
   protected readonly defaultResponseRatio = RESPONSE_RATIO.default;
   private readonly streamPanel = viewChild<StreamPanel>(StreamPanel);
 

@@ -255,7 +255,10 @@
     </div>
 
     <footer class="panel-footer">
-      <span class="shortcut"><kbd>⌘</kbd><kbd>↵</kbd> to create</span>
+      <span class="shortcut"
+        ><kbd>{{ shortcuts.command }}</kbd
+        ><kbd>{{ shortcuts.enter }}</kbd> to create</span
+      >
       <button type="button" class="btn btn-ghost" (click)="close()">Cancel</button>
       <button type="submit" class="btn btn-primary" [disabled]="isSaving()">
         {{ isSaving() ? 'Creating…' : 'Create' }}

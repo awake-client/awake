@@ -10,6 +10,7 @@ import { EnvironmentStore } from '@core/environment-store';
 import { EnvironmentDialog } from '../environments/environment-dialog';
 import { GitSync } from '@core/git-sync';
 import { LayoutStore, SIDEBAR_WIDTH } from '@core/layout-store';
+import { Shortcuts } from '@core/shortcuts';
 import { TabsStore } from '@core/tabs-store';
 import { WorkspaceStore } from '@core/workspace-store';
 import { CollectionTree } from '@features/collections/collection-tree';
@@ -87,6 +88,7 @@ export class WorkspaceShell {
   protected readonly gitSync = inject(GitSync);
   protected readonly tabs = inject(TabsStore);
   protected readonly layout = inject(LayoutStore);
+  protected readonly shortcuts = inject(Shortcuts);
   protected readonly defaultSidebarWidth = SIDEBAR_WIDTH.default;
   protected readonly sections = SIDEBAR_SECTIONS;
   protected readonly workspace = this.workspaceStore.workspace;

@@ -2,6 +2,7 @@ import { Component, ElementRef, effect, inject, signal, viewChild } from '@angul
 import { CollectionColors } from '@core/collection-colors';
 import { Confirmation } from '@core/confirmation';
 import { RequestTab, TabsStore } from '@core/tabs-store';
+import { Shortcuts } from '@core/shortcuts';
 
 /** What a tab menu entry closes, relative to the tab clicked. */
 type CloseTarget = 'this' | 'others' | 'left' | 'right' | 'saved' | 'all';
@@ -24,7 +25,7 @@ const METHOD_LABELS: Record<string, string> = { DELETE: 'DEL', OPTIONS: 'OPT' };
 /**
  * Tab bar of the open requests, shown at the top of the work area. Tabs can
  * be reordered by dragging, pinned with a double click and closed with the
- * close button, a middle click or ⌘W.
+ * close button, a middle click or the close shortcut.
  */
 @Component({
   selector: 'app-request-tabs',
@@ -67,7 +68,7 @@ const METHOD_LABELS: Record<string, string> = { DELETE: 'DEL', OPTIONS: 'OPT' };
             class="tab-close"
             [class.dirty]="tab.dirty"
             [attr.aria-label]="'Close ' + tab.name"
-            [title]="tab.dirty ? 'Unsaved changes' : 'Close (⌘W)'"
+            [title]="tab.dirty ? 'Unsaved changes' : 'Close (' + shortcuts.key('W') + ')'"
             (click)="close(tab, $event)"
           >
             <span class="dirty-dot" aria-hidden="true"></span>
@@ -93,7 +94,7 @@ const METHOD_LABELS: Record<string, string> = { DELETE: 'DEL', OPTIONS: 'OPT' };
       >
         <button type="button" role="menuitem" class="menu-item" (click)="closeFromMenu('this')">
           Close
-          <kbd>⌘W</kbd>
+          <kbd>{{ shortcuts.key('W') }}</kbd>
         </button>
         <button
           type="button"
@@ -143,6 +144,7 @@ const METHOD_LABELS: Record<string, string> = { DELETE: 'DEL', OPTIONS: 'OPT' };
 export class RequestTabs {
   protected readonly tabs = inject(TabsStore);
   protected readonly collectionColors = inject(CollectionColors);
+  protected readonly shortcuts = inject(Shortcuts);
   private readonly confirmation = inject(Confirmation);
 
   protected readonly dropIndex = signal<number | null>(null);
