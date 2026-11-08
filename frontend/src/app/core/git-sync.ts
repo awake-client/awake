@@ -53,7 +53,7 @@ export class GitSync {
       case 'synced':
         return `Synced ${relativeTime(this.lastSync(), this.clock())}`;
       default:
-        return 'Waiting to sync';
+        return 'Waiting...';
     }
   });
 
