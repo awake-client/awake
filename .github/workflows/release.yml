@@ -96,6 +96,36 @@ jobs:
         working-directory: frontend
         run: npm ci && npm run build
 
+      - name: Set Windows version metadata
+        if: matrix.goos == 'windows'
+        shell: pwsh
+        env:
+          VERSION: ${{ github.ref_name }}
+        run: |
+          $version = $env:VERSION -replace '^v', ''
+          $numeric = if ($version -match '^(\d+\.\d+\.\d+)') { $Matches[1] } else { '0.1.0' }
+          $path = 'build/windows/info.json'
+          $info = Get-Content $path -Raw | ConvertFrom-Json
+          $info.fixed.file_version = $numeric
+          $info.fixed.product_version = $numeric
+          $info.info.'0409'.FileVersion = $numeric
+          $info.info.'0409'.ProductVersion = $numeric
+          [System.IO.File]::WriteAllText(
+            (Resolve-Path $path),
+            ($info | ConvertTo-Json -Depth 10)
+          )
+
+      - name: Generate Windows resources
+        if: matrix.goos == 'windows'
+        shell: bash
+        run: |
+          go run github.com/wailsapp/wails/v3/cmd/wails3@v3.1.0 generate syso \
+            -arch "${{ matrix.goarch }}" \
+            -icon build/windows/icon.ico \
+            -manifest build/windows/wails.exe.manifest \
+            -info build/windows/info.json \
+            -out "wails_windows_${{ matrix.goarch }}.syso"
+
       - name: Build binary
         shell: bash
         env:
