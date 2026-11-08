@@ -3,6 +3,11 @@ import { Parameter } from '@bindings/github.com/clementherve/awake/src/domain/mo
 /** A query value written as a whole :name placeholder, kept in the URL. */
 const PLACEHOLDER_VALUE = /^:[A-Za-z_][A-Za-z0-9_]*$/;
 
+/** A URL is one logical line, so line breaks pasted into it are dropped. */
+export function singleLineUrl(value: string): string {
+  return value.replace(/[\r\n]+/g, '');
+}
+
 /** Characters that would end an entry or its value, escaped in the URL text. */
 const NAME_ESCAPED = /[%&#=+]/g;
 /** A value ends at &, # or a plus; an equals sign is safe after the name's. */

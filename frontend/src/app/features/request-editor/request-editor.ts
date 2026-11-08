@@ -48,7 +48,12 @@ import {
   replaceUrlPlaceholders,
   urlPlaceholders,
 } from '@shared/path-parameters';
-import { composeUrlQuery, mergeUrlParameters, parseUrlQuery } from '@shared/url-query';
+import {
+  composeUrlQuery,
+  mergeUrlParameters,
+  parseUrlQuery,
+  singleLineUrl,
+} from '@shared/url-query';
 import { VariableStore } from '@core/variable-store';
 import { WorkspaceStore } from '@core/workspace-store';
 import { AuthEditor } from '@shared/auth-editor';
@@ -938,9 +943,11 @@ export class RequestEditor {
    * A whole :name value stays in the URL as a path parameter.
    */
   protected updateUrl(value: string): void {
-    this.urlInput.set(value);
+    // A URL is a single logical line even when the field wraps it.
+    const line = singleLineUrl(value);
+    this.urlInput.set(line);
 
-    const parsed = parseUrlQuery(value);
+    const parsed = parseUrlQuery(line);
     this.url.set(parsed.url);
 
     // Disabled and still unnamed rows are not in the URL; keep them.

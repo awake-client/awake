@@ -3,6 +3,7 @@ import {
   Component,
   DestroyRef,
   ElementRef,
+  afterRenderEffect,
   computed,
   inject,
   input,
@@ -103,6 +104,9 @@ interface PendingReference {
 
 const PENDING_PATTERN = /\{\{\s*(\$?[A-Za-z0-9_]*)$/;
 const MAX_SUGGESTIONS = 8;
+/** Height of one line of a multiline field, so wrapping matches the drawing. */
+const MULTILINE_LINE_HEIGHT = 20;
+const MULTILINE_PADDING = 9;
 
 /**
  * Single-line field aware of `{{variables}}`. References are colored by
@@ -110,6 +114,9 @@ const MAX_SUGGESTIONS = 8;
  * variables of the active environment, and the tooltip shows the resolved
  * text. The text itself is drawn by a layer behind a transparent input, so
  * native editing, selection and undo keep working.
+ *
+ * A multiline field wraps a long value instead of scrolling it sideways and
+ * grows up to its maximum number of lines, then scrolls vertically.
  */
 @Component({
   selector: 'app-variable-input',
@@ -118,34 +125,60 @@ const MAX_SUGGESTIONS = 8;
     '[class.bare]': 'bare()',
     '[class.mono]': 'mono()',
     '[class.masked]': 'masked()',
+    '[class.multiline]': 'multiline()',
   },
   template: `
     <div class="highlight" aria-hidden="true">
-      <div class="highlight-text" [style.transform]="'translateX(' + -scrollLeft() + 'px)'">
+      <div
+        class="highlight-text"
+        [style.transform]="'translate(' + -scrollLeft() + 'px, ' + -scrollTop() + 'px)'"
+      >
         @for (segment of segments(); track $index) {
           <span [class]="segment.state">{{ segment.text }}</span>
         }
       </div>
     </div>
-    <input
-      #field
-      type="text"
-      [value]="value()"
-      [placeholder]="placeholder()"
-      [attr.aria-label]="ariaLabel() || null"
-      [title]="tooltip()"
-      spellcheck="false"
-      autocomplete="off"
-      role="combobox"
-      [attr.aria-expanded]="isOpen()"
-      (input)="handleInput()"
-      (keydown)="handleKeydown($event)"
-      (keyup)="handleCaretMove($event)"
-      (click)="refreshSuggestions()"
-      (scroll)="syncScroll()"
-      (focus)="followScroll()"
-      (blur)="close(); stopFollowingScroll()"
-    />
+    @if (multiline()) {
+      <textarea
+        #multiLineField
+        rows="1"
+        [value]="value()"
+        [placeholder]="placeholder()"
+        [attr.aria-label]="ariaLabel() || null"
+        [title]="tooltip()"
+        spellcheck="false"
+        autocomplete="off"
+        role="combobox"
+        [attr.aria-expanded]="isOpen()"
+        (input)="handleInput()"
+        (keydown)="handleKeydown($event)"
+        (keyup)="handleCaretMove($event)"
+        (click)="refreshSuggestions()"
+        (scroll)="syncScroll()"
+        (focus)="followScroll()"
+        (blur)="close(); stopFollowingScroll()"
+      ></textarea>
+    } @else {
+      <input
+        #singleLineField
+        type="text"
+        [value]="value()"
+        [placeholder]="placeholder()"
+        [attr.aria-label]="ariaLabel() || null"
+        [title]="tooltip()"
+        spellcheck="false"
+        autocomplete="off"
+        role="combobox"
+        [attr.aria-expanded]="isOpen()"
+        (input)="handleInput()"
+        (keydown)="handleKeydown($event)"
+        (keyup)="handleCaretMove($event)"
+        (click)="refreshSuggestions()"
+        (scroll)="syncScroll()"
+        (focus)="followScroll()"
+        (blur)="close(); stopFollowingScroll()"
+      />
+    }
     @if (isOpen()) {
       <ul
         class="suggestions"
@@ -174,7 +207,10 @@ const MAX_SUGGESTIONS = 8;
 })
 export class VariableInput {
   private readonly store = inject(VariableStore);
-  private readonly field = viewChild.required<ElementRef<HTMLInputElement>>('field');
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
+  private readonly singleLineField = viewChild<ElementRef<HTMLInputElement>>('singleLineField');
+  private readonly multiLineField = viewChild<ElementRef<HTMLTextAreaElement>>('multiLineField');
+  private lastWidth = 0;
 
   readonly value = input('');
   readonly placeholder = input('');
@@ -186,17 +222,57 @@ export class VariableInput {
   readonly masked = input(false);
   /** Highlights path parameters and the query, for a request URL. */
   readonly url = input(false);
+  /** Wraps long values and grows vertically instead of scrolling sideways. */
+  readonly multiline = input(false);
+  /** Number of lines shown before a multiline field scrolls. */
+  readonly maxLines = input(3);
   readonly valueChange = output<string>();
 
   protected readonly scrollLeft = signal(0);
+  protected readonly scrollTop = signal(0);
   private scrollFrame: number | null = null;
 
   constructor() {
+    // The drawing layer follows the field's scroll and the field grows with
+    // its content. A wrapped value changes height when the pane is resized.
+    afterRenderEffect(() => {
+      this.value();
+      if (this.multiline()) {
+        this.resize();
+      }
+    });
+
+    const observer =
+      typeof ResizeObserver === 'undefined'
+        ? null
+        : new ResizeObserver((entries) => {
+            const width = entries[0]?.contentRect.width ?? 0;
+            if (!this.multiline() || width === this.lastWidth) {
+              return;
+            }
+            this.lastWidth = width;
+            this.resize();
+          });
+    observer?.observe(this.host.nativeElement);
+
     inject(DestroyRef).onDestroy(() => {
+      observer?.disconnect();
       if (this.scrollFrame !== null) {
         cancelAnimationFrame(this.scrollFrame);
       }
     });
+  }
+
+  private field(): HTMLInputElement | HTMLTextAreaElement {
+    const multiline = this.multiLineField()?.nativeElement;
+    const singleLine = this.singleLineField()?.nativeElement;
+    if (this.multiline() && multiline) {
+      return multiline;
+    }
+    if (singleLine) {
+      return singleLine;
+    }
+    return multiline ?? singleLine!;
   }
   protected readonly pending = signal<PendingReference | null>(null);
   protected readonly activeIndex = signal(0);
@@ -275,17 +351,22 @@ export class VariableInput {
   protected readonly isOpen = computed(() => this.matches().length > 0);
 
   focus(): void {
-    this.field().nativeElement.focus();
+    this.field().focus();
   }
 
   protected handleInput(): void {
-    this.valueChange.emit(this.field().nativeElement.value);
+    this.valueChange.emit(this.field().value);
     this.refreshSuggestions();
+    this.resize();
     this.syncScroll();
   }
 
   protected handleKeydown(event: KeyboardEvent): void {
     if (!this.isOpen()) {
+      // A multiline field wraps, it never stores a line break.
+      if (this.multiline() && event.key === 'Enter' && !event.metaKey && !event.ctrlKey) {
+        event.preventDefault();
+      }
       return;
     }
     const count = this.matches().length;
@@ -323,7 +404,7 @@ export class VariableInput {
   }
 
   protected refreshSuggestions(): void {
-    const element = this.field().nativeElement;
+    const element = this.field();
     const caret = element.selectionStart ?? element.value.length;
     const match = PENDING_PATTERN.exec(element.value.slice(0, caret));
     if (!match) {
@@ -353,7 +434,7 @@ export class VariableInput {
     if (!variable || !pending) {
       return;
     }
-    const element = this.field().nativeElement;
+    const element = this.field();
     const text = element.value;
     const caret = element.selectionStart ?? text.length;
     const after = text.slice(caret).replace(/^\s*\}\}/, '');
@@ -365,11 +446,32 @@ export class VariableInput {
     element.setSelectionRange(position, position);
     this.valueChange.emit(next);
     this.close();
+    this.resize();
     this.syncScroll();
   }
 
+  /** Grows the field up to its maximum number of lines, then scrolls. */
+  private resize(): void {
+    const field = this.multiLineField()?.nativeElement;
+    if (!field || !this.multiline()) {
+      return;
+    }
+
+    // scrollHeight already counts the content hidden below the visible box,
+    // so the field keeps its scroll position while it grows.
+    const maximum = MULTILINE_LINE_HEIGHT * this.maxLines() + 2 * MULTILINE_PADDING;
+    const scrollHeight = field.scrollHeight;
+    const height = `${Math.min(scrollHeight, maximum)}px`;
+    if (field.style.height !== height) {
+      field.style.height = height;
+    }
+    field.style.overflowY = scrollHeight > maximum ? 'auto' : 'hidden';
+  }
+
   protected syncScroll(): void {
-    this.scrollLeft.set(this.field().nativeElement.scrollLeft);
+    const field = this.field();
+    this.scrollLeft.set(field.scrollLeft);
+    this.scrollTop.set(field.scrollTop);
   }
 
   /**

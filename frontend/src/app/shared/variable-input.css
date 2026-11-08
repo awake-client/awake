@@ -33,11 +33,16 @@
   --variable-padding: 12px;
 }
 
-/* The highlight layer and the input must lay out text identically. */
+/* The highlight layer and the field must lay out text identically. */
 .highlight,
-input {
+input,
+textarea {
   font: inherit;
   letter-spacing: normal;
+}
+
+.highlight,
+input {
   white-space: pre;
 }
 
@@ -56,7 +61,8 @@ input {
   will-change: transform;
 }
 
-input {
+input,
+textarea {
   position: relative;
   width: 100%;
   height: 100%;
@@ -67,19 +73,65 @@ input {
   caret-color: var(--color-text-strong);
 }
 
-input:focus {
+textarea {
+  display: block;
+  resize: none;
+}
+
+input:focus,
+textarea:focus {
   outline: none;
 }
 
-input::placeholder {
+input::placeholder,
+textarea::placeholder {
   color: var(--color-text-subtle);
 }
 
 /* The selected text stays transparent: the drawn text behind shows it, so
    it is never painted twice. */
-input::selection {
+input::selection,
+textarea::selection {
   background: var(--color-selection);
   color: transparent;
+}
+
+/* A multiline field wraps its value and grows with it. The drawing layer
+   follows both scroll axes, and the line height and vertical padding must
+   match the field exactly. */
+:host(.multiline) {
+  height: auto;
+  min-height: var(--control-height);
+}
+
+:host(.multiline) .highlight {
+  align-items: flex-start;
+  padding-top: 9px;
+  padding-bottom: 9px;
+}
+
+:host(.multiline) .highlight-text {
+  width: 100%;
+  min-width: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 20px;
+}
+
+:host(.multiline) textarea {
+  height: auto;
+  min-height: 38px;
+  padding-top: 9px;
+  padding-bottom: 9px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 20px;
+  overflow-y: hidden;
+  scrollbar-width: none;
+}
+
+:host(.multiline) textarea::-webkit-scrollbar {
+  display: none;
 }
 
 /* Reference states ---------------------------------------------------------- */
@@ -175,7 +227,8 @@ input::selection {
   visibility: hidden;
 }
 
-:host(.masked) input {
+:host(.masked) input,
+:host(.masked) textarea {
   color: var(--color-text-strong);
   -webkit-text-security: disc;
 }

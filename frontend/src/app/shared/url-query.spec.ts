@@ -1,5 +1,5 @@
 import { Parameter } from '@bindings/github.com/clementherve/awake/src/domain/models';
-import { composeUrlQuery, mergeUrlParameters, parseUrlQuery } from './url-query';
+import { composeUrlQuery, mergeUrlParameters, parseUrlQuery, singleLineUrl } from './url-query';
 
 function parameter(Name: string, Value: string, Enabled = true): Parameter {
   return { Name, Value, Enabled };
@@ -59,6 +59,14 @@ describe('composeUrlQuery', () => {
       url,
       parameters,
     });
+  });
+});
+
+describe('singleLineUrl', () => {
+  it('drops the line breaks of a wrapped or pasted URL', () => {
+    expect(singleLineUrl('https://api.example.com/users?page=1\r\n&sort=desc')).toBe(
+      'https://api.example.com/users?page=1&sort=desc',
+    );
   });
 });
 
