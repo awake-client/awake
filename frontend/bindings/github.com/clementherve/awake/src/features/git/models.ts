@@ -80,6 +80,11 @@ export interface SyncResult {
     "Reason": string;
 
     /**
+     * Committed is true when pending changes were committed automatically.
+     */
+    "Committed": boolean;
+
+    /**
      * Pulled is true when the pull brought new commits.
      */
     "Pulled": boolean;

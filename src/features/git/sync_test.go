@@ -28,7 +28,7 @@ func TestSynchronizePullsAndPushes(t *testing.T) {
 	runTestGit(t, first, "add", "request.yaml")
 	runTestGit(t, first, "commit", "-m", "add request")
 
-	pushed, err := synchronize(ctx, openTestClient(t, ctx, first), true, true)
+	pushed, err := synchronize(ctx, openTestClient(t, ctx, first), false, true, true)
 	if err != nil {
 		t.Fatalf("synchronize first: %v", err)
 	}
@@ -37,7 +37,7 @@ func TestSynchronizePullsAndPushes(t *testing.T) {
 	}
 
 	// ...and pulled by the synchronization of the second clone.
-	pulled, err := synchronize(ctx, openTestClient(t, ctx, second), true, true)
+	pulled, err := synchronize(ctx, openTestClient(t, ctx, second), false, true, true)
 	if err != nil {
 		t.Fatalf("synchronize second: %v", err)
 	}
@@ -45,7 +45,7 @@ func TestSynchronizePullsAndPushes(t *testing.T) {
 		t.Fatalf("expected the second clone to pull without pushing, got %+v", pulled)
 	}
 
-	again, err := synchronize(ctx, openTestClient(t, ctx, second), true, true)
+	again, err := synchronize(ctx, openTestClient(t, ctx, second), false, true, true)
 	if err != nil {
 		t.Fatalf("synchronize again: %v", err)
 	}
@@ -76,7 +76,7 @@ func TestSynchronizeStopsOnConflicts(t *testing.T) {
 	writeTestFile(t, second, "awake.yaml", "name: second\n")
 	runTestGit(t, second, "commit", "-am", "second")
 
-	result, err := synchronize(ctx, openTestClient(t, ctx, second), true, true)
+	result, err := synchronize(ctx, openTestClient(t, ctx, second), false, true, true)
 	if err != nil {
 		t.Fatalf("synchronize: %v", err)
 	}
@@ -84,12 +84,65 @@ func TestSynchronizeStopsOnConflicts(t *testing.T) {
 		t.Fatalf("expected a conflict and no push, got %+v", result)
 	}
 
-	again, err := synchronize(ctx, openTestClient(t, ctx, second), true, true)
+	again, err := synchronize(ctx, openTestClient(t, ctx, second), false, true, true)
 	if err != nil {
 		t.Fatalf("synchronize again: %v", err)
 	}
 	if again.Outcome != SyncConflicts {
 		t.Fatalf("expected the next synchronization to stop on the open conflict, got %+v", again)
+	}
+}
+
+func TestSynchronizeCommitsPendingChanges(t *testing.T) {
+	initializeTestEnvironment(t)
+
+	ctx := context.Background()
+	root := t.TempDir()
+	remote := filepath.Join(root, "remote.git")
+	runTestGit(t, root, "init", "--bare", "--initial-branch=main", remote)
+	repository := filepath.Join(root, "workspace")
+	runTestGit(t, root, "clone", remote, repository)
+	writeTestFile(t, repository, "awake.yaml", "name: base\n")
+	runTestGit(t, repository, "add", "awake.yaml")
+	runTestGit(t, repository, "commit", "-m", "base")
+	runTestGit(t, repository, "push", "--set-upstream", "origin", "main")
+
+	writeTestFile(t, repository, "request.yaml", "name: ping\n")
+	client := openTestClient(t, ctx, repository)
+
+	result, err := synchronize(ctx, client, true, true, true)
+	if err != nil {
+		t.Fatalf("synchronize: %v", err)
+	}
+	if !result.Committed || !result.Pushed || result.Ahead != 0 {
+		t.Fatalf("expected the pending change to be committed and pushed, got %+v", result)
+	}
+
+	status, err := client.Status(ctx)
+	if err != nil {
+		t.Fatalf("status: %v", err)
+	}
+	if len(status.Changes) != 0 {
+		t.Fatalf("expected a clean work tree, got %+v", status.Changes)
+	}
+}
+
+func TestSynchronizeCommitsWithoutUpstream(t *testing.T) {
+	initializeTestEnvironment(t)
+
+	ctx := context.Background()
+	repository := initializeTestRepository(t, ctx)
+	writeTestFile(t, repository, "awake.yaml", "name: solo\n")
+
+	result, err := synchronize(ctx, openTestClient(t, ctx, repository), true, true, true)
+	if err != nil {
+		t.Fatalf("synchronize: %v", err)
+	}
+	if result.Outcome != SyncDone || !result.Committed || result.Pushed {
+		t.Fatalf("expected a local commit without a push, got %+v", result)
+	}
+	if result.Reason == "" {
+		t.Fatal("expected a reason explaining that the branch has no upstream")
 	}
 }
 
@@ -102,7 +155,7 @@ func TestSynchronizeSkipsBranchesWithoutUpstream(t *testing.T) {
 	runTestGit(t, repository, "add", "awake.yaml")
 	runTestGit(t, repository, "commit", "-m", "solo")
 
-	result, err := synchronize(ctx, openTestClient(t, ctx, repository), true, true)
+	result, err := synchronize(ctx, openTestClient(t, ctx, repository), false, true, true)
 	if err != nil {
 		t.Fatalf("synchronize: %v", err)
 	}

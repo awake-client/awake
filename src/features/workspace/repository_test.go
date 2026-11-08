@@ -184,6 +184,7 @@ func TestUpdateGitStoresSynchronizationSettings(t *testing.T) {
 	}
 
 	updated, err := service.UpdateGit(rootPath, GitConfiguration{
+		AutomaticCommit:         true,
 		AutomaticPull:           true,
 		AutomaticPush:           true,
 		SynchronizationInterval: "2m",
@@ -191,7 +192,7 @@ func TestUpdateGitStoresSynchronizationSettings(t *testing.T) {
 	if err != nil {
 		t.Fatalf("update git settings: %v", err)
 	}
-	if updated.Git == nil || !updated.Git.AutomaticPull || updated.Git.SynchronizationInterval != "2m" {
+	if updated.Git == nil || !updated.Git.AutomaticCommit || !updated.Git.AutomaticPull || updated.Git.SynchronizationInterval != "2m" {
 		t.Fatalf("unexpected configuration: %+v", updated.Git)
 	}
 

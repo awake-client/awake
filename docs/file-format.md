@@ -61,6 +61,7 @@ variables:
 git:
   remote: origin
   branch: main
+  automaticCommit: true
   automaticPull: true
   automaticPush: true
   synchronizationInterval: 5m

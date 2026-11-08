@@ -101,10 +101,11 @@ export function Status(workspaceRoot: string): $CancellablePromise<$models.Statu
 }
 
 /**
- * Synchronize pulls then pushes the current branch, as configured. It never
- * pulls over unresolved conflicts and only pushes when local commits are
- * ahead of the upstream branch, so it is safe to call on a timer.
+ * Synchronize commits, pulls then pushes the current branch, as configured.
+ * It commits pending changes first so a pull never runs over a dirty work
+ * tree, never pulls over unresolved conflicts, and only pushes when local
+ * commits are ahead of the upstream branch, so it is safe to call on a timer.
  */
-export function Synchronize(workspaceRoot: string, pull: boolean, push: boolean): $CancellablePromise<$models.SyncResult> {
-    return $Call.ByID(4267651757, workspaceRoot, pull, push);
+export function Synchronize(workspaceRoot: string, commit: boolean, pull: boolean, push: boolean): $CancellablePromise<$models.SyncResult> {
+    return $Call.ByID(4267651757, workspaceRoot, commit, pull, push);
 }

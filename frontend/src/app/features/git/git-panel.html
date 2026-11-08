@@ -382,6 +382,15 @@
         <label class="switch">
           <input
             type="checkbox"
+            [checked]="settings()?.AutomaticCommit ?? false"
+            (change)="updateSync({ AutomaticCommit: checked($event) })"
+          />
+          <span class="track"></span>
+          <span>Commit my changes</span>
+        </label>
+        <label class="switch">
+          <input
+            type="checkbox"
             [checked]="settings()?.AutomaticPull ?? false"
             (change)="updateSync({ AutomaticPull: checked($event) })"
           />
@@ -398,7 +407,11 @@
           <span>Push my commits</span>
         </label>
         <select
-          [disabled]="!settings()?.AutomaticPull && !settings()?.AutomaticPush"
+          [disabled]="
+            !settings()?.AutomaticCommit &&
+            !settings()?.AutomaticPull &&
+            !settings()?.AutomaticPush
+          "
           (change)="updateSync({ SynchronizationInterval: inputValue($event) })"
         >
           @for (interval of syncIntervals; track interval.value) {
@@ -412,7 +425,8 @@
         </select>
         <p class="hint">
           Saved in <code>awake.yaml</code>, so the whole team shares these settings. Only committed
-          changes are pushed, and syncing pauses while a conflict is open.
+          changes are pushed: turn on commit to save them before each sync. Syncing pauses while a
+          conflict is open.
         </p>
       </aside>
     </div>

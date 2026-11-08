@@ -34,6 +34,7 @@ export interface CreateOptions {
 export interface GitConfiguration {
     "Remote": string;
     "Branch": string;
+    "AutomaticCommit": boolean;
     "AutomaticPull": boolean;
     "AutomaticPush": boolean;
     "SynchronizationInterval": string;

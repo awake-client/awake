@@ -36,6 +36,7 @@ type Configuration struct {
 type GitConfiguration struct {
 	Remote                  string `yaml:"remote"`
 	Branch                  string `yaml:"branch"`
+	AutomaticCommit         bool   `yaml:"automaticCommit"`
 	AutomaticPull           bool   `yaml:"automaticPull"`
 	AutomaticPush           bool   `yaml:"automaticPush"`
 	SynchronizationInterval string `yaml:"synchronizationInterval"`

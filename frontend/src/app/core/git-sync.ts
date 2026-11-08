@@ -14,9 +14,10 @@ const MINIMUM_PERIOD = 30_000;
 const FIRST_SYNC_DELAY = 5_000;
 
 /**
- * Pulls and pushes the workspace on a timer, following the git settings of
- * awake.yaml. After a pull that brought commits, the collection tree and the
- * environments reload so the team's changes show up without a restart.
+ * Commits, pulls and pushes the workspace on a timer, following the git
+ * settings of awake.yaml. After a pull that brought commits, the collection
+ * tree and the environments reload so the team's changes show up without a
+ * restart.
  */
 @Injectable({ providedIn: 'root' })
 export class GitSync {
@@ -34,7 +35,9 @@ export class GitSync {
   readonly settings = computed(() => this.workspaceStore.workspace()?.configuration.Git ?? null);
   readonly enabled = computed(() => {
     const settings = this.settings();
-    return !!settings && (settings.AutomaticPull || settings.AutomaticPush);
+    return (
+      !!settings && (settings.AutomaticCommit || settings.AutomaticPull || settings.AutomaticPush)
+    );
   });
 
   /** Short status for the sidebar, such as "Synced 3 min ago". */
@@ -91,6 +94,7 @@ export class GitSync {
     try {
       const result = await GitService.Synchronize(
         rootPath,
+        settings?.AutomaticCommit ?? false,
         settings?.AutomaticPull ?? true,
         settings?.AutomaticPush ?? true,
       );
@@ -108,7 +112,9 @@ export class GitSync {
           this.state.set('synced');
           this.lastSync.set(new Date());
           this.clock.set(Date.now());
-          this.message.set(describeResult(result.Pulled, result.Pushed));
+          this.message.set(
+            result.Reason || describeResult(result.Committed, result.Pulled, result.Pushed),
+          );
       }
       if (result.Pulled) {
         notifyCollectionsChanged();
@@ -152,7 +158,19 @@ function relativeTime(date: Date | null, now: number): string {
   return `${Math.floor(minutes / 60)} h`;
 }
 
-function describeResult(pulled: boolean, pushed: boolean): string {
+function describeResult(committed: boolean, pulled: boolean, pushed: boolean): string {
+  if (committed && pulled && pushed) {
+    return 'Committed your changes, pulled the team changes and pushed yours.';
+  }
+  if (committed && pulled) {
+    return 'Committed your changes and pulled the team changes.';
+  }
+  if (committed && pushed) {
+    return 'Committed and pushed your changes.';
+  }
+  if (committed) {
+    return 'Committed your changes.';
+  }
   if (pulled && pushed) {
     return 'Pulled the team changes and pushed yours.';
   }

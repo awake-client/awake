@@ -403,6 +403,7 @@ export class GitPanel {
   protected async updateSync(changes: {
     Remote?: string;
     Branch?: string;
+    AutomaticCommit?: boolean;
     AutomaticPull?: boolean;
     AutomaticPush?: boolean;
     SynchronizationInterval?: string;
@@ -416,6 +417,7 @@ export class GitPanel {
       const configuration = await WorkspaceService.UpdateGit(rootPath, {
         Remote: current?.Remote ?? '',
         Branch: current?.Branch ?? '',
+        AutomaticCommit: current?.AutomaticCommit ?? false,
         AutomaticPull: current?.AutomaticPull ?? false,
         AutomaticPush: current?.AutomaticPush ?? false,
         SynchronizationInterval: current?.SynchronizationInterval || '5m',
