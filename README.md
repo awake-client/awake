@@ -65,6 +65,13 @@ wails3 task package # create the platform package
 
 - [File format](docs/file-format.md)
 - [Architecture and conventions](docs/conventions.md)
+- [Changelog](CHANGELOG.md)
+
+## Contributing
+
+Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md), the
+[Code of Conduct](CODE_OF_CONDUCT.md), and [SECURITY.md](SECURITY.md) for
+reporting vulnerabilities.
 
 ## License
 
