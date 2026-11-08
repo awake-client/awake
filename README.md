@@ -8,7 +8,7 @@ A git-native API client for macOS, Linux and Windows. Collections, requests and
 environments are plain YAML files in a git repository, so a team collaborates
 through git instead of a cloud account.
 
-![The request editor, collection tree and a JSON response in Awake](docs/screenshot.png)
+![The request editor, collection tree and a JSON response in Awake](docs/screenshot-light-iss.png)
 
 ## Features
 
