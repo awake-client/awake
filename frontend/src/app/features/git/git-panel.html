@@ -92,8 +92,75 @@
             <app-icon name="refresh" [size]="14" [class.spinning]="busy() === 'sync'" />
             {{ busy() === 'sync' ? 'Syncing…' : 'Sync' }}
           </button>
+        } @else if (hasRemote()) {
+          <button
+            type="button"
+            class="btn btn-primary"
+            [disabled]="busy() !== null || conflicts().length > 0"
+            title="Publish this branch and its commits"
+            (click)="push()"
+          >
+            <app-icon name="upload" [size]="14" />
+            {{ busy() === 'push' ? 'Pushing…' : 'Push' }}
+          </button>
         }
       </div>
+    </section>
+
+    <!-- The remote the workspace publishes to, editable at any time. -->
+    <section class="remote-card">
+      <div class="remote-head">
+        <span class="remote-icon"><app-icon name="globe" [size]="16" /></span>
+        <div class="remote-text">
+          <p class="remote-label">Remote repository</p>
+          @if (remoteUrl(); as url) {
+            <p class="remote-url" [title]="url">{{ url }}</p>
+          } @else {
+            <p class="remote-url unlinked">Not linked yet</p>
+          }
+        </div>
+        @if (hasRemote() && !editingRemote()) {
+          <button type="button" class="btn btn-ghost btn-sm" (click)="editRemote()">
+            <app-icon name="pencil" [size]="14" />
+            Change
+          </button>
+        }
+      </div>
+
+      @if (!hasRemote() || editingRemote()) {
+        <div class="remote-form">
+          <input
+            class="input mono"
+            type="text"
+            [value]="remoteDraft()"
+            (input)="remoteDraft.set(inputValue($event))"
+            (keydown)="handleRemoteKeydown($event)"
+            placeholder="git@github.com:team/workspace.git"
+            aria-label="Remote repository URL"
+          />
+          <button
+            type="button"
+            class="btn btn-primary"
+            [disabled]="busy() !== null || remoteDraft().trim() === ''"
+            (click)="saveRemote()"
+          >
+            @if (busy() === 'remote') {
+              Saving…
+            } @else {
+              {{ hasRemote() ? 'Update remote' : 'Add origin' }}
+            }
+          </button>
+          @if (editingRemote()) {
+            <button type="button" class="btn btn-ghost btn-sm" (click)="cancelRemoteEdit()">
+              Cancel
+            </button>
+          }
+        </div>
+        <p class="hint">
+          Use the HTTPS or SSH URL of the repository your team shares. Push your commits to publish
+          this branch.
+        </p>
+      }
     </section>
 
     <div class="layout">
@@ -281,7 +348,7 @@
                 >
                   {{ busy() === 'commit' ? 'Committing…' : 'Commit' }}
                 </button>
-                @if (hasUpstream()) {
+                @if (hasRemote()) {
                   <button
                     type="button"
                     class="btn btn-primary"

@@ -99,7 +99,40 @@ func (service *Service) Pull(workspaceRoot string) (PullResult, error) {
 	return client.Pull(requestContext)
 }
 
-// Push publishes the current branch.
+// RemoteURL returns the URL of the repository's origin remote, or an empty
+// string when the workspace has not been linked to one yet.
+func (service *Service) RemoteURL(workspaceRoot string) (string, error) {
+	requestContext, cancel := contextForOperation()
+	defer cancel()
+
+	client, err := Open(requestContext, workspaceRoot)
+	if err != nil {
+		return "", err
+	}
+
+	return client.RemoteURL(requestContext, "origin")
+}
+
+// SetRemote links the repository to a remote, stored as origin. An existing
+// origin is moved to the new URL.
+func (service *Service) SetRemote(workspaceRoot string, url string) error {
+	url = strings.TrimSpace(url)
+	if url == "" {
+		return fmt.Errorf("git: remote URL is required")
+	}
+
+	requestContext, cancel := contextForOperation()
+	defer cancel()
+
+	client, err := Open(requestContext, workspaceRoot)
+	if err != nil {
+		return err
+	}
+
+	return client.SetRemoteURL(requestContext, "origin", url)
+}
+
+// Push publishes the current branch, setting its upstream on the first push.
 func (service *Service) Push(workspaceRoot string) error {
 	requestContext, cancel := contextForOperation()
 	defer cancel()
@@ -107,6 +140,14 @@ func (service *Service) Push(workspaceRoot string) error {
 	client, err := Open(requestContext, workspaceRoot)
 	if err != nil {
 		return err
+	}
+
+	remote, err := client.RemoteURL(requestContext, "origin")
+	if err != nil {
+		return err
+	}
+	if remote == "" {
+		return fmt.Errorf("git: no remote repository is configured; add one in the Git tab first")
 	}
 
 	return client.Push(requestContext)

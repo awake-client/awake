@@ -57,10 +57,18 @@ export function Pull(workspaceRoot: string): $CancellablePromise<$models.PullRes
 }
 
 /**
- * Push publishes the current branch.
+ * Push publishes the current branch, setting its upstream on the first push.
  */
 export function Push(workspaceRoot: string): $CancellablePromise<void> {
     return $Call.ByID(4962509, workspaceRoot);
+}
+
+/**
+ * RemoteURL returns the URL of the repository's origin remote, or an empty
+ * string when the workspace has not been linked to one yet.
+ */
+export function RemoteURL(workspaceRoot: string): $CancellablePromise<string> {
+    return $Call.ByID(1919248500, workspaceRoot);
 }
 
 /**
@@ -68,6 +76,14 @@ export function Push(workspaceRoot: string): $CancellablePromise<void> {
  */
 export function ResolveWith(workspaceRoot: string, path: string, content: string): $CancellablePromise<void> {
     return $Call.ByID(2829661019, workspaceRoot, path, content);
+}
+
+/**
+ * SetRemote links the repository to a remote, stored as origin. An existing
+ * origin is moved to the new URL.
+ */
+export function SetRemote(workspaceRoot: string, url: string): $CancellablePromise<void> {
+    return $Call.ByID(1132744185, workspaceRoot, url);
 }
 
 /**

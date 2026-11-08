@@ -1,6 +1,9 @@
 package git
 
-import "testing"
+import (
+	"context"
+	"testing"
+)
 
 func TestResolveWithinRootRejectsPathTraversal(t *testing.T) {
 	for _, path := range []string{"../outside.yaml", "collections/../../outside.yaml"} {
@@ -27,5 +30,21 @@ func TestCommitRequiresMessage(t *testing.T) {
 
 	if _, err := service.Commit(t.TempDir(), "   "); err == nil {
 		t.Fatal("expected an error for an empty message")
+	}
+}
+
+func TestSetRemoteRequiresURL(t *testing.T) {
+	if err := NewService().SetRemote(t.TempDir(), "   "); err == nil {
+		t.Fatal("expected an error for an empty remote URL")
+	}
+}
+
+func TestPushRequiresRemote(t *testing.T) {
+	initializeTestEnvironment(t)
+
+	repository := initializeTestRepository(t, context.Background())
+
+	if err := NewService().Push(repository); err == nil {
+		t.Fatal("expected an error when the repository has no remote")
 	}
 }

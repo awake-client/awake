@@ -168,6 +168,71 @@ h1 {
   }
 }
 
+/* Remote -------------------------------------------------------------------- */
+
+.remote-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 18px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+}
+
+.remote-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.remote-icon {
+  display: inline-flex;
+  padding: 7px;
+  border-radius: var(--radius-md);
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+}
+
+.remote-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.remote-label {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-text-strong);
+}
+
+.remote-url {
+  margin: 2px 0 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.remote-url.unlinked {
+  font-family: inherit;
+  font-style: italic;
+  color: var(--color-text-subtle);
+}
+
+.remote-form {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.remote-form .input {
+  flex: 1;
+  min-width: 0;
+}
+
 /* Layout -------------------------------------------------------------------- */
 
 .layout {
@@ -476,6 +541,10 @@ h1 {
 
   .versions {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .remote-form {
+    flex-wrap: wrap;
   }
 }
 

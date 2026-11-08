@@ -56,6 +56,11 @@ export class GitPanel {
   protected readonly conflictVersions = signal<ConflictVersions | null>(null);
   protected readonly isLoadingConflict = signal(false);
 
+  /** The origin remote, its draft while editing, and whether the form is open. */
+  protected readonly remoteUrl = signal('');
+  protected readonly remoteDraft = signal('');
+  protected readonly editingRemote = signal(false);
+
   /** Claude Code, used to propose the resolution of a conflict. */
   protected readonly claudeInstalled = signal(false);
   protected readonly isSuggesting = signal(false);
@@ -72,6 +77,7 @@ export class GitPanel {
   protected readonly ahead = computed(() => this.status()?.Ahead ?? 0);
   protected readonly behind = computed(() => this.status()?.Behind ?? 0);
   protected readonly hasUpstream = computed(() => !!this.status()?.Upstream);
+  protected readonly hasRemote = computed(() => this.remoteUrl() !== '');
 
   /** One sentence telling where the branch stands. */
   protected readonly summary = computed(() => {
@@ -83,7 +89,9 @@ export class GitPanel {
       return `${plural(this.conflicts().length, 'conflict')} to resolve before syncing`;
     }
     if (!status.Upstream) {
-      return 'This branch is not published to a remote yet';
+      return this.hasRemote()
+        ? 'This branch is not published to the remote yet'
+        : 'This branch is not linked to a remote yet';
     }
     const parts: string[] = [];
     if (status.Ahead > 0) {
@@ -153,6 +161,13 @@ export class GitPanel {
       this.isRepository.set(isRepository);
       if (isRepository) {
         this.status.set(await GitService.Status(workspaceRoot));
+        const remote = await GitService.RemoteURL(workspaceRoot);
+        this.remoteUrl.set(remote);
+        if (remote !== '' && !this.editingRemote()) {
+          this.remoteDraft.set(remote);
+        }
+      } else {
+        this.remoteUrl.set('');
       }
     } catch (error) {
       this.errorMessage.set(describeError(error));
@@ -202,10 +217,49 @@ export class GitPanel {
   }
 
   protected async push(): Promise<void> {
+    const published = this.hasUpstream();
     await this.run('push', async (workspaceRoot) => {
       await GitService.Push(workspaceRoot);
-      return 'Pushed your commits.';
+      return published ? 'Pushed your commits.' : 'Published the branch to the remote.';
     });
+  }
+
+  /** Makes the remote URL editable, prefilled with the current one. */
+  protected editRemote(): void {
+    this.remoteDraft.set(this.remoteUrl());
+    this.editingRemote.set(true);
+  }
+
+  protected cancelRemoteEdit(): void {
+    this.remoteDraft.set(this.remoteUrl());
+    this.editingRemote.set(false);
+  }
+
+  /** Links the repository to its origin remote, or moves an existing one. */
+  protected async saveRemote(): Promise<void> {
+    const url = this.remoteDraft().trim();
+    if (url === '') {
+      this.errorMessage.set('Enter the URL of the remote repository.');
+      return;
+    }
+    const replacing = this.hasRemote();
+    const done = await this.run('remote', async (workspaceRoot) => {
+      await GitService.SetRemote(workspaceRoot, url);
+      await this.updateSync({ Remote: 'origin', Branch: this.status()?.Branch || 'main' });
+      return replacing
+        ? 'Remote updated.'
+        : 'Remote origin added. Push your commits to publish the branch.';
+    });
+    if (done) {
+      this.editingRemote.set(false);
+    }
+  }
+
+  protected handleRemoteKeydown(event: KeyboardEvent): void {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      void this.saveRemote();
+    }
   }
 
   protected async commit(andPush: boolean): Promise<void> {
@@ -216,7 +270,7 @@ export class GitPanel {
     }
     const done = await this.run(andPush ? 'commit-push' : 'commit', async (workspaceRoot) => {
       const hash = await GitService.Commit(workspaceRoot, message);
-      if (andPush && this.hasUpstream()) {
+      if (andPush && this.hasRemote()) {
         await GitService.Push(workspaceRoot);
         return `Committed ${hash.slice(0, 7)} and pushed.`;
       }
@@ -345,6 +399,8 @@ export class GitPanel {
 
   /** Saves a synchronization setting as soon as it changes. */
   protected async updateSync(changes: {
+    Remote?: string;
+    Branch?: string;
     AutomaticPull?: boolean;
     AutomaticPush?: boolean;
     SynchronizationInterval?: string;

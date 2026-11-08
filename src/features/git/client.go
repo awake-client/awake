@@ -113,9 +113,45 @@ func (client *Client) Pull(ctx context.Context) (PullResult, error) {
 	return result, nil
 }
 
-// Push publishes the current branch to its upstream.
+// RemoteURL returns the URL of the named remote, or an empty string when the
+// repository has no such remote.
+func (client *Client) RemoteURL(ctx context.Context, name string) (string, error) {
+	output, err := client.run(ctx, "remote", "get-url", name)
+	if err != nil {
+		// Git reports a missing remote as an error, but for the caller it only
+		// means the workspace is not linked to a remote yet.
+		return "", nil
+	}
+
+	return strings.TrimSpace(string(output)), nil
+}
+
+// SetRemoteURL adds the named remote, or updates its URL when it already
+// exists, so the same call covers both linking and moving a repository.
+func (client *Client) SetRemoteURL(ctx context.Context, name string, url string) error {
+	if _, err := client.run(ctx, "remote", "get-url", name); err == nil {
+		_, err := client.run(ctx, "remote", "set-url", name, url)
+		return err
+	}
+
+	_, err := client.run(ctx, "remote", "add", name, url)
+	return err
+}
+
+// Push publishes the current branch. The first push of an unpublished branch
+// sets its upstream, so a freshly linked remote needs no extra command.
 func (client *Client) Push(ctx context.Context) error {
-	_, err := client.run(ctx, "push")
+	status, err := client.Status(ctx)
+	if err != nil {
+		return err
+	}
+
+	if status.Upstream == "" && status.Branch != "" {
+		_, err := client.run(ctx, "push", "--set-upstream", "origin", status.Branch)
+		return err
+	}
+
+	_, err = client.run(ctx, "push")
 	return err
 }
 
