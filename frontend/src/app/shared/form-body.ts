@@ -2,7 +2,7 @@ import {
   Body,
   BodyType,
   Parameter,
-} from '@bindings/github.com/clementherve/awake/src/domain/models';
+} from '@bindings/github.com/awake-client/awake/src/domain/models';
 
 /** A body that sends nothing. */
 export function emptyBody(): Body {

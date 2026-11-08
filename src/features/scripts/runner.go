@@ -14,7 +14,7 @@ import (
 
 	"github.com/dop251/goja"
 
-	"github.com/clementherve/awake/src/domain"
+	"github.com/awake-client/awake/src/domain"
 )
 
 const scriptTimeout = 5 * time.Second

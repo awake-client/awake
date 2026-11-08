@@ -1,13 +1,13 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
-import * as WorkspaceService from '@bindings/github.com/clementherve/awake/src/features/workspace/service';
-import * as UpdatesService from '@bindings/github.com/clementherve/awake/src/features/updates/service';
+import * as WorkspaceService from '@bindings/github.com/awake-client/awake/src/features/workspace/service';
+import * as UpdatesService from '@bindings/github.com/awake-client/awake/src/features/updates/service';
 import {
   Configuration,
   CreateOptions,
   Mode,
-} from '@bindings/github.com/clementherve/awake/src/features/workspace/models';
+} from '@bindings/github.com/awake-client/awake/src/features/workspace/models';
 import { chooseDirectory } from '@core/dialogs';
 import { RecentWorkspace, WorkspaceStore } from '@core/workspace-store';
 import { Icon } from '@shared/icon';

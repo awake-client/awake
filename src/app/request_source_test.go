@@ -5,8 +5,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/clementherve/awake/src/features/workspace"
-	"github.com/clementherve/awake/src/shared/variables"
+	"github.com/awake-client/awake/src/features/workspace"
+	"github.com/awake-client/awake/src/shared/variables"
 )
 
 func TestLoadVariableLayersInheritsFromGlobalEnvironment(t *testing.T) {

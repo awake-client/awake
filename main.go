@@ -4,7 +4,7 @@ import (
 	"embed"
 	"log"
 
-	"github.com/clementherve/awake/src/app"
+	"github.com/awake-client/awake/src/app"
 )
 
 // The frontend build output is embedded into the binary so the application

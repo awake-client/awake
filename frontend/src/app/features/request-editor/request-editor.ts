@@ -11,15 +11,15 @@ import {
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
-import * as CollectionsService from '@bindings/github.com/clementherve/awake/src/features/collections/service';
-import * as HistoryService from '@bindings/github.com/clementherve/awake/src/features/history/service';
-import * as HTTPClientService from '@bindings/github.com/clementherve/awake/src/features/httpclient/service';
+import * as CollectionsService from '@bindings/github.com/awake-client/awake/src/features/collections/service';
+import * as HistoryService from '@bindings/github.com/awake-client/awake/src/features/history/service';
+import * as HTTPClientService from '@bindings/github.com/awake-client/awake/src/features/httpclient/service';
 import {
   Chunk,
   Response as HTTPResponse,
-} from '@bindings/github.com/clementherve/awake/src/features/httpclient/models';
-import * as OAuth2Service from '@bindings/github.com/clementherve/awake/src/features/oauth2/service';
-import { Status as OAuth2Status } from '@bindings/github.com/clementherve/awake/src/features/oauth2/models';
+} from '@bindings/github.com/awake-client/awake/src/features/httpclient/models';
+import * as OAuth2Service from '@bindings/github.com/awake-client/awake/src/features/oauth2/service';
+import { Status as OAuth2Status } from '@bindings/github.com/awake-client/awake/src/features/oauth2/models';
 import {
   Authentication,
   AuthenticationType,
@@ -33,7 +33,7 @@ import {
   Protocol,
   Request,
   ScriptOutcome,
-} from '@bindings/github.com/clementherve/awake/src/domain/models';
+} from '@bindings/github.com/awake-client/awake/src/domain/models';
 import { EnvironmentStore } from '@core/environment-store';
 import {
   COLLECTIONS_CHANGED_EVENT,

@@ -6,7 +6,7 @@ import {
   Header,
   OAuth2GrantType,
   Protocol,
-} from '@bindings/github.com/clementherve/awake/src/domain/models';
+} from '@bindings/github.com/awake-client/awake/src/domain/models';
 import { isFormBody, parseFormContent } from '@shared/form-body';
 
 /** What the smart request field recognised in the text typed or pasted. */

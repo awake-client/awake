@@ -5,7 +5,7 @@ package interop
 import (
 	"errors"
 
-	"github.com/clementherve/awake/src/domain"
+	"github.com/awake-client/awake/src/domain"
 )
 
 // Format identifies an interchange document format.

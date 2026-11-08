@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/clementherve/awake/src/domain"
+	"github.com/awake-client/awake/src/domain"
 )
 
 type postmanCollection struct {

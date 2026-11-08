@@ -1,19 +1,19 @@
 package app
 
 import (
-	"github.com/clementherve/awake/src/features/assistant"
-	"github.com/clementherve/awake/src/features/collections"
-	"github.com/clementherve/awake/src/features/environments"
-	"github.com/clementherve/awake/src/features/git"
-	"github.com/clementherve/awake/src/features/history"
-	"github.com/clementherve/awake/src/features/httpclient"
-	"github.com/clementherve/awake/src/features/interop"
-	"github.com/clementherve/awake/src/features/oauth2"
-	"github.com/clementherve/awake/src/features/platform"
-	"github.com/clementherve/awake/src/features/scripts"
-	"github.com/clementherve/awake/src/features/secrets"
-	"github.com/clementherve/awake/src/features/updates"
-	"github.com/clementherve/awake/src/features/workspace"
+	"github.com/awake-client/awake/src/features/assistant"
+	"github.com/awake-client/awake/src/features/collections"
+	"github.com/awake-client/awake/src/features/environments"
+	"github.com/awake-client/awake/src/features/git"
+	"github.com/awake-client/awake/src/features/history"
+	"github.com/awake-client/awake/src/features/httpclient"
+	"github.com/awake-client/awake/src/features/interop"
+	"github.com/awake-client/awake/src/features/oauth2"
+	"github.com/awake-client/awake/src/features/platform"
+	"github.com/awake-client/awake/src/features/scripts"
+	"github.com/awake-client/awake/src/features/secrets"
+	"github.com/awake-client/awake/src/features/updates"
+	"github.com/awake-client/awake/src/features/workspace"
 )
 
 // services holds the feature services exposed to the frontend. Dependencies are

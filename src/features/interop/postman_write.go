@@ -5,7 +5,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/clementherve/awake/src/domain"
+	"github.com/awake-client/awake/src/domain"
 )
 
 // WritePostman renders collections as a Postman collection, version 2.1. Each

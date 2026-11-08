@@ -136,7 +136,7 @@ jobs:
         run: |
           set -euo pipefail
           version="${VERSION#v}"
-          ldflags="-s -w -X github.com/clementherve/awake/src/features/updates.Version=${version}"
+          ldflags="-s -w -X github.com/awake-client/awake/src/features/updates.Version=${version}"
           if [ "${{ matrix.goos }}" = "windows" ]; then
             ldflags="${ldflags} -H windowsgui"
           fi

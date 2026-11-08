@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/clementherve/awake/src/domain"
-	"github.com/clementherve/awake/src/shared/variables"
+	"github.com/awake-client/awake/src/domain"
+	"github.com/awake-client/awake/src/shared/variables"
 )
 
 // configuration is the resolved OAuth 2 settings of one request.

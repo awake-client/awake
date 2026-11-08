@@ -2,7 +2,7 @@ import { DestroyRef, Injectable, computed, effect, inject, signal } from '@angul
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { NavigationEnd, Router } from '@angular/router';
 import { filter } from 'rxjs';
-import * as HTTPClientService from '@bindings/github.com/clementherve/awake/src/features/httpclient/service';
+import * as HTTPClientService from '@bindings/github.com/awake-client/awake/src/features/httpclient/service';
 import { COLLECTIONS_CHANGED_EVENT, CollectionsChange } from './collection-events';
 import { WorkspaceStore } from './workspace-store';
 

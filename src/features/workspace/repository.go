@@ -11,8 +11,8 @@ import (
 
 	"go.yaml.in/yaml/v3"
 
-	"github.com/clementherve/awake/src/shared/files"
-	"github.com/clementherve/awake/src/shared/yamlcodec"
+	"github.com/awake-client/awake/src/shared/files"
+	"github.com/awake-client/awake/src/shared/yamlcodec"
 )
 
 const (

@@ -4,7 +4,7 @@ import {
   Authentication,
   AuthenticationType,
   OAuth2GrantType,
-} from '@bindings/github.com/clementherve/awake/src/domain/models';
+} from '@bindings/github.com/awake-client/awake/src/domain/models';
 import { Icon, IconName } from './icon';
 import { SecretInput } from './secret-input';
 import { VariableInput } from './variable-input';

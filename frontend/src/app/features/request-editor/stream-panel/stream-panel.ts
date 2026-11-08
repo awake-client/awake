@@ -9,12 +9,12 @@ import {
   viewChild,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import * as HTTPClientService from '@bindings/github.com/clementherve/awake/src/features/httpclient/service';
+import * as HTTPClientService from '@bindings/github.com/awake-client/awake/src/features/httpclient/service';
 import {
   Stream,
   StreamEvent,
-} from '@bindings/github.com/clementherve/awake/src/features/httpclient/models';
-import { Protocol } from '@bindings/github.com/clementherve/awake/src/domain/models';
+} from '@bindings/github.com/awake-client/awake/src/features/httpclient/models';
+import { Protocol } from '@bindings/github.com/awake-client/awake/src/domain/models';
 import { WorkspaceStore } from '@core/workspace-store';
 
 const POLL_INTERVAL_MILLISECONDS = 250;

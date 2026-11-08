@@ -1,5 +1,5 @@
 import { Events, Window } from '@wailsio/runtime';
-import * as PlatformService from '@bindings/github.com/clementherve/awake/src/features/platform/service';
+import * as PlatformService from '@bindings/github.com/awake-client/awake/src/features/platform/service';
 
 const fullscreenEvent = 'common:WindowFullscreen';
 const unfullscreenEvent = 'common:WindowUnFullscreen';

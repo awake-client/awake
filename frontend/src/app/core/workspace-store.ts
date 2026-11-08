@@ -1,5 +1,5 @@
 import { Injectable, computed, signal } from '@angular/core';
-import { Configuration } from '@bindings/github.com/clementherve/awake/src/features/workspace/models';
+import { Configuration } from '@bindings/github.com/awake-client/awake/src/features/workspace/models';
 
 const STORAGE_KEY = 'awake.workspace';
 const RECENT_KEY = 'awake.recentWorkspaces';

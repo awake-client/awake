@@ -6,7 +6,7 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/clementherve/awake/src/domain"
+	"github.com/awake-client/awake/src/domain"
 )
 
 // historyBodyLimit caps the request body kept in the history, like the

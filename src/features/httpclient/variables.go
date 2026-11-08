@@ -3,7 +3,7 @@ package httpclient
 import (
 	"sort"
 
-	"github.com/clementherve/awake/src/shared/variables"
+	"github.com/awake-client/awake/src/shared/variables"
 )
 
 // DynamicVariable describes a {{$name}} placeholder generated at send time.

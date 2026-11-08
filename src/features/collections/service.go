@@ -1,6 +1,6 @@
 package collections
 
-import "github.com/clementherve/awake/src/domain"
+import "github.com/awake-client/awake/src/domain"
 
 // Service exposes collection operations to the application layer.
 type Service struct{}

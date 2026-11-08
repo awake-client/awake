@@ -6,7 +6,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/clementherve/awake/src/domain"
+	"github.com/awake-client/awake/src/domain"
 )
 
 // ReadOpenAPI parses an OpenAPI 3 or Swagger 2 document. Both YAML and JSON are

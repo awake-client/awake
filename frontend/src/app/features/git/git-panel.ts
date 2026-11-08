@@ -1,12 +1,12 @@
 import { Component, computed, effect, inject, signal } from '@angular/core';
-import * as GitService from '@bindings/github.com/clementherve/awake/src/features/git/service';
+import * as GitService from '@bindings/github.com/awake-client/awake/src/features/git/service';
 import {
   Change,
   ConflictVersions,
   Status,
-} from '@bindings/github.com/clementherve/awake/src/features/git/models';
-import * as AssistantService from '@bindings/github.com/clementherve/awake/src/features/assistant/service';
-import * as WorkspaceService from '@bindings/github.com/clementherve/awake/src/features/workspace/service';
+} from '@bindings/github.com/awake-client/awake/src/features/git/models';
+import * as AssistantService from '@bindings/github.com/awake-client/awake/src/features/assistant/service';
+import * as WorkspaceService from '@bindings/github.com/awake-client/awake/src/features/workspace/service';
 import { notifyCollectionsChanged } from '@core/collection-events';
 import { GitSync } from '@core/git-sync';
 import { Shortcuts } from '@core/shortcuts';

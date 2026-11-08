@@ -6,7 +6,7 @@ import (
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"github.com/wailsapp/wails/v3/pkg/updater"
 
-	"github.com/clementherve/awake/src/features/updates"
+	"github.com/awake-client/awake/src/features/updates"
 )
 
 const updateRepository = "awake-client/awake"

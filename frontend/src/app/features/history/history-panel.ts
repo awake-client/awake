@@ -1,7 +1,7 @@
 import { Component, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
-import * as HistoryService from '@bindings/github.com/clementherve/awake/src/features/history/service';
-import { HistoryEntry } from '@bindings/github.com/clementherve/awake/src/domain/models';
+import * as HistoryService from '@bindings/github.com/awake-client/awake/src/features/history/service';
+import { HistoryEntry } from '@bindings/github.com/awake-client/awake/src/domain/models';
 import { WorkspaceStore } from '@core/workspace-store';
 import { Icon } from '@shared/icon';
 

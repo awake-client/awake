@@ -6,9 +6,9 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/clementherve/awake/src/domain"
-	"github.com/clementherve/awake/src/features/environments"
-	"github.com/clementherve/awake/src/features/secrets"
+	"github.com/awake-client/awake/src/domain"
+	"github.com/awake-client/awake/src/features/environments"
+	"github.com/awake-client/awake/src/features/secrets"
 )
 
 // environmentWriter saves the variables scripts store with awake.environment.

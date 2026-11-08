@@ -1,9 +1,9 @@
 import { Component, DestroyRef, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
-import * as EnvironmentsService from '@bindings/github.com/clementherve/awake/src/features/environments/service';
-import { Summary } from '@bindings/github.com/clementherve/awake/src/features/environments/models';
-import * as CollectionsService from '@bindings/github.com/clementherve/awake/src/features/collections/service';
+import * as EnvironmentsService from '@bindings/github.com/awake-client/awake/src/features/environments/service';
+import { Summary } from '@bindings/github.com/awake-client/awake/src/features/environments/models';
+import * as CollectionsService from '@bindings/github.com/awake-client/awake/src/features/collections/service';
 import { requestEntryCreation } from '@core/collection-events';
 import { WorkspaceStore } from '@core/workspace-store';
 import { Icon } from '@shared/icon';

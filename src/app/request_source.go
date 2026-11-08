@@ -3,12 +3,12 @@ package app
 import (
 	"errors"
 
-	"github.com/clementherve/awake/src/domain"
-	"github.com/clementherve/awake/src/features/collections"
-	"github.com/clementherve/awake/src/features/environments"
-	"github.com/clementherve/awake/src/features/secrets"
-	"github.com/clementherve/awake/src/features/workspace"
-	"github.com/clementherve/awake/src/shared/variables"
+	"github.com/awake-client/awake/src/domain"
+	"github.com/awake-client/awake/src/features/collections"
+	"github.com/awake-client/awake/src/features/environments"
+	"github.com/awake-client/awake/src/features/secrets"
+	"github.com/awake-client/awake/src/features/workspace"
+	"github.com/awake-client/awake/src/shared/variables"
 )
 
 // requestSource adapts the storage features to the HTTP client. It lives in

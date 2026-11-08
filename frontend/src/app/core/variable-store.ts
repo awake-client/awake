@@ -1,5 +1,5 @@
 import { DestroyRef, Injectable, computed, effect, inject, signal } from '@angular/core';
-import * as HTTPClientService from '@bindings/github.com/clementherve/awake/src/features/httpclient/service';
+import * as HTTPClientService from '@bindings/github.com/awake-client/awake/src/features/httpclient/service';
 import { COLLECTIONS_CHANGED_EVENT } from './collection-events';
 import { EnvironmentStore } from './environment-store';
 import { TabsStore } from './tabs-store';

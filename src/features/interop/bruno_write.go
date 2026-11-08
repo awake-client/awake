@@ -8,7 +8,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/clementherve/awake/src/domain"
+	"github.com/awake-client/awake/src/domain"
 )
 
 // WriteBrunoDirectory writes each collection as a Bruno collection directory

@@ -2,9 +2,9 @@ import { Component, DestroyRef, computed, effect, inject, signal, viewChild } fr
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { filter } from 'rxjs';
-import { ScopedSummary } from '@bindings/github.com/clementherve/awake/src/features/environments/models';
-import * as EnvironmentsService from '@bindings/github.com/clementherve/awake/src/features/environments/service';
-import * as UpdatesService from '@bindings/github.com/clementherve/awake/src/features/updates/service';
+import { ScopedSummary } from '@bindings/github.com/awake-client/awake/src/features/environments/models';
+import * as EnvironmentsService from '@bindings/github.com/awake-client/awake/src/features/environments/service';
+import * as UpdatesService from '@bindings/github.com/awake-client/awake/src/features/updates/service';
 import { EnvironmentEditing } from '@core/environment-editing';
 import { EnvironmentStore } from '@core/environment-store';
 import { EnvironmentDialog } from '../environments/environment-dialog';

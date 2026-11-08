@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/clementherve/awake/src/domain"
+	"github.com/awake-client/awake/src/domain"
 )
 
 func TestBeforeRequestMutatesRequestAndVariables(t *testing.T) {

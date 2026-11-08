@@ -1,4 +1,4 @@
-module github.com/clementherve/awake
+module github.com/awake-client/awake
 
 go 1.26.0
 

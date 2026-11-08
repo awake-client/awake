@@ -1,9 +1,9 @@
 import { Component, computed, inject, signal } from '@angular/core';
-import * as InteropService from '@bindings/github.com/clementherve/awake/src/features/interop/service';
+import * as InteropService from '@bindings/github.com/awake-client/awake/src/features/interop/service';
 import {
   ExportOptions,
   Format,
-} from '@bindings/github.com/clementherve/awake/src/features/interop/models';
+} from '@bindings/github.com/awake-client/awake/src/features/interop/models';
 import { notifyCollectionsChanged } from '@core/collection-events';
 import { chooseDirectory, chooseFile, chooseSaveFile } from '@core/dialogs';
 import { WorkspaceStore } from '@core/workspace-store';

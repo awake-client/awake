@@ -1,4 +1,4 @@
-import { Parameter } from '@bindings/github.com/clementherve/awake/src/domain/models';
+import { Parameter } from '@bindings/github.com/awake-client/awake/src/domain/models';
 
 /** A query value written as a whole :name placeholder, kept in the URL. */
 const PLACEHOLDER_VALUE = /^:[A-Za-z_][A-Za-z0-9_]*$/;

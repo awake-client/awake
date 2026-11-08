@@ -1,10 +1,10 @@
 import { Component, ElementRef, computed, effect, inject, signal, viewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import * as AssistantService from '@bindings/github.com/clementherve/awake/src/features/assistant/service';
+import * as AssistantService from '@bindings/github.com/awake-client/awake/src/features/assistant/service';
 import {
   AgentStatus,
   ChatMessage,
-} from '@bindings/github.com/clementherve/awake/src/features/assistant/models';
+} from '@bindings/github.com/awake-client/awake/src/features/assistant/models';
 import { notifyCollectionsChanged } from '@core/collection-events';
 import { WorkspaceStore } from '@core/workspace-store';
 import { Icon, IconName } from '@shared/icon';

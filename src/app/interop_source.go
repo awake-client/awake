@@ -5,10 +5,10 @@ import (
 	"os"
 	"strings"
 
-	"github.com/clementherve/awake/src/domain"
-	"github.com/clementherve/awake/src/features/collections"
-	"github.com/clementherve/awake/src/features/environments"
-	"github.com/clementherve/awake/src/features/interop"
+	"github.com/awake-client/awake/src/domain"
+	"github.com/awake-client/awake/src/features/collections"
+	"github.com/awake-client/awake/src/features/environments"
+	"github.com/awake-client/awake/src/features/interop"
 )
 
 // interopAdapter connects the interop feature to collection files. It lives in

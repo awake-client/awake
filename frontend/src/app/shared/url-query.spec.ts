@@ -1,4 +1,4 @@
-import { Parameter } from '@bindings/github.com/clementherve/awake/src/domain/models';
+import { Parameter } from '@bindings/github.com/awake-client/awake/src/domain/models';
 import { composeUrlQuery, mergeUrlParameters, parseUrlQuery, singleLineUrl } from './url-query';
 
 function parameter(Name: string, Value: string, Enabled = true): Parameter {

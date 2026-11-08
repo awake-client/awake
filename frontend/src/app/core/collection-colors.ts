@@ -1,5 +1,5 @@
 import { Injectable, effect, inject, signal } from '@angular/core';
-import * as CollectionsService from '@bindings/github.com/clementherve/awake/src/features/collections/service';
+import * as CollectionsService from '@bindings/github.com/awake-client/awake/src/features/collections/service';
 import { COLLECTIONS_CHANGED_EVENT } from './collection-events';
 import { WorkspaceStore } from './workspace-store';
 

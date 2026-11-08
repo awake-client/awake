@@ -3,8 +3,8 @@ package oauth2
 import (
 	"net/http"
 
-	"github.com/clementherve/awake/src/domain"
-	"github.com/clementherve/awake/src/shared/variables"
+	"github.com/awake-client/awake/src/domain"
+	"github.com/awake-client/awake/src/shared/variables"
 )
 
 // Source supplies the request and its variable layers to the authorization

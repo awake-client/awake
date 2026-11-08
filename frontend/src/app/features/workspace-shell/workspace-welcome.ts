@@ -1,10 +1,10 @@
 import { Component, DestroyRef, computed, effect, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import * as CollectionsService from '@bindings/github.com/clementherve/awake/src/features/collections/service';
-import { Entry } from '@bindings/github.com/clementherve/awake/src/features/collections/models';
-import * as WorkspaceService from '@bindings/github.com/clementherve/awake/src/features/workspace/service';
-import * as EnvironmentsService from '@bindings/github.com/clementherve/awake/src/features/environments/service';
-import { Summary } from '@bindings/github.com/clementherve/awake/src/features/environments/models';
+import * as CollectionsService from '@bindings/github.com/awake-client/awake/src/features/collections/service';
+import { Entry } from '@bindings/github.com/awake-client/awake/src/features/collections/models';
+import * as WorkspaceService from '@bindings/github.com/awake-client/awake/src/features/workspace/service';
+import * as EnvironmentsService from '@bindings/github.com/awake-client/awake/src/features/environments/service';
+import { Summary } from '@bindings/github.com/awake-client/awake/src/features/environments/models';
 import { WorkspaceStore } from '@core/workspace-store';
 import { requestEntryCreation } from '@core/collection-events';
 import { ColorPicker } from '@shared/color-picker';

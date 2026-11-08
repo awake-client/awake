@@ -2,7 +2,7 @@ import {
   AuthenticationType,
   BodyType,
   Protocol,
-} from '@bindings/github.com/clementherve/awake/src/domain/models';
+} from '@bindings/github.com/awake-client/awake/src/domain/models';
 import { parseRequestInput, tokenize } from './request-input';
 
 describe('parseRequestInput', () => {

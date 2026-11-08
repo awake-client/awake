@@ -3,7 +3,7 @@ package history
 import (
 	"testing"
 
-	"github.com/clementherve/awake/src/domain"
+	"github.com/awake-client/awake/src/domain"
 )
 
 func TestRecordStoresEntriesNewestFirst(t *testing.T) {

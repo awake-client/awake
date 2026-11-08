@@ -9,7 +9,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/clementherve/awake/src/domain"
+	"github.com/awake-client/awake/src/domain"
 )
 
 const (

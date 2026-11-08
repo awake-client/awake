@@ -1,4 +1,4 @@
-import { ScopedSummary } from '@bindings/github.com/clementherve/awake/src/features/environments/models';
+import { ScopedSummary } from '@bindings/github.com/awake-client/awake/src/features/environments/models';
 import { collectionScopeOf, visibleEnvironments } from './environment-scope';
 
 function summary(fileName: string, scope: string, local = false): ScopedSummary {

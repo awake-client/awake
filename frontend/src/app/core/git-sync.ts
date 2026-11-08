@@ -1,6 +1,6 @@
 import { DestroyRef, Injectable, computed, effect, inject, signal } from '@angular/core';
-import * as GitService from '@bindings/github.com/clementherve/awake/src/features/git/service';
-import { SyncOutcome } from '@bindings/github.com/clementherve/awake/src/features/git/models';
+import * as GitService from '@bindings/github.com/awake-client/awake/src/features/git/service';
+import { SyncOutcome } from '@bindings/github.com/awake-client/awake/src/features/git/models';
 import { notifyCollectionsChanged } from './collection-events';
 import { WorkspaceStore } from './workspace-store';
 

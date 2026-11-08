@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/clementherve/awake/src/domain"
-	"github.com/clementherve/awake/src/shared/files"
+	"github.com/awake-client/awake/src/domain"
+	"github.com/awake-client/awake/src/shared/files"
 )
 
 // Writer persists imported collections and requests. The application layer

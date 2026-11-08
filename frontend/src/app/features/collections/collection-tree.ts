@@ -3,12 +3,12 @@ import { Component, DestroyRef, effect, inject, input, output, signal } from '@a
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { NavigationEnd, Router } from '@angular/router';
 import { filter } from 'rxjs';
-import * as HistoryService from '@bindings/github.com/clementherve/awake/src/features/history/service';
-import * as CollectionsService from '@bindings/github.com/clementherve/awake/src/features/collections/service';
+import * as HistoryService from '@bindings/github.com/awake-client/awake/src/features/history/service';
+import * as CollectionsService from '@bindings/github.com/awake-client/awake/src/features/collections/service';
 import {
   Entry,
   Kind,
-} from '@bindings/github.com/clementherve/awake/src/features/collections/models';
+} from '@bindings/github.com/awake-client/awake/src/features/collections/models';
 import {
   COLLECTIONS_CHANGED_EVENT,
   CollectionsChange,

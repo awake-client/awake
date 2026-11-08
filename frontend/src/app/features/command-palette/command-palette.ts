@@ -1,8 +1,8 @@
 import { Component, ElementRef, computed, effect, inject, signal, viewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
-import * as CollectionsService from '@bindings/github.com/clementherve/awake/src/features/collections/service';
-import { Entry } from '@bindings/github.com/clementherve/awake/src/features/collections/models';
+import * as CollectionsService from '@bindings/github.com/awake-client/awake/src/features/collections/service';
+import { Entry } from '@bindings/github.com/awake-client/awake/src/features/collections/models';
 import { WorkspaceStore } from '@core/workspace-store';
 
 const RESULT_LIMIT = 500;

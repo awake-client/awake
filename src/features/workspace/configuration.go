@@ -3,7 +3,7 @@ package workspace
 import (
 	"time"
 
-	"github.com/clementherve/awake/src/domain"
+	"github.com/awake-client/awake/src/domain"
 )
 
 // SupportedVersion is the newest workspace format version this build can read.

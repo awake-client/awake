@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/clementherve/awake/src/domain"
-	"github.com/clementherve/awake/src/shared/variables"
+	"github.com/awake-client/awake/src/domain"
+	"github.com/awake-client/awake/src/shared/variables"
 )
 
 type fakeSource struct {

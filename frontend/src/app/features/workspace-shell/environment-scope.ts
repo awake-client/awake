@@ -1,4 +1,4 @@
-import { ScopedSummary } from '@bindings/github.com/clementherve/awake/src/features/environments/models';
+import { ScopedSummary } from '@bindings/github.com/awake-client/awake/src/features/environments/models';
 import { EnvironmentChoice } from './environment-picker';
 
 /** Routes showing a request or a collection, whose environments are offered. */

@@ -3,7 +3,7 @@ package interop
 import (
 	"testing"
 
-	"github.com/clementherve/awake/src/domain"
+	"github.com/awake-client/awake/src/domain"
 )
 
 func TestReadPostmanConvertsFoldersAndAuth(t *testing.T) {

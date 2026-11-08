@@ -9,10 +9,10 @@ import {
   untracked,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import * as EnvironmentsService from '@bindings/github.com/clementherve/awake/src/features/environments/service';
-import { Environment } from '@bindings/github.com/clementherve/awake/src/features/environments/models';
-import * as SecretsService from '@bindings/github.com/clementherve/awake/src/features/secrets/service';
-import { SecretState } from '@bindings/github.com/clementherve/awake/src/features/secrets/models';
+import * as EnvironmentsService from '@bindings/github.com/awake-client/awake/src/features/environments/service';
+import { Environment } from '@bindings/github.com/awake-client/awake/src/features/environments/models';
+import * as SecretsService from '@bindings/github.com/awake-client/awake/src/features/secrets/service';
+import { SecretState } from '@bindings/github.com/awake-client/awake/src/features/secrets/models';
 import { Confirmation } from '@core/confirmation';
 import { EnvironmentStore } from '@core/environment-store';
 import { Prompt } from '@core/prompt';

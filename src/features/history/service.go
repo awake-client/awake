@@ -13,7 +13,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/clementherve/awake/src/domain"
+	"github.com/awake-client/awake/src/domain"
 
 	_ "modernc.org/sqlite"
 )

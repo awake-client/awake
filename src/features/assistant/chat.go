@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/clementherve/awake/src/shared/files"
+	"github.com/awake-client/awake/src/shared/files"
 )
 
 const (

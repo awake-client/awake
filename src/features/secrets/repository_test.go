@@ -6,9 +6,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/clementherve/awake/src/features/workspace"
+	"github.com/awake-client/awake/src/features/workspace"
 
-	"github.com/clementherve/awake/src/features/environments"
+	"github.com/awake-client/awake/src/features/environments"
 )
 
 type fakeKeychain struct {

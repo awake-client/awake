@@ -10,13 +10,13 @@ import {
 import { FormsModule } from '@angular/forms';
 import { slugify } from '@shared/slug';
 import { Router } from '@angular/router';
-import * as EnvironmentsService from '@bindings/github.com/clementherve/awake/src/features/environments/service';
-import * as CollectionsService from '@bindings/github.com/clementherve/awake/src/features/collections/service';
+import * as EnvironmentsService from '@bindings/github.com/awake-client/awake/src/features/environments/service';
+import * as CollectionsService from '@bindings/github.com/awake-client/awake/src/features/collections/service';
 import {
   Entry,
   Kind,
-} from '@bindings/github.com/clementherve/awake/src/features/collections/models';
-import { Protocol, Request } from '@bindings/github.com/clementherve/awake/src/domain/models';
+} from '@bindings/github.com/awake-client/awake/src/features/collections/models';
+import { Protocol, Request } from '@bindings/github.com/awake-client/awake/src/domain/models';
 import {
   CREATE_ENTRY_EVENT,
   CreationKind,

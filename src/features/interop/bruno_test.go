@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/clementherve/awake/src/domain"
+	"github.com/awake-client/awake/src/domain"
 )
 
 func TestReadBrunoFileParsesBlocks(t *testing.T) {

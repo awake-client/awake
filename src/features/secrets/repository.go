@@ -3,8 +3,8 @@ package secrets
 import (
 	"fmt"
 
-	"github.com/clementherve/awake/src/features/environments"
-	"github.com/clementherve/awake/src/features/workspace"
+	"github.com/awake-client/awake/src/features/environments"
+	"github.com/awake-client/awake/src/features/workspace"
 )
 
 const keychainServicePrefix = "awake/"

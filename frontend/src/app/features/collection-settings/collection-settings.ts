@@ -1,13 +1,13 @@
 import { Component, DestroyRef, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, RouterLink } from '@angular/router';
-import * as CollectionsService from '@bindings/github.com/clementherve/awake/src/features/collections/service';
+import * as CollectionsService from '@bindings/github.com/awake-client/awake/src/features/collections/service';
 import {
   Authentication,
   AuthenticationType,
   Collection,
   OAuth2GrantType,
-} from '@bindings/github.com/clementherve/awake/src/domain/models';
+} from '@bindings/github.com/awake-client/awake/src/domain/models';
 import { notifyCollectionsChanged } from '@core/collection-events';
 import { Shortcuts } from '@core/shortcuts';
 import { VariableStore } from '@core/variable-store';
