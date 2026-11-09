@@ -112,7 +112,7 @@ export class NewEntryDialog {
   protected readonly name = signal('');
   protected readonly fileName = signal('');
   protected readonly showOptions = signal(false);
-  /** Whether a new collection is shared through git or kept private. */
+  /** Whether a new collection or environment is shared through git or kept private. */
   protected readonly isPrivate = signal(false);
   /** Color of a new collection or environment. */
   protected readonly color = signal('');
@@ -381,12 +381,17 @@ export class NewEntryDialog {
         if (existing.some((environment) => environment.FileName === slug)) {
           throw new Error('An environment with this name already exists here.');
         }
-        await EnvironmentsService.Save(rootPath, scope, slug, {
+        const environment = {
           Name: name,
           Variables: {},
           SecretVariables: [],
           Color: this.color(),
-        });
+        };
+        if (this.isPrivate()) {
+          await EnvironmentsService.SavePrivate(rootPath, scope, slug, environment);
+        } else {
+          await EnvironmentsService.Save(rootPath, scope, slug, environment);
+        }
         return slug;
       }
       case 'collection': {

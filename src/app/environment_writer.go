@@ -50,6 +50,17 @@ func (writer environmentWriter) ApplyEnvironmentChanges(
 	if err != nil {
 		return err
 	}
+	if resolved.Private {
+		environment := resolved.Environment()
+		for _, change := range plain {
+			if change.Removed {
+				delete(environment.Variables, change.Name)
+			} else {
+				environment.Variables[change.Name] = change.Value
+			}
+		}
+		return repository.SavePrivate(environmentFileName, environment)
+	}
 	return repository.ApplyLocalChanges(environmentFileName, plain)
 }
 

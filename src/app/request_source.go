@@ -99,9 +99,13 @@ func (source requestSource) LoadVariableLayers(workspaceRoot string, requestPath
 				label = "folder environment"
 			}
 		}
-		layers = append(layers, variables.Layer{Source: label, Values: resolved.Shared.Variables})
-		if resolved.Local != nil {
-			layers = append(layers, variables.Layer{Source: label + " (local)", Values: resolved.Local.Variables})
+		if resolved.Private && resolved.Local != nil {
+			layers = append(layers, variables.Layer{Source: label + " (private)", Values: resolved.Local.Variables})
+		} else {
+			layers = append(layers, variables.Layer{Source: label, Values: resolved.Shared.Variables})
+			if resolved.Local != nil {
+				layers = append(layers, variables.Layer{Source: label + " (local)", Values: resolved.Local.Variables})
+			}
 		}
 
 		if source.secrets != nil {

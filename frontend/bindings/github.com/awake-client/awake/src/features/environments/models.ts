@@ -17,11 +17,14 @@ export interface Environment {
 
 /**
  * ResolvedEnvironment combines a shared environment with its local overrides.
+ * A private environment has no shared file: its contents are in Local and
+ * Shared stays empty.
  */
 export interface ResolvedEnvironment {
     "Name": string;
     "Shared": Environment;
     "Local": Environment | null;
+    "Private": boolean;
 }
 
 /**
@@ -31,6 +34,12 @@ export interface ScopedSummary {
     "Name": string;
     "FileName": string;
     "HasLocalOverrides": boolean;
+
+    /**
+     * Private reports an environment whose only file is local and git
+     * ignored, with no shared counterpart.
+     */
+    "Private": boolean;
     "Color": string;
     "Scope": string;
 }
@@ -42,5 +51,11 @@ export interface Summary {
     "Name": string;
     "FileName": string;
     "HasLocalOverrides": boolean;
+
+    /**
+     * Private reports an environment whose only file is local and git
+     * ignored, with no shared counterpart.
+     */
+    "Private": boolean;
     "Color": string;
 }

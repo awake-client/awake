@@ -51,14 +51,29 @@ type Summary struct {
 	Name              string
 	FileName          string
 	HasLocalOverrides bool
-	Color             string
+	// Private reports an environment whose only file is local and git
+	// ignored, with no shared counterpart.
+	Private bool
+	Color   string
 }
 
 // ResolvedEnvironment combines a shared environment with its local overrides.
+// A private environment has no shared file: its contents are in Local and
+// Shared stays empty.
 type ResolvedEnvironment struct {
-	Name   string
-	Shared Environment
-	Local  *Environment
+	Name    string
+	Shared  Environment
+	Local   *Environment
+	Private bool
+}
+
+// Environment returns the contents of the environment: the shared one, or
+// the local file of a private environment.
+func (environment ResolvedEnvironment) Environment() Environment {
+	if environment.Private && environment.Local != nil {
+		return *environment.Local
+	}
+	return environment.Shared
 }
 
 // Layers returns the variable maps in increasing precedence order.

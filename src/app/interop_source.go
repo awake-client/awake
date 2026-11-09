@@ -24,8 +24,10 @@ func (interopAdapter) CreateEnvironment(workspaceRoot string, scope string, file
 	if err != nil {
 		return err
 	}
-	if _, err := os.Stat(repository.SharedPath(fileName)); err == nil {
+	if _, err := repository.Load(fileName); err == nil {
 		return os.ErrExist
+	} else if !errors.Is(err, environments.ErrEnvironmentNotFound) {
+		return err
 	}
 	return repository.Save(fileName, environments.Environment{
 		Name:            environment.Name,

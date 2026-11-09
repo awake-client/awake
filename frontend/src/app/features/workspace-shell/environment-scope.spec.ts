@@ -1,12 +1,18 @@
 import { ScopedSummary } from '@bindings/github.com/awake-client/awake/src/features/environments/models';
 import { collectionScopeOf, visibleEnvironments } from './environment-scope';
 
-function summary(fileName: string, scope: string, local = false): ScopedSummary {
+function summary(
+  fileName: string,
+  scope: string,
+  local = false,
+  privateEnv = false,
+): ScopedSummary {
   return {
     FileName: fileName,
     Name: fileName,
     Scope: scope,
     HasLocalOverrides: local,
+    Private: privateEnv,
     Color: '',
   };
 }
@@ -81,6 +87,14 @@ describe('visibleEnvironments', () => {
     );
 
     expect(production?.CollectionOnly).toBe(true);
+  });
+
+  it('offers a private environment living in a local file only', () => {
+    const options = visibleEnvironments([summary('scratch', '', false, true)], '');
+
+    expect(options.map((option) => option.FileName)).toEqual(['scratch']);
+    expect(options[0].Private).toBe(true);
+    expect(options[0].HasLocalOverrides).toBe(false);
   });
 
   it('lists every scope defining an environment', () => {

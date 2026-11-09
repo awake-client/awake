@@ -121,7 +121,9 @@ func (repository *Repository) LocalPath(fileName string) string {
 	return filepath.Join(repository.DirectoryPath(), fileName+localSuffix)
 }
 
-// List returns the shared environments, ignoring local override files.
+// List returns the shared environments and the private ones: local files with
+// no shared counterpart. A local file next to a shared environment stays an
+// override and is not listed on its own.
 func (repository *Repository) List() ([]Summary, error) {
 	entries, err := os.ReadDir(repository.DirectoryPath())
 	if err != nil {
@@ -132,17 +134,24 @@ func (repository *Repository) List() ([]Summary, error) {
 	}
 
 	summaries := make([]Summary, 0, len(entries))
+	shared := make(map[string]bool)
+	private := make([]string, 0)
 	for _, entry := range entries {
 		if entry.IsDir() {
 			continue
 		}
 
 		fileName := entry.Name()
-		if !strings.HasSuffix(fileName, fileExtension) || strings.HasSuffix(fileName, localSuffix) {
+		if !strings.HasSuffix(fileName, fileExtension) {
+			continue
+		}
+		if strings.HasSuffix(fileName, localSuffix) {
+			private = append(private, strings.TrimSuffix(fileName, localSuffix))
 			continue
 		}
 
 		baseName := strings.TrimSuffix(fileName, fileExtension)
+		shared[baseName] = true
 
 		environment, err := repository.readShared(baseName)
 		if err != nil {
@@ -157,6 +166,28 @@ func (repository *Repository) List() ([]Summary, error) {
 		})
 	}
 
+	sort.Strings(private)
+	for _, baseName := range private {
+		if shared[baseName] {
+			continue
+		}
+
+		environment, err := repository.readLocal(baseName)
+		if err != nil {
+			return nil, fmt.Errorf("read private environment %s: %w", baseName, err)
+		}
+		if environment == nil {
+			continue
+		}
+
+		summaries = append(summaries, Summary{
+			Name:     environment.Name,
+			FileName: baseName,
+			Private:  true,
+			Color:    environment.Color,
+		})
+	}
+
 	sort.Slice(summaries, func(first int, second int) bool {
 		return summaries[first].Name < summaries[second].Name
 	})
@@ -164,13 +195,28 @@ func (repository *Repository) List() ([]Summary, error) {
 	return summaries, nil
 }
 
-// Load returns a shared environment merged with its local overrides.
+// Load returns a shared environment merged with its local overrides, or a
+// private environment when only the local file exists.
 func (repository *Repository) Load(fileName string) (ResolvedEnvironment, error) {
 	if err := validateFileName(fileName); err != nil {
 		return ResolvedEnvironment{}, err
 	}
 
 	shared, err := repository.readShared(fileName)
+	if errors.Is(err, ErrEnvironmentNotFound) {
+		local, localErr := repository.readLocal(fileName)
+		if localErr != nil {
+			return ResolvedEnvironment{}, localErr
+		}
+		if local == nil {
+			return ResolvedEnvironment{}, ErrEnvironmentNotFound
+		}
+		return ResolvedEnvironment{
+			Name:    local.Name,
+			Local:   local,
+			Private: true,
+		}, nil
+	}
 	if err != nil {
 		return ResolvedEnvironment{}, err
 	}
@@ -247,6 +293,10 @@ func (repository *Repository) Save(fileName string, environment Environment) err
 	}
 
 	path := repository.SharedPath(fileName)
+	// A local file without a shared one is a private environment being made
+	// shared: the local file moves into git instead of staying an override.
+	private := !fileExists(path) && fileExists(repository.LocalPath(fileName))
+
 	existing, err := os.ReadFile(path)
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		return fmt.Errorf("read environment %s: %w", fileName, err)
@@ -265,8 +315,56 @@ func (repository *Repository) Save(fileName string, environment Environment) err
 	if err := os.MkdirAll(repository.DirectoryPath(), 0o755); err != nil {
 		return fmt.Errorf("create environments directory: %w", err)
 	}
+	if err := files.WriteAtomically(path, content); err != nil {
+		return err
+	}
 
-	return files.WriteAtomically(path, content)
+	if private {
+		if err := os.Remove(repository.LocalPath(fileName)); err != nil && !errors.Is(err, os.ErrNotExist) {
+			return fmt.Errorf("remove private environment %s: %w", fileName, err)
+		}
+	}
+	return nil
+}
+
+// SavePrivate writes an environment to its local, git ignored file. It has no
+// shared counterpart, so the environment stays on this machine only.
+func (repository *Repository) SavePrivate(fileName string, environment Environment) error {
+	if err := validateFileName(fileName); err != nil {
+		return err
+	}
+	if err := environment.validate(); err != nil {
+		return err
+	}
+
+	path := repository.LocalPath(fileName)
+	existing, err := os.ReadFile(path)
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("read private environment %s: %w", fileName, err)
+	}
+
+	var content []byte
+	if len(existing) > 0 {
+		content, err = encodeEnvironment(existing, environment)
+	} else {
+		content, err = yamlcodec.EncodeValue(environment)
+	}
+	if err != nil {
+		return fmt.Errorf("encode private environment %s: %w", fileName, err)
+	}
+
+	if err := os.MkdirAll(repository.DirectoryPath(), 0o755); err != nil {
+		return fmt.Errorf("create environments directory: %w", err)
+	}
+	if err := files.WriteAtomically(path, content); err != nil {
+		return err
+	}
+
+	// Making a shared environment private removes its tracked file.
+	if err := os.Remove(repository.SharedPath(fileName)); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("remove shared environment %s: %w", fileName, err)
+	}
+	return nil
 }
 
 func encodeEnvironment(existing []byte, environment Environment) ([]byte, error) {
@@ -373,21 +471,29 @@ func removeMappingValue(mapping *yaml.Node, key string) {
 	}
 }
 
-// Delete removes a shared environment and its local overrides.
+// Delete removes an environment and its local file, whether it is shared or
+// private.
 func (repository *Repository) Delete(fileName string) error {
 	if err := validateFileName(fileName); err != nil {
 		return err
 	}
 
 	sharedPath := repository.SharedPath(fileName)
-	if !fileExists(sharedPath) {
+	localPath := repository.LocalPath(fileName)
+	sharedExists := fileExists(sharedPath)
+	localExists := fileExists(localPath)
+	if !sharedExists && !localExists {
 		return ErrEnvironmentNotFound
 	}
-	if err := os.Remove(sharedPath); err != nil {
-		return fmt.Errorf("delete environment %s: %w", fileName, err)
+	if sharedExists {
+		if err := os.Remove(sharedPath); err != nil {
+			return fmt.Errorf("delete environment %s: %w", fileName, err)
+		}
 	}
-	if err := os.Remove(repository.LocalPath(fileName)); err != nil && !errors.Is(err, os.ErrNotExist) {
-		return fmt.Errorf("delete local overrides of %s: %w", fileName, err)
+	if localExists {
+		if err := os.Remove(localPath); err != nil {
+			return fmt.Errorf("delete local file of %s: %w", fileName, err)
+		}
 	}
 	return nil
 }
@@ -395,6 +501,18 @@ func (repository *Repository) Delete(fileName string) error {
 func fileExists(path string) bool {
 	info, err := os.Stat(path)
 	return err == nil && !info.IsDir()
+}
+
+// exists reports a shared or private environment of that file name.
+func (repository *Repository) exists(fileName string) bool {
+	return fileExists(repository.SharedPath(fileName)) || fileExists(repository.LocalPath(fileName))
+}
+
+// requireEnvironment checks that a shared or private environment exists and
+// is valid.
+func (repository *Repository) requireEnvironment(fileName string) error {
+	_, err := repository.Load(fileName)
+	return err
 }
 
 // localOverrides is the shape written for a new local override file: it only
@@ -413,7 +531,7 @@ func (repository *Repository) ApplyLocalChanges(fileName string, changes []domai
 	if err := validateFileName(fileName); err != nil {
 		return err
 	}
-	if _, err := repository.readShared(fileName); err != nil {
+	if err := repository.requireEnvironment(fileName); err != nil {
 		return err
 	}
 
@@ -476,7 +594,7 @@ func (repository *Repository) Clone(sourceFileName string, targetFileName string
 	if err := validateFileName(targetFileName); err != nil {
 		return err
 	}
-	if fileExists(repository.SharedPath(targetFileName)) {
+	if repository.exists(targetFileName) {
 		return ErrEnvironmentExists
 	}
 
@@ -486,7 +604,13 @@ func (repository *Repository) Clone(sourceFileName string, targetFileName string
 	}
 
 	shared := source.Shared
+	if source.Private {
+		shared = source.Environment()
+	}
 	shared.Name = strings.TrimSpace(name)
+	if source.Private {
+		return repository.SavePrivate(targetFileName, shared)
+	}
 	if err := repository.Save(targetFileName, shared); err != nil {
 		return err
 	}
@@ -513,19 +637,26 @@ func (repository *Repository) Rename(fileName string, newFileName string) error 
 	if fileName == newFileName {
 		return nil
 	}
-	if !fileExists(repository.SharedPath(fileName)) {
+	sharedPath := repository.SharedPath(fileName)
+	localPath := repository.LocalPath(fileName)
+	sharedExists := fileExists(sharedPath)
+	localExists := fileExists(localPath)
+	if !sharedExists && !localExists {
 		return ErrEnvironmentNotFound
 	}
-	if fileExists(repository.SharedPath(newFileName)) {
+	if repository.exists(newFileName) {
 		return ErrEnvironmentExists
 	}
 
-	if err := os.Rename(repository.SharedPath(fileName), repository.SharedPath(newFileName)); err != nil {
-		return fmt.Errorf("rename environment %s: %w", fileName, err)
+	if sharedExists {
+		if err := os.Rename(sharedPath, repository.SharedPath(newFileName)); err != nil {
+			return fmt.Errorf("rename environment %s: %w", fileName, err)
+		}
 	}
-	err := os.Rename(repository.LocalPath(fileName), repository.LocalPath(newFileName))
-	if err != nil && !errors.Is(err, os.ErrNotExist) {
-		return fmt.Errorf("rename local overrides of %s: %w", fileName, err)
+	if localExists {
+		if err := os.Rename(localPath, repository.LocalPath(newFileName)); err != nil {
+			return fmt.Errorf("rename local file of %s: %w", fileName, err)
+		}
 	}
 	return nil
 }
@@ -536,7 +667,7 @@ func (repository *Repository) SaveLocalVariables(fileName string, values map[str
 	if err := validateFileName(fileName); err != nil {
 		return err
 	}
-	if _, err := repository.readShared(fileName); err != nil {
+	if err := repository.requireEnvironment(fileName); err != nil {
 		return err
 	}
 	for name := range values {

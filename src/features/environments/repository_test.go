@@ -38,6 +38,194 @@ func TestListReturnsSharedEnvironmentsSorted(t *testing.T) {
 	}
 }
 
+func TestListReturnsPrivateEnvironments(t *testing.T) {
+	workspaceRoot := t.TempDir()
+
+	writeEnvironmentFile(t, workspaceRoot, "development.yaml", "name: Development\n")
+	writeEnvironmentFile(t, workspaceRoot, "development.local.yaml", "variables:\n  token: x\n")
+	writeEnvironmentFile(t, workspaceRoot, "scratch.local.yaml", "name: Scratch\nvariables:\n  baseUrl: http://localhost:3000\n")
+
+	summaries, err := NewRepository(workspaceRoot).List()
+	if err != nil {
+		t.Fatalf("list environments: %v", err)
+	}
+
+	if len(summaries) != 2 {
+		t.Fatalf("expected 2 environments, got %d: %+v", len(summaries), summaries)
+	}
+	if summaries[0].FileName != "development" || summaries[0].Private {
+		t.Errorf("unexpected shared environment: %+v", summaries[0])
+	}
+	if !summaries[0].HasLocalOverrides {
+		t.Error("expected development to report local overrides")
+	}
+	if summaries[1].FileName != "scratch" || !summaries[1].Private {
+		t.Errorf("unexpected private environment: %+v", summaries[1])
+	}
+	if summaries[1].HasLocalOverrides {
+		t.Error("a private environment is not reported as an override")
+	}
+}
+
+func TestLoadPrivateEnvironment(t *testing.T) {
+	workspaceRoot := t.TempDir()
+	writeEnvironmentFile(t, workspaceRoot, "scratch.local.yaml", `
+name: Scratch
+color: green
+variables:
+  baseUrl: http://localhost:3000
+secretVariables:
+  - localToken
+`)
+
+	resolved, err := NewRepository(workspaceRoot).Load("scratch")
+	if err != nil {
+		t.Fatalf("load private environment: %v", err)
+	}
+
+	if !resolved.Private || resolved.Local == nil {
+		t.Fatalf("expected a private environment, got %+v", resolved)
+	}
+	if resolved.Name != "Scratch" || resolved.Local.Color != "green" {
+		t.Errorf("unexpected private environment: %+v", resolved)
+	}
+	interpolated, err := variables.Interpolate("{{baseUrl}}", resolved.Layers()...)
+	if err != nil || interpolated != "http://localhost:3000" {
+		t.Errorf("unexpected interpolation %q, %v", interpolated, err)
+	}
+	if names := resolved.SecretNames(); len(names) != 1 || names[0] != "localToken" {
+		t.Errorf("unexpected secret names: %v", names)
+	}
+}
+
+func TestSavePrivateEnvironmentRemovesTheSharedFile(t *testing.T) {
+	workspaceRoot := t.TempDir()
+	writeEnvironmentFile(t, workspaceRoot, "staging.yaml", "name: Staging\ncolor: red\nvariables:\n  baseUrl: https://staging.example.com\nsecretVariables:\n  - apiToken\n")
+	writeEnvironmentFile(t, workspaceRoot, "staging.local.yaml", "# my machine\nvariables:\n  token: x\n")
+
+	repository := NewRepository(workspaceRoot)
+	err := repository.SavePrivate("staging", Environment{
+		Name:            "Staging",
+		Color:           "blue",
+		Variables:       map[string]string{"baseUrl": "https://staging.example.com", "token": "x"},
+		SecretVariables: []string{"apiToken"},
+	})
+	if err != nil {
+		t.Fatalf("save private environment: %v", err)
+	}
+
+	if _, err := os.Stat(repository.SharedPath("staging")); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("expected the shared file to be removed, got %v", err)
+	}
+	local, err := os.ReadFile(repository.LocalPath("staging"))
+	if err != nil {
+		t.Fatalf("read private environment: %v", err)
+	}
+	if !strings.Contains(string(local), "# my machine") {
+		t.Errorf("expected the local comment to survive, got:\n%s", local)
+	}
+
+	resolved, err := repository.Load("staging")
+	if err != nil {
+		t.Fatalf("load private environment: %v", err)
+	}
+	if !resolved.Private || resolved.Name != "Staging" || resolved.Local.Color != "blue" {
+		t.Errorf("unexpected private environment: %+v", resolved)
+	}
+	if resolved.Local.Variables["token"] != "x" {
+		t.Errorf("unexpected variables: %+v", resolved.Local.Variables)
+	}
+}
+
+func TestSaveSharedEnvironmentLeavesPrivateMode(t *testing.T) {
+	workspaceRoot := t.TempDir()
+	writeEnvironmentFile(t, workspaceRoot, "scratch.local.yaml", "name: Scratch\nvariables:\n  baseUrl: http://localhost:3000\n")
+
+	repository := NewRepository(workspaceRoot)
+	if err := repository.Save("scratch", Environment{
+		Name:      "Scratch",
+		Variables: map[string]string{"baseUrl": "http://localhost:4000"},
+	}); err != nil {
+		t.Fatalf("save shared environment: %v", err)
+	}
+
+	if _, err := os.Stat(repository.LocalPath("scratch")); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("expected the private file to be removed, got %v", err)
+	}
+	resolved, err := repository.Load("scratch")
+	if err != nil {
+		t.Fatalf("load shared environment: %v", err)
+	}
+	if resolved.Private || resolved.Shared.Variables["baseUrl"] != "http://localhost:4000" {
+		t.Errorf("unexpected shared environment: %+v", resolved)
+	}
+}
+
+func TestClonePrivateEnvironmentStaysPrivate(t *testing.T) {
+	workspaceRoot := t.TempDir()
+	writeEnvironmentFile(t, workspaceRoot, "scratch.local.yaml", "name: Scratch\nvariables:\n  baseUrl: http://localhost:3000\n")
+
+	repository := NewRepository(workspaceRoot)
+	if err := repository.Clone("scratch", "scratch-copy", "Scratch copy"); err != nil {
+		t.Fatalf("clone: %v", err)
+	}
+
+	if _, err := os.Stat(repository.SharedPath("scratch-copy")); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("expected no shared file for the clone, got %v", err)
+	}
+	clone, err := repository.Load("scratch-copy")
+	if err != nil {
+		t.Fatalf("load clone: %v", err)
+	}
+	if !clone.Private || clone.Name != "Scratch copy" || clone.Local.Variables["baseUrl"] != "http://localhost:3000" {
+		t.Errorf("unexpected clone: %+v", clone)
+	}
+}
+
+func TestRenameAndDeletePrivateEnvironment(t *testing.T) {
+	workspaceRoot := t.TempDir()
+	writeEnvironmentFile(t, workspaceRoot, "scratch.local.yaml", "name: Scratch\n")
+
+	repository := NewRepository(workspaceRoot)
+	if err := repository.Rename("scratch", "sandbox"); err != nil {
+		t.Fatalf("rename: %v", err)
+	}
+	if _, err := repository.Load("scratch"); !errors.Is(err, ErrEnvironmentNotFound) {
+		t.Errorf("expected the former file to be gone, got %v", err)
+	}
+	if resolved, err := repository.Load("sandbox"); err != nil || !resolved.Private {
+		t.Errorf("unexpected renamed environment: %+v, %v", resolved, err)
+	}
+
+	if err := repository.Delete("sandbox"); err != nil {
+		t.Fatalf("delete: %v", err)
+	}
+	if _, err := repository.Load("sandbox"); !errors.Is(err, ErrEnvironmentNotFound) {
+		t.Errorf("expected the environment to be gone, got %v", err)
+	}
+}
+
+func TestApplyLocalChangesUpdatesPrivateEnvironment(t *testing.T) {
+	workspaceRoot := t.TempDir()
+	writeEnvironmentFile(t, workspaceRoot, "scratch.local.yaml", "name: Scratch\ncolor: green\nsecretVariables:\n  - token\nvariables:\n  baseUrl: http://localhost:3000\n")
+
+	repository := NewRepository(workspaceRoot)
+	if err := repository.ApplyLocalChanges("scratch", []domain.EnvironmentChange{{Name: "pageSize", Value: "10"}}); err != nil {
+		t.Fatalf("apply local changes: %v", err)
+	}
+
+	resolved, err := repository.Load("scratch")
+	if err != nil {
+		t.Fatalf("load private environment: %v", err)
+	}
+	if !resolved.Private || resolved.Local.Name != "Scratch" || resolved.Local.Color != "green" {
+		t.Errorf("unexpected private environment: %+v", resolved)
+	}
+	if resolved.Local.Variables["pageSize"] != "10" || resolved.Local.Variables["baseUrl"] != "http://localhost:3000" {
+		t.Errorf("unexpected variables: %+v", resolved.Local.Variables)
+	}
+}
+
 func TestLoadMergesLocalOverrides(t *testing.T) {
 	workspaceRoot := t.TempDir()
 

@@ -75,3 +75,11 @@ export function Save(workspaceRoot: string, scope: string, fileName: string, env
 export function SaveLocal(workspaceRoot: string, scope: string, fileName: string, variables: { [_ in string]?: string } | null): $CancellablePromise<void> {
     return $Call.ByID(3161276824, workspaceRoot, scope, fileName, variables);
 }
+
+/**
+ * SavePrivate writes an environment only to this machine, in its git ignored
+ * local file. A shared file of the same name is removed.
+ */
+export function SavePrivate(workspaceRoot: string, scope: string, fileName: string, environment: $models.Environment): $CancellablePromise<void> {
+    return $Call.ByID(3127520540, workspaceRoot, scope, fileName, environment);
+}

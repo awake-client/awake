@@ -73,12 +73,27 @@ export class EnvironmentEditor {
   protected readonly newSecretName = signal('');
   protected readonly isLoading = signal(false);
   protected readonly isSaving = signal(false);
+  /** Whether the environment lives in a git ignored local file, not shared. */
+  protected readonly isPrivate = signal(false);
   protected readonly message = signal<string | null>(null);
   protected readonly errorMessage = signal<string | null>(null);
   /** The file name always follows the display name. */
   protected readonly targetFileName = computed(() => slugify(this.name()));
   /** Shown once the editor reloads under a new file name. */
   private carriedMessage: string | null = null;
+
+  /** Path of the environment file on disk, local when it is private. */
+  protected readonly filePath = computed(() => this.environmentFilePath(this.fileName()));
+  /** Path of the file a rename moves to, local when the environment is private. */
+  protected readonly targetFilePath = computed(() =>
+    this.environmentFilePath(this.targetFileName()),
+  );
+
+  private environmentFilePath(fileName: string): string {
+    const directory = this.scope() ? `${this.scope()}/` : '';
+    const base = this.isPrivate() ? `${fileName}.local` : fileName;
+    return `${directory}environments/${base}.yaml`;
+  }
 
   constructor() {
     effect(() => {
@@ -180,8 +195,12 @@ export class EnvironmentEditor {
       if (targetFileName !== fileName) {
         await this.renameFile(rootPath, fileName, targetFileName);
       }
-      await EnvironmentsService.Save(rootPath, this.scope(), targetFileName, environment);
-      await EnvironmentsService.SaveLocal(rootPath, this.scope(), targetFileName, localVariables);
+      if (this.isPrivate()) {
+        await EnvironmentsService.SavePrivate(rootPath, this.scope(), targetFileName, environment);
+      } else {
+        await EnvironmentsService.Save(rootPath, this.scope(), targetFileName, environment);
+        await EnvironmentsService.SaveLocal(rootPath, this.scope(), targetFileName, localVariables);
+      }
       notifyEnvironmentsChanged();
       this.saved.emit();
       if (targetFileName !== fileName) {
@@ -281,9 +300,13 @@ export class EnvironmentEditor {
       return;
     }
 
+    const targetFile = this.isPrivate() ? `${fileName}.local.yaml` : `${fileName}.yaml`;
+    const overrides = this.isPrivate() ? '' : ', its local overrides';
+    const message = `${this.scope() ? `${this.scope()}/` : ''}environments/${targetFile}${overrides} and its stored secret values will be removed.`;
+
     const confirmed = await this.confirmation.ask({
       title: `Delete the environment “${this.name() || fileName}”?`,
-      message: `${this.scope() ? `${this.scope()}/` : ''}environments/${fileName}.yaml, its local overrides and its stored secret values will be removed.`,
+      message,
       confirmLabel: 'Delete environment',
       danger: true,
     });
@@ -404,10 +427,22 @@ export class EnvironmentEditor {
     try {
       const resolved = await EnvironmentsService.Load(rootPath, scope, fileName);
       this.name.set(resolved.Name);
-      this.color.set(resolved.Shared.Color ?? '');
-      this.variables.set(toRows(resolved.Shared.Variables));
-      this.localVariables.set(toRows(resolved.Local?.Variables));
-      this.secretNames.set(resolved.Shared.SecretVariables ?? []);
+      this.isPrivate.set(resolved.Private);
+      this.color.set(
+        resolved.Private ? (resolved.Local?.Color ?? '') : (resolved.Shared.Color ?? ''),
+      );
+      if (resolved.Private) {
+        this.variables.set(toRows(resolved.Local?.Variables));
+        this.localVariables.set([]);
+      } else {
+        this.variables.set(toRows(resolved.Shared.Variables));
+        this.localVariables.set(toRows(resolved.Local?.Variables));
+      }
+      this.secretNames.set(
+        resolved.Private
+          ? (resolved.Local?.SecretVariables ?? [])
+          : (resolved.Shared.SecretVariables ?? []),
+      );
       this.secretValues.set({});
       this.newSecretName.set('');
       await this.loadSecretStates();

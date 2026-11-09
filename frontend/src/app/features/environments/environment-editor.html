@@ -6,10 +6,10 @@
 }
 
 <p class="editor-file">
-  <code>{{ scope() ? scope() + '/' : '' }}environments/{{ fileName() }}.yaml</code>
+  <code>{{ filePath() }}</code>
   @if (targetFileName() && targetFileName() !== fileName()) {
     <span class="rename-hint"
-      >→ renamed to <code>{{ targetFileName() }}.yaml</code> on save</span
+      >→ renamed to <code>{{ targetFilePath() }}</code> on save</span
     >
   }
 </p>
@@ -24,6 +24,40 @@
     autocomplete="off"
   />
 </label>
+
+<div class="field">
+  <span class="field-label">Privacy</span>
+  <div class="visibility" role="radiogroup" aria-label="Environment privacy">
+    <button
+      type="button"
+      role="radio"
+      class="visibility-option"
+      [class.selected]="!isPrivate()"
+      [attr.aria-checked]="!isPrivate()"
+      (click)="isPrivate.set(false)"
+    >
+      <app-icon name="git" [size]="15" />
+      <span>
+        <strong>Shared</strong>
+        <small>Committed and synced with the team</small>
+      </span>
+    </button>
+    <button
+      type="button"
+      role="radio"
+      class="visibility-option"
+      [class.selected]="isPrivate()"
+      [attr.aria-checked]="isPrivate()"
+      (click)="isPrivate.set(true)"
+    >
+      <app-icon name="lock" [size]="15" />
+      <span>
+        <strong>Private</strong>
+        <small>Stays on this computer, ignored by git</small>
+      </span>
+    </button>
+  </div>
+</div>
 
 <div class="field">
   <span class="field-label">Color</span>
@@ -82,53 +116,57 @@
   }
 </article>
 
-<article class="editor-section">
-  <header class="section-header">
-    <h2>Local overrides</h2>
-    <button type="button" class="ghost-button" (click)="addVariable('local')">Add override</button>
-  </header>
-  <p class="section-hint">
-    Kept on this machine in <code>{{ fileName() }}.local.yaml</code>, which git ignores. They win
-    over the variables above, and scripts save here with <code>awake.environment.set</code>.
-  </p>
+@if (!isPrivate()) {
+  <article class="editor-section">
+    <header class="section-header">
+      <h2>Local overrides</h2>
+      <button type="button" class="ghost-button" (click)="addVariable('local')">
+        Add override
+      </button>
+    </header>
+    <p class="section-hint">
+      Kept on this machine in <code>{{ fileName() }}.local.yaml</code>, which git ignores. They win
+      over the variables above, and scripts save here with <code>awake.environment.set</code>.
+    </p>
 
-  @if (variables().length === 0) {
-    <p class="section-empty">No local override.</p>
-  } @else {
-    <div class="variable-rows">
-      @for (variable of localVariables(); track $index) {
-        <div class="variable-row">
-          <input
-            type="text"
-            [name]="'localName' + $index"
-            [ngModel]="variable.name"
-            (ngModelChange)="updateVariable($index, 'name', $event, 'local')"
-            placeholder="baseUrl"
-            autocomplete="off"
-            spellcheck="false"
-          />
-          <input
-            type="text"
-            [name]="'localValue' + $index"
-            [ngModel]="variable.value"
-            (ngModelChange)="updateVariable($index, 'value', $event, 'local')"
-            placeholder="https://example.com"
-            autocomplete="off"
-            spellcheck="false"
-          />
-          <button
-            type="button"
-            class="icon-button"
-            title="Remove override"
-            (click)="removeVariable($index, 'local')"
-          >
-            Remove
-          </button>
-        </div>
-      }
-    </div>
-  }
-</article>
+    @if (variables().length === 0) {
+      <p class="section-empty">No local override.</p>
+    } @else {
+      <div class="variable-rows">
+        @for (variable of localVariables(); track $index) {
+          <div class="variable-row">
+            <input
+              type="text"
+              [name]="'localName' + $index"
+              [ngModel]="variable.name"
+              (ngModelChange)="updateVariable($index, 'name', $event, 'local')"
+              placeholder="baseUrl"
+              autocomplete="off"
+              spellcheck="false"
+            />
+            <input
+              type="text"
+              [name]="'localValue' + $index"
+              [ngModel]="variable.value"
+              (ngModelChange)="updateVariable($index, 'value', $event, 'local')"
+              placeholder="https://example.com"
+              autocomplete="off"
+              spellcheck="false"
+            />
+            <button
+              type="button"
+              class="icon-button"
+              title="Remove override"
+              (click)="removeVariable($index, 'local')"
+            >
+              Remove
+            </button>
+          </div>
+        }
+      </div>
+    }
+  </article>
+}
 
 <article class="editor-section">
   <header class="section-header">

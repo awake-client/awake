@@ -15,6 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   scripts, and basic, bearer, API key and OAuth 2 authentication.
 - Shared environments with local overrides; secret values are stored in the
   operating system keychain.
+- Private environments: an environment can live in a git ignored local file
+  instead of a shared one, with editor, picker and secrets handling.
 - Coding-agent integration for Claude Code and OpenCode.
 - Import and export for Bruno, OpenCollection, OpenAPI and Postman.
 - Virtualized collection tree, SQLite index, search, command palette, request

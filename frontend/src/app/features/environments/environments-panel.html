@@ -58,7 +58,9 @@
                   {{ environment.Name }}
                 </span>
                 <span class="environment-file">{{ environment.FileName }}</span>
-                @if (environment.HasLocalOverrides) {
+                @if (environment.Private) {
+                  <span class="local-badge">private</span>
+                } @else if (environment.HasLocalOverrides) {
                   <span class="local-badge">local</span>
                 }
                 @if (scope() && globalNames().has(environment.FileName)) {

@@ -151,7 +151,7 @@
         </label>
       }
 
-      @if (kind() === 'collection') {
+      @if (kind() === 'collection' || kind() === 'environment') {
         <div class="field">
           <span class="field-label">Visibility</span>
           <div class="visibility" role="radiogroup" aria-label="Visibility">

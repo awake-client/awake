@@ -58,6 +58,7 @@ export function visibleEnvironments(scoped: ScopedSummary[], scope: string): Env
         FileName: summary.FileName,
         Name: summary.Name,
         HasLocalOverrides: summary.HasLocalOverrides || !!existing?.HasLocalOverrides,
+        Private: summary.Private || !!existing?.Private,
         CollectionOnly: summary.Scope !== '',
         Color: summary.Color || existing?.Color || '',
         Scopes: scopes,
@@ -66,6 +67,9 @@ export function visibleEnvironments(scoped: ScopedSummary[], scope: string): Env
       existing.Scopes = scopes;
       if (summary.HasLocalOverrides) {
         existing.HasLocalOverrides = true;
+      }
+      if (summary.Private) {
+        existing.Private = true;
       }
     }
   }

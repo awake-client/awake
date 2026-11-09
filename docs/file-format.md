@@ -96,6 +96,14 @@ secretVariables:
 `environments/development.local.yaml` has the same shape and is git ignored. It
 overrides the shared environment on the local machine.
 
+### Private environments
+
+An environment can also be private: it then lives in
+`environments/<name>.local.yaml` and has no shared counterpart, so nothing of it
+is committed to git. The editor offers both kinds, shared or private, and saving
+in the private mode writes the git ignored local file; saving in the shared mode
+writes the tracked file and drops the private one.
+
 ### Collection environments
 
 A collection can declare its own environments in `<collection>/environments/`,
@@ -117,7 +125,8 @@ From lowest to highest precedence:
 2. collection variables (`collection.yaml`);
 3. global environment, then its local overrides and secrets;
 4. collection environment of the same name, then its local overrides and
-   secrets;
+   secrets; the private file of an environment stands for the environment
+   itself, so a private environment has no override layer on top of it.
 5. values set by the pre-request script.
 
 ### Dynamic variables
@@ -399,7 +408,8 @@ comments is left untouched, and its associations must then be added by hand.
 - A private collection lives in `local/` with the same layout as
   `collections/`. It is ignored by git and only visible on the local machine.
 - Local environment files override shared values without changing tracked
-  files.
+  files; a private environment is one that only has such a local file, so no
+  tracked environment goes with it.
 - A request may have local overrides in `<name>.local.yaml`, next to it and
   git ignored. Each section present replaces the shared one when the request
   is sent, even when empty; an absent section keeps the shared one. Moving or

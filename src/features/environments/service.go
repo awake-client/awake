@@ -115,6 +115,16 @@ func (service *Service) Save(workspaceRoot string, scope string, fileName string
 	return repository.Save(fileName, environment)
 }
 
+// SavePrivate writes an environment only to this machine, in its git ignored
+// local file. A shared file of the same name is removed.
+func (service *Service) SavePrivate(workspaceRoot string, scope string, fileName string, environment Environment) error {
+	repository, err := NewScopedRepository(workspaceRoot, scope)
+	if err != nil {
+		return err
+	}
+	return repository.SavePrivate(fileName, environment)
+}
+
 // Clone copies an environment of a scope, with its local overrides, under a
 // new file name and display name.
 func (service *Service) Clone(workspaceRoot string, scope string, sourceFileName string, targetFileName string, name string) error {
@@ -145,7 +155,8 @@ func (service *Service) Rename(workspaceRoot string, scope string, fileName stri
 	return repository.Rename(fileName, newFileName)
 }
 
-// Delete removes a shared environment and its local overrides.
+// Delete removes an environment and its local file, whether it is shared or
+// private.
 func (service *Service) Delete(workspaceRoot string, scope string, fileName string) error {
 	repository, err := NewScopedRepository(workspaceRoot, scope)
 	if err != nil {

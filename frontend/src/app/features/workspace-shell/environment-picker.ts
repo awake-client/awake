@@ -8,6 +8,8 @@ export interface EnvironmentChoice {
   FileName: string;
   Name: string;
   HasLocalOverrides: boolean;
+  /** True when the environment lives in a git ignored local file only. */
+  Private: boolean;
   CollectionOnly: boolean;
   Color: string;
   /** Scopes defining it: '' for the global one, then the collection path. */
@@ -66,7 +68,9 @@ export interface EnvironmentChoice {
               </span>
               <span class="option-dot" [attr.data-color]="option.Color || null"></span>
               <span class="option-name">{{ option.Name }}</span>
-              @if (option.HasLocalOverrides) {
+              @if (option.Private) {
+                <span class="badge">private</span>
+              } @else if (option.HasLocalOverrides) {
                 <span class="badge">local</span>
               }
               @if (option.CollectionOnly) {
@@ -119,6 +123,7 @@ export class EnvironmentPicker {
       FileName: '',
       Name: 'No environment',
       HasLocalOverrides: false,
+      Private: false,
       CollectionOnly: false,
       Color: '',
       Scopes: [],
