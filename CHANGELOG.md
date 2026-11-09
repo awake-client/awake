@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Import and export for Bruno, OpenCollection, OpenAPI and Postman.
 - Virtualized collection tree, SQLite index, search, command palette, request
   history, and light and dark themes.
+- Hiding a collection from the tree, with a menu to display the hidden ones again.
 - In-app update checker backed by GitHub Releases.
 - macOS and Linux installers, plus a Windows NSIS installer and portable archive.
 

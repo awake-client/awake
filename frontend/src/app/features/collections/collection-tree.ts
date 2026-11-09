@@ -17,6 +17,7 @@ import {
   requestEntryCreation,
 } from '@core/collection-events';
 import { Confirmation } from '@core/confirmation';
+import { HiddenCollectionsStore } from '@core/hidden-collections';
 import { Prompt } from '@core/prompt';
 import { Shortcuts } from '@core/shortcuts';
 import { TabsStore } from '@core/tabs-store';
@@ -68,6 +69,7 @@ export class CollectionTree {
   private readonly destroyRef = inject(DestroyRef);
   private readonly router = inject(Router);
   private readonly confirmation = inject(Confirmation);
+  private readonly hiddenCollections = inject(HiddenCollectionsStore);
   private readonly prompt = inject(Prompt);
   private readonly tabsStore = inject(TabsStore);
   protected readonly shortcuts = inject(Shortcuts);
@@ -86,6 +88,9 @@ export class CollectionTree {
   protected readonly selected = signal<string | null>(null);
   protected readonly isMenuOpen = signal(false);
   protected readonly rowMenu = signal<RowMenu | null>(null);
+  /** Collections the user hid, offered by the hidden collections menu. */
+  protected readonly hiddenEntries = signal<Entry[]>([]);
+  protected readonly isHiddenMenuOpen = signal(false);
   /** Folder that would receive the row being dragged. */
   protected readonly dropTarget = signal<string | null>(null);
   protected readonly dragged = signal<TreeRow | null>(null);
@@ -113,6 +118,7 @@ export class CollectionTree {
     };
     const closeMenu = () => {
       this.isMenuOpen.set(false);
+      this.isHiddenMenuOpen.set(false);
       this.rowMenu.set(null);
     };
 
@@ -153,6 +159,11 @@ export class CollectionTree {
     return row.entry.Kind === Kind.KindRequest;
   }
 
+  /** Reports whether a root entry is a collection the user hid. */
+  protected isHidden(entry: Entry): boolean {
+    return entry.Kind === Kind.KindCollection && this.hiddenCollections.isHidden(entry.Path);
+  }
+
   protected async activate(row: TreeRow): Promise<void> {
     if (row.section) {
       return;
@@ -188,6 +199,7 @@ export class CollectionTree {
   protected async reload(workspaceRoot: string): Promise<void> {
     this.isLoading.set(true);
     this.errorMessage.set(null);
+    this.hiddenCollections.useWorkspace(workspaceRoot);
 
     const previouslyExpanded = [...this.expandedPaths].sort(
       (first, second) => first.split('/').length - second.split('/').length,
@@ -201,11 +213,29 @@ export class CollectionTree {
 
       this.childrenCache.clear();
       this.expandedPaths.clear();
-      const rows = this.toRows(entries ?? [], 0);
-      if ((privateEntries ?? []).length > 0) {
-        rows.push(privateSectionRow(), ...this.toRows(privateEntries ?? [], 0));
+      const rows: TreeRow[] = [];
+      const hidden: Entry[] = [];
+      for (const entry of entries ?? []) {
+        if (this.isHidden(entry)) {
+          hidden.push(entry);
+          continue;
+        }
+        rows.push(...this.toRows([entry], 0));
+      }
+
+      const visiblePrivateEntries: Entry[] = [];
+      for (const entry of privateEntries ?? []) {
+        if (this.isHidden(entry)) {
+          hidden.push(entry);
+          continue;
+        }
+        visiblePrivateEntries.push(entry);
+      }
+      if (visiblePrivateEntries.length > 0) {
+        rows.push(privateSectionRow(), ...this.toRows(visiblePrivateEntries, 0));
       }
       this.rows.set(rows);
+      this.hiddenEntries.set(hidden);
 
       for (const path of previouslyExpanded) {
         const row = this.rows().find((candidate) => candidate.entry.Path === path);
@@ -225,6 +255,46 @@ export class CollectionTree {
     if (workspaceRoot) {
       void this.reload(workspaceRoot);
     }
+  }
+
+  protected toggleHiddenMenu(event: Event): void {
+    event.stopPropagation();
+    this.isHiddenMenuOpen.update((open) => !open);
+  }
+
+  /** Unhides a collection from the hidden menu and unfolds it again. */
+  protected async revealHidden(entry: Entry): Promise<void> {
+    this.isHiddenMenuOpen.set(false);
+    this.hiddenCollections.unhide(entry.Path);
+    const workspaceRoot = this.workspaceRoot();
+    if (!workspaceRoot) {
+      return;
+    }
+    await this.reload(workspaceRoot);
+    const row = this.rows().find((candidate) => candidate.entry.Path === entry.Path);
+    if (row && !row.expanded) {
+      await this.toggle(row);
+    }
+    this.selected.set(entry.Path);
+  }
+
+  /** Hides a collection from the tree, keeping its files on disk. */
+  protected async hideCollection(row: TreeRow): Promise<void> {
+    const workspaceRoot = this.workspaceRoot();
+    if (!workspaceRoot || row.section) {
+      return;
+    }
+
+    this.hiddenCollections.hide(row.entry.Path);
+    const contains = (path: string | null) =>
+      !!path && (path === row.entry.Path || path.startsWith(`${row.entry.Path}/`));
+    if (contains(this.openRequestPath())) {
+      await this.router.navigate(['/workspace']);
+    }
+    if (contains(this.selected())) {
+      this.selected.set(null);
+    }
+    await this.reload(workspaceRoot);
   }
 
   protected toggleMenu(event: Event): void {
@@ -294,6 +364,15 @@ export class CollectionTree {
     this.rowMenu.set(null);
     if (menu) {
       void this.renameCollection(menu.row);
+    }
+  }
+
+  /** Hides a collection from the tree, keeping its files on disk. */
+  protected hideFromRowMenu(): void {
+    const menu = this.rowMenu();
+    this.rowMenu.set(null);
+    if (menu) {
+      void this.hideCollection(menu.row);
     }
   }
 
