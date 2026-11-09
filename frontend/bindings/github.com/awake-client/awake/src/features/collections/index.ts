@@ -11,5 +11,6 @@ export {
 } from "./models.js";
 
 export type {
-    Entry
+    Entry,
+    InheritedAuthentication
 } from "./models.js";

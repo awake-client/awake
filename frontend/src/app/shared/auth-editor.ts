@@ -81,6 +81,7 @@ export class AuthEditor {
   /** What an inheriting request receives, and where to edit it. */
   readonly inherited = input<Authentication | null>(null);
   readonly inheritedFrom = input('');
+  /** Settings page of the collection or folder that defines `inherited`. */
   readonly collectionPath = input('');
   readonly authenticationChange = output<Authentication>();
 

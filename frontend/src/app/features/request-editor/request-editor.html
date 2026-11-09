@@ -378,8 +378,8 @@
               [authentication]="authentication()"
               (authenticationChange)="setAuthentication($event)"
               [inherited]="inheritedAuthentication()"
-              [inheritedFrom]="collectionName()"
-              [collectionPath]="collectionPath()"
+              [inheritedFrom]="authenticationSourceName()"
+              [collectionPath]="authenticationSourcePath()"
             >
               <div oauth2Actions class="oauth2-actions">
                 <button

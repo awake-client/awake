@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -650,6 +651,98 @@ func TestMoveAndDeleteCarryTheOverride(t *testing.T) {
 	}
 }
 
+func TestResolveInheritedAuthenticationUsesTheClosestAncestor(t *testing.T) {
+	workspaceRoot := t.TempDir()
+	writeTestFile(t, workspaceRoot, "collections/billing/collection.yaml", "name: Billing\nauthentication:\n  type: bearer\n  token: collection-token\n")
+	writeTestFile(t, workspaceRoot, "collections/billing/users/folder.yaml", "name: Users\nauthentication:\n  type: basic\n  username: folder-user\n")
+	writeTestFile(t, workspaceRoot, "collections/billing/users/admins/folder.yaml", "name: Admins\nauthentication:\n  type: apiKey\n  key: X-Api-Key\n  value: admin-key\n")
+
+	repository := NewRepository(workspaceRoot)
+	cases := []struct {
+		name       string
+		request    string
+		expected   domain.Authentication
+		sourcePath string
+		sourceName string
+	}{
+		{
+			name:       "nested folder wins over the collection",
+			request:    "collections/billing/users/admins/list.yaml",
+			expected:   domain.Authentication{Type: domain.AuthenticationAPIKey, Key: "X-Api-Key", Value: "admin-key"},
+			sourcePath: "collections/billing/users/admins",
+			sourceName: "Admins",
+		},
+		{
+			name:       "closest folder falls back to the collection",
+			request:    "collections/billing/users/list.yaml",
+			expected:   domain.Authentication{Type: domain.AuthenticationBasic, Username: "folder-user"},
+			sourcePath: "collections/billing/users",
+			sourceName: "Users",
+		},
+		{
+			name:       "request at the collection root uses the collection",
+			request:    "collections/billing/list.yaml",
+			expected:   domain.Authentication{Type: domain.AuthenticationBearer, Token: "collection-token"},
+			sourcePath: "collections/billing",
+			sourceName: "Billing",
+		},
+	}
+
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			inherited, err := repository.ResolveInheritedAuthentication(testCase.request)
+			if err != nil {
+				t.Fatalf("resolve authentication: %v", err)
+			}
+			if !reflect.DeepEqual(inherited.Authentication, &testCase.expected) {
+				t.Errorf("expected %+v, got %+v", testCase.expected, inherited.Authentication)
+			}
+			if inherited.SourcePath != testCase.sourcePath || inherited.SourceName != testCase.sourceName {
+				t.Errorf("expected source %q (%q), got %q (%q)", testCase.sourcePath, testCase.sourceName, inherited.SourcePath, inherited.SourceName)
+			}
+		})
+	}
+}
+
+func TestResolveInheritedAuthenticationForScopeSkipsItself(t *testing.T) {
+	workspaceRoot := t.TempDir()
+	writeTestFile(t, workspaceRoot, "collections/billing/collection.yaml", "name: Billing\nauthentication:\n  type: bearer\n  token: collection-token\n")
+	writeTestFile(t, workspaceRoot, "collections/billing/users/folder.yaml", "name: Users\nauthentication:\n  type: basic\n  username: folder-user\n")
+	writeTestFile(t, workspaceRoot, "collections/billing/users/admins/folder.yaml", "name: Admins\nauthentication:\n  type: apiKey\n  key: X-Api-Key\n  value: admin-key\n")
+
+	repository := NewRepository(workspaceRoot)
+	inherited, err := repository.ResolveInheritedAuthenticationForScope("collections/billing/users/admins")
+	if err != nil {
+		t.Fatalf("resolve folder authentication: %v", err)
+	}
+	if inherited.Authentication == nil || inherited.Authentication.Type != domain.AuthenticationBasic || inherited.Authentication.Username != "folder-user" {
+		t.Fatalf("expected the parent folder authentication, got %+v", inherited.Authentication)
+	}
+	if inherited.SourcePath != "collections/billing/users" || inherited.SourceName != "Users" {
+		t.Errorf("expected source collections/billing/users (Users), got %q (%q)", inherited.SourcePath, inherited.SourceName)
+	}
+
+	if _, err := repository.ResolveInheritedAuthenticationForScope("collections/billing"); !errors.Is(err, ErrInvalidPath) {
+		t.Errorf("a collection has no parent scope, got %v", err)
+	}
+}
+
+func TestResolveInheritedAuthenticationWithoutAncestorReturnsNone(t *testing.T) {
+	workspaceRoot := t.TempDir()
+	writeTestFile(t, workspaceRoot, "collections/open/collection.yaml", "name: Open\n")
+
+	inherited, err := NewRepository(workspaceRoot).ResolveInheritedAuthentication("collections/open/ping.yaml")
+	if err != nil {
+		t.Fatalf("resolve authentication: %v", err)
+	}
+	if inherited.Authentication == nil || inherited.Authentication.Type != domain.AuthenticationNone {
+		t.Fatalf("expected no authentication, got %+v", inherited.Authentication)
+	}
+	if inherited.SourcePath != "" || inherited.SourceName != "" {
+		t.Errorf("expected no source, got %q (%q)", inherited.SourcePath, inherited.SourceName)
+	}
+}
+
 func TestUpdateCollectionWritesFolderMetadata(t *testing.T) {
 	workspaceRoot := t.TempDir()
 	repository := NewRepository(workspaceRoot)
@@ -664,7 +757,7 @@ func TestUpdateCollectionWritesFolderMetadata(t *testing.T) {
 	updated := domain.Collection{
 		Name:           "Invoices",
 		Variables:      map[string]string{"pageSize": "20"},
-		Documentation: "Paid invoices",
+		Documentation:  "Paid invoices",
 		Authentication: &domain.Authentication{Type: domain.AuthenticationBearer, Token: "{{token}}"},
 	}
 	if err := repository.UpdateCollection("collections/billing/invoices", updated); err != nil {

@@ -70,6 +70,15 @@ type Entry struct {
 	Color string
 }
 
+// InheritedAuthentication is the authentication a request set to inherit
+// receives, with the collection or folder that defines it. Authentication is
+// always set: it is None when no ancestor defines one.
+type InheritedAuthentication struct {
+	Authentication *domain.Authentication
+	SourcePath     string
+	SourceName     string
+}
+
 // Repository reads the collection tree from a workspace.
 type Repository struct {
 	workspaceRoot string
@@ -92,10 +101,20 @@ func isCollectionPath(cleaned string) bool {
 }
 
 // isFolderPath reports whether a cleaned path is a folder of a collection, such
-// as collections/billing/users.
+// as collections/billing/users, or a folder nested in one, such as
+// collections/billing/users/invoices.
 func isFolderPath(cleaned string) bool {
 	segments := strings.Split(path.Clean(cleaned), "/")
-	return len(segments) == 3 && isRoot(segments[0]) && isValidName(segments[2])
+	if len(segments) < 3 || !isRoot(segments[0]) ||
+		strings.HasSuffix(segments[len(segments)-1], fileExtension) {
+		return false
+	}
+	for _, segment := range segments[2:] {
+		if !isValidName(segment) {
+			return false
+		}
+	}
+	return true
 }
 
 // isValidName reports whether a path segment is usable as a name.
@@ -338,6 +357,59 @@ func (repository *Repository) LoadCollection(relativePath string) (domain.Collec
 	}
 
 	return collection, nil
+}
+
+// ResolveInheritedAuthentication returns the authentication of the closest
+// ancestor of a request that defines one: its folder, then the folders above
+// it, then its collection. A request with no such ancestor receives none.
+func (repository *Repository) ResolveInheritedAuthentication(requestPath string) (InheritedAuthentication, error) {
+	if !isRequestPath(requestPath) {
+		return InheritedAuthentication{}, ErrInvalidPath
+	}
+	return repository.inheritedAuthenticationFrom(path.Dir(path.Clean(requestPath)))
+}
+
+// ResolveInheritedAuthenticationForScope returns the authentication a folder
+// inherits from the folders and collection above it. A collection has no
+// parent scope and receives none.
+func (repository *Repository) ResolveInheritedAuthenticationForScope(scopePath string) (InheritedAuthentication, error) {
+	cleaned := path.Clean(scopePath)
+	if !isFolderPath(cleaned) {
+		return InheritedAuthentication{}, ErrInvalidPath
+	}
+	return repository.inheritedAuthenticationFrom(path.Dir(cleaned))
+}
+
+// inheritedAuthenticationFrom walks the directories from directory to the
+// collections root and returns the first authentication that replaces the
+// inherited one.
+func (repository *Repository) inheritedAuthenticationFrom(directory string) (InheritedAuthentication, error) {
+	none := InheritedAuthentication{Authentication: &domain.Authentication{Type: domain.AuthenticationNone}}
+	for directory != "." && directory != "/" {
+		if !isRoot(directory) {
+			metadata, err := repository.LoadCollection(directory)
+			if err != nil && !errors.Is(err, ErrEntryNotFound) {
+				return InheritedAuthentication{}, err
+			}
+			if err == nil && metadata.Authentication != nil &&
+				metadata.Authentication.Type != domain.AuthenticationInherit {
+				copied := *metadata.Authentication
+				return InheritedAuthentication{
+					Authentication: &copied,
+					SourcePath:     directory,
+					SourceName:     metadata.Name,
+				}, nil
+			}
+		}
+
+		parent := path.Dir(directory)
+		if parent == directory {
+			break
+		}
+		directory = parent
+	}
+
+	return none, nil
 }
 
 // loadFolder reads the metadata of a folder: its display name, its default

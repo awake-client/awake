@@ -39,6 +39,18 @@ func (service *Service) LoadCollection(workspaceRoot string, relativePath string
 	return NewRepository(workspaceRoot).LoadCollection(relativePath)
 }
 
+// LoadInheritedAuthentication returns the authentication an inheriting request
+// receives from its closest folder or collection, and where it comes from.
+func (service *Service) LoadInheritedAuthentication(workspaceRoot string, requestPath string) (InheritedAuthentication, error) {
+	return NewRepository(workspaceRoot).ResolveInheritedAuthentication(requestPath)
+}
+
+// LoadInheritedAuthenticationForScope returns the authentication a folder
+// inherits from the folders and collection above it.
+func (service *Service) LoadInheritedAuthenticationForScope(workspaceRoot string, scopePath string) (InheritedAuthentication, error) {
+	return NewRepository(workspaceRoot).ResolveInheritedAuthenticationForScope(scopePath)
+}
+
 // CreateRequest writes a new request file.
 func (service *Service) CreateRequest(workspaceRoot string, relativePath string, request domain.Request) error {
 	return NewRepository(workspaceRoot).CreateRequest(relativePath, request)

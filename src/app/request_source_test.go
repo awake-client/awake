@@ -111,6 +111,45 @@ func TestLoadRequestInheritsTheCollectionAuthentication(t *testing.T) {
 	}
 }
 
+func TestLoadRequestInheritsAuthenticationWithoutWritingIt(t *testing.T) {
+	root := t.TempDir()
+	if _, err := workspace.NewService().Create(root, workspace.CreateOptions{Name: "AutomaticAuth", Mode: workspace.ModeTeam}); err != nil {
+		t.Fatalf("create workspace: %v", err)
+	}
+	write := func(path string, content string) {
+		t.Helper()
+		full := filepath.Join(root, filepath.FromSlash(path))
+		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(full, []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write("collections/billing/collection.yaml", "name: Billing\nauthentication:\n  type: bearer\n  token: collection-token\n")
+	write("collections/billing/users/folder.yaml", "name: Users\nauthentication:\n  type: basic\n  username: folder-user\n")
+	write("collections/billing/users/invoices/list.yaml", "name: List\nmethod: GET\nurl: https://example.com\n")
+	write("collections/billing/users/admins/folder.yaml", "name: Admins\nauthentication:\n  type: apiKey\n  key: X-Api-Key\n  value: admin-key\n")
+	write("collections/billing/users/admins/report.yaml", "name: Report\nmethod: GET\nurl: https://example.com\n")
+
+	source := requestSource{}
+	inherited, err := source.LoadRequest(root, "collections/billing/users/invoices/list.yaml")
+	if err != nil {
+		t.Fatalf("load request: %v", err)
+	}
+	if inherited.Authentication == nil || inherited.Authentication.Type != domain.AuthenticationBasic || inherited.Authentication.Username != "folder-user" {
+		t.Fatalf("expected the closest folder authentication, got %+v", inherited.Authentication)
+	}
+
+	nested, err := source.LoadRequest(root, "collections/billing/users/admins/report.yaml")
+	if err != nil {
+		t.Fatalf("load nested request: %v", err)
+	}
+	if nested.Authentication == nil || nested.Authentication.Type != domain.AuthenticationAPIKey || nested.Authentication.Value != "admin-key" {
+		t.Fatalf("expected the nested folder authentication, got %+v", nested.Authentication)
+	}
+}
+
 func TestLoadRequestAppliesLocalOverrides(t *testing.T) {
 	root := t.TempDir()
 	write := func(path string, content string) {

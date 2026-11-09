@@ -63,6 +63,22 @@ export function LoadCollection(workspaceRoot: string, relativePath: string): $Ca
 }
 
 /**
+ * LoadInheritedAuthentication returns the authentication an inheriting request
+ * receives from its closest folder or collection, and where it comes from.
+ */
+export function LoadInheritedAuthentication(workspaceRoot: string, requestPath: string): $CancellablePromise<$models.InheritedAuthentication> {
+    return $Call.ByID(3887741167, workspaceRoot, requestPath);
+}
+
+/**
+ * LoadInheritedAuthenticationForScope returns the authentication a folder
+ * inherits from the folders and collection above it.
+ */
+export function LoadInheritedAuthenticationForScope(workspaceRoot: string, scopePath: string): $CancellablePromise<$models.InheritedAuthentication> {
+    return $Call.ByID(250912270, workspaceRoot, scopePath);
+}
+
+/**
  * LoadRequest returns a request with defaults applied.
  */
 export function LoadRequest(workspaceRoot: string, relativePath: string): $CancellablePromise<domain$0.Request> {

@@ -51,6 +51,10 @@ export class CollectionSettings {
   protected readonly color = signal('');
   protected readonly variables = signal<VariableRow[]>([]);
   protected readonly authentication = signal<Authentication>(emptyAuthentication());
+  /** What a folder inherits from the folders and collection above it. */
+  protected readonly inheritedAuthentication = signal<Authentication | null>(null);
+  protected readonly authenticationSourceName = signal('');
+  protected readonly authenticationSourcePath = signal('');
   protected readonly isLoading = signal(true);
   protected readonly isSaving = signal(false);
   protected readonly errorMessage = signal<string | null>(null);
@@ -73,13 +77,20 @@ export class CollectionSettings {
       }
     }
     const authentication = this.authentication();
+    // A folder inheriting from its parent stores no authentication; choosing
+    // None stores an explicit one so requests below stop inheriting.
+    let storedAuthentication: Authentication | null = authentication;
+    if (authentication.Type === AuthenticationType.AuthenticationInherit) {
+      storedAuthentication = null;
+    } else if (!this.isFolder() && authentication.Type === AuthenticationType.AuthenticationNone) {
+      storedAuthentication = null;
+    }
     return {
       Name: this.name().trim(),
       Documentation: this.documentation(),
       Color: this.color(),
       Variables: Object.keys(variables).length > 0 ? variables : null,
-      Authentication:
-        authentication.Type === AuthenticationType.AuthenticationNone ? null : authentication,
+      Authentication: storedAuthentication,
     };
   });
 
@@ -179,13 +190,44 @@ export class CollectionSettings {
           value: value ?? '',
         })),
       );
-      this.authentication.set({ ...emptyAuthentication(), ...(collection.Authentication ?? {}) });
+      this.authentication.set({
+        ...emptyAuthentication(),
+        ...(collection.Authentication ?? {}),
+        ...(this.isFolder() && !collection.Authentication
+          ? { Type: AuthenticationType.AuthenticationInherit }
+          : {}),
+      });
+      if (this.isFolder()) {
+        await this.loadInheritedAuthentication(rootPath, path);
+      } else {
+        this.resetInheritedAuthentication();
+      }
       this.snapshot.set(JSON.stringify(this.draft()));
     } catch (error) {
       this.errorMessage.set(error instanceof Error ? error.message : String(error));
     } finally {
       this.isLoading.set(false);
     }
+  }
+
+  private async loadInheritedAuthentication(rootPath: string, path: string): Promise<void> {
+    try {
+      const inherited = await CollectionsService.LoadInheritedAuthenticationForScope(
+        rootPath,
+        path,
+      );
+      this.inheritedAuthentication.set(inherited.Authentication);
+      this.authenticationSourceName.set(inherited.SourceName);
+      this.authenticationSourcePath.set(inherited.SourcePath);
+    } catch {
+      this.resetInheritedAuthentication();
+    }
+  }
+
+  private resetInheritedAuthentication(): void {
+    this.inheritedAuthentication.set(null);
+    this.authenticationSourceName.set('');
+    this.authenticationSourcePath.set('');
   }
 }
 

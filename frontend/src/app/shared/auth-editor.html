@@ -26,8 +26,8 @@
           }
         </p>
         <p class="hint">
-          This request uses the authentication of its collection. Change it there to update every
-          request that inherits it.
+          This request uses the authentication of its closest folder or collection. Change it there
+          to update every request that inherits it.
         </p>
         @if (collectionPath()) {
           <a
@@ -35,7 +35,7 @@
             [routerLink]="collectionLink()"
             [queryParams]="{ tab: 'authentication' }"
           >
-            Edit the collection authentication
+            Edit this authentication
             <app-icon name="chevron-right" [size]="12" />
           </a>
         }

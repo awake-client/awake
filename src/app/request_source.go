@@ -20,7 +20,7 @@ type requestSource struct {
 
 // LoadRequest returns a request ready to be sent: its local overrides
 // applied and, when it inherits its authentication, the authentication of its
-// collection in its place, or none when the collection defines none.
+// closest folder or collection in its place, or none when neither defines one.
 func (requestSource) LoadRequest(workspaceRoot string, relativePath string) (domain.Request, error) {
 	repository := collections.NewRepository(workspaceRoot)
 	request, err := repository.LoadRequest(relativePath)
@@ -36,27 +36,11 @@ func (requestSource) LoadRequest(workspaceRoot string, relativePath string) (dom
 		return request, nil
 	}
 
-	// The authentication comes from the most specific scope of the request:
-	// the folder it belongs to, then the collection, or none when neither
-	// defines one.
-	inherited := &domain.Authentication{Type: domain.AuthenticationNone}
-	scopes := environments.ScopesOfRequest(relativePath)
-	for index := len(scopes) - 1; index >= 0; index-- {
-		scope := scopes[index]
-		if scope == "" {
-			continue
-		}
-		collection, err := repository.LoadCollection(scope)
-		if err != nil && !errors.Is(err, collections.ErrEntryNotFound) {
-			return domain.Request{}, err
-		}
-		if err == nil && collection.Authentication != nil && collection.Authentication.Type != domain.AuthenticationInherit {
-			copied := *collection.Authentication
-			inherited = &copied
-			break
-		}
+	inherited, err := repository.ResolveInheritedAuthentication(relativePath)
+	if err != nil {
+		return domain.Request{}, err
 	}
-	request.Authentication = inherited
+	request.Authentication = inherited.Authentication
 	return request, nil
 }
 

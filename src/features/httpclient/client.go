@@ -581,8 +581,8 @@ func resolvedAuthentication(authentication *domain.Authentication) domain.Authen
 		return domain.Authentication{Type: domain.AuthenticationNone}
 	}
 	if authentication.Type == domain.AuthenticationInherit {
-		// Collection-level authentication is applied when the collections
-		// feature exposes inherited credentials.
+		// The application layer replaces inherited authentication with the one
+		// of the closest folder or collection before the request is sent.
 		return domain.Authentication{Type: domain.AuthenticationNone}
 	}
 	return *authentication

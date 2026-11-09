@@ -153,7 +153,10 @@ documentation: |
 ```
 
 The directory tree defines nesting. A collection directory without a
-`collection.yaml` is valid and inherits the parent metadata.
+`collection.yaml` is valid and inherits the parent metadata. A folder may hold a
+`folder.yaml` with a display name, default variables and its own authentication;
+the settings of the closest folder, then of the collection, apply to the
+requests below it.
 
 ## Requests
 
@@ -332,6 +335,12 @@ configured inline limit are never embedded in YAML.
 ### Authentication types
 
 `inherit`, `none`, `basic`, `bearer`, `apiKey`, `oauth2`.
+
+A request with no `authentication` section, or with the `inherit` type, uses
+the authentication of its closest folder that defines one, then of its
+collection. A folder itself can inherit, or omit its `authentication` section
+to pass the parent one through. A scope that defines its own authentication,
+including `none`, replaces the inherited one.
 
 ```yaml
 authentication:

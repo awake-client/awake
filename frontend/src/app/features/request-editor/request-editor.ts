@@ -193,12 +193,9 @@ export class RequestEditor {
   protected readonly selectedEnvironment = this.environmentStore.selected;
 
   protected readonly requestPath = signal('');
-  /** The collection of the request, whose authentication it may inherit. */
-  protected readonly collectionPath = computed(() => {
-    const segments = this.requestPath().split('/');
-    return segments.length >= 3 ? `${segments[0]}/${segments[1]}` : '';
-  });
-  protected readonly collectionName = signal('');
+  /** The collection or folder whose authentication the request inherits. */
+  protected readonly authenticationSourcePath = signal('');
+  protected readonly authenticationSourceName = signal('');
   protected readonly inheritedAuthentication = signal<Authentication | null>(null);
   /** Request path split for the breadcrumb, without the collections root. */
   protected readonly pathSegments = computed(() => {
@@ -522,7 +519,7 @@ export class RequestEditor {
 
     // Follow the request when it moves in the tree, keeping unsaved edits.
     const collectionsChanged = (event: Event) => {
-      void this.loadCollection(this.collectionPath());
+      void this.loadInheritedAuthentication(this.requestPath());
       const moved = (event as CustomEvent<CollectionsChange | null>).detail?.moved;
       const path = this.requestPath();
       if (moved && path && (path === moved.from || path.startsWith(`${moved.from}/`))) {
@@ -534,9 +531,10 @@ export class RequestEditor {
       window.removeEventListener(COLLECTIONS_CHANGED_EVENT, collectionsChanged),
     );
 
-    // Load what an inheriting request receives from its collection.
+    // Load what an inheriting request receives from its closest folder or
+    // collection, so the editor shows the authentication that is applied.
     effect(() => {
-      void this.loadCollection(this.collectionPath());
+      void this.loadInheritedAuthentication(this.requestPath());
     });
 
     // The URL field always shows the query parameters of the version on
@@ -1065,19 +1063,22 @@ export class RequestEditor {
     return new Date(executedAt).toLocaleDateString();
   }
 
-  private async loadCollection(collectionPath: string): Promise<void> {
+  private async loadInheritedAuthentication(requestPath: string): Promise<void> {
     const rootPath = this.workspaceStore.rootPath();
-    if (!rootPath || !collectionPath) {
-      this.collectionName.set('');
+    if (!rootPath || !requestPath) {
+      this.authenticationSourceName.set('');
+      this.authenticationSourcePath.set('');
       this.inheritedAuthentication.set(null);
       return;
     }
     try {
-      const collection = await CollectionsService.LoadCollection(rootPath, collectionPath);
-      this.collectionName.set(collection.Name);
-      this.inheritedAuthentication.set(collection.Authentication);
+      const inherited = await CollectionsService.LoadInheritedAuthentication(rootPath, requestPath);
+      this.authenticationSourceName.set(inherited.SourceName);
+      this.authenticationSourcePath.set(inherited.SourcePath);
+      this.inheritedAuthentication.set(inherited.Authentication);
     } catch {
-      this.collectionName.set('');
+      this.authenticationSourceName.set('');
+      this.authenticationSourcePath.set('');
       this.inheritedAuthentication.set(null);
     }
   }

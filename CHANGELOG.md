@@ -22,6 +22,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Hiding a collection from the tree, with a menu to display the hidden ones again.
 - Folder level configuration: a settings page per folder like the collections,
   with its own variables and authentication.
+- Requests automatically inherit the authentication of their closest folder,
+  then of their collection, even when their file omits the `authentication`
+  section; the editor shows the inherited credentials and where they come from.
 - In-app update checker backed by GitHub Releases.
 - macOS and Linux installers, plus a Windows NSIS installer and portable archive.
 

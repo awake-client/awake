@@ -155,13 +155,24 @@
         }
 
         @case ('authentication') {
-          <p class="hint">
-            Requests set to <strong>Inherit</strong>, the default, use this authentication. A
-            request can still define its own.
-          </p>
+          @if (isFolder()) {
+            <p class="hint">
+              Requests set to <strong>Inherit</strong>, the default, use the authentication of this
+              folder, or of its closest parent when it has none. Choosing <strong>None</strong>
+              stops inheritance for this folder.
+            </p>
+          } @else {
+            <p class="hint">
+              Requests set to <strong>Inherit</strong>, the default, use this authentication. A
+              request can still define its own.
+            </p>
+          }
           <app-auth-editor
             [authentication]="authentication()"
-            [allowInherit]="false"
+            [allowInherit]="isFolder()"
+            [inherited]="inheritedAuthentication()"
+            [inheritedFrom]="authenticationSourceName()"
+            [collectionPath]="authenticationSourcePath()"
             (authenticationChange)="authentication.set($event)"
           />
         }
