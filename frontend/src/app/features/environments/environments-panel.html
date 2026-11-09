@@ -27,8 +27,13 @@
       </label>
       @if (scope()) {
         <p class="scope-hint">
-          Environments of this collection refine the global ones of the same name. Variables they
-          don't define are inherited.
+          @if (isFolderScope()) {
+            Environments of this folder refine the global ones of the same name. Variables they
+            don't define are inherited.
+          } @else {
+            Environments of this collection refine the global ones of the same name. Variables they
+            don't define are inherited.
+          }
         </p>
       }
 

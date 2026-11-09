@@ -59,6 +59,12 @@ export class CollectionSettings {
 
   protected readonly isPrivate = computed(() => this.collectionPath().startsWith('local/'));
 
+  /**
+   * A path with three segments is a folder of a collection, with two the
+   * collection itself.
+   */
+  protected readonly isFolder = computed(() => this.collectionPath().split('/').length > 2);
+
   private readonly draft = computed<Collection>(() => {
     const variables: Record<string, string> = {};
     for (const variable of this.variables()) {

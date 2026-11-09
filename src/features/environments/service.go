@@ -68,6 +68,30 @@ func (service *Service) ListAll(workspaceRoot string) ([]ScopedSummary, error) {
 			for _, summary := range summaries {
 				result = append(result, ScopedSummary{Summary: summary, Scope: scope})
 			}
+			folders, err := os.ReadDir(filepath.Join(workspaceRoot, filepath.FromSlash(scope)))
+			if err != nil {
+				if os.IsNotExist(err) {
+					continue
+				}
+				return nil, err
+			}
+			for _, folder := range folders {
+				if !folder.IsDir() {
+					continue
+				}
+				folderScope := scope + "/" + folder.Name()
+				folderRepository, err := NewScopedRepository(workspaceRoot, folderScope)
+				if err != nil {
+					continue
+				}
+				folderSummaries, err := folderRepository.List()
+				if err != nil {
+					return nil, err
+				}
+				for _, summary := range folderSummaries {
+					result = append(result, ScopedSummary{Summary: summary, Scope: folderScope})
+				}
+			}
 		}
 	}
 	return result, nil

@@ -649,3 +649,46 @@ func TestMoveAndDeleteCarryTheOverride(t *testing.T) {
 		t.Errorf("expected the override to be deleted, got %v", err)
 	}
 }
+
+func TestUpdateCollectionWritesFolderMetadata(t *testing.T) {
+	workspaceRoot := t.TempDir()
+	repository := NewRepository(workspaceRoot)
+
+	if err := repository.CreateCollection("collections/billing", domain.Collection{Name: "Billing"}); err != nil {
+		t.Fatalf("create collection: %v", err)
+	}
+	if err := repository.CreateFolder("collections/billing/invoices", ""); err != nil {
+		t.Fatalf("create folder: %v", err)
+	}
+
+	updated := domain.Collection{
+		Name:           "Invoices",
+		Variables:      map[string]string{"pageSize": "20"},
+		Documentation: "Paid invoices",
+		Authentication: &domain.Authentication{Type: domain.AuthenticationBearer, Token: "{{token}}"},
+	}
+	if err := repository.UpdateCollection("collections/billing/invoices", updated); err != nil {
+		t.Fatalf("update folder: %v", err)
+	}
+
+	content, err := os.ReadFile(filepath.Join(workspaceRoot, "collections", "billing", "invoices", "folder.yaml"))
+	if err != nil {
+		t.Fatalf("read folder metadata: %v", err)
+	}
+	for _, expected := range []string{"name: Invoices", "variables:", "authentication:", "type: bearer"} {
+		if !strings.Contains(string(content), expected) {
+			t.Errorf("expected folder metadata to contain %q, got:\n%s", expected, content)
+		}
+	}
+
+	loaded, err := repository.LoadCollection("collections/billing/invoices")
+	if err != nil {
+		t.Fatalf("load folder: %v", err)
+	}
+	if loaded.Name != "Invoices" || loaded.Variables["pageSize"] != "20" || loaded.Documentation != "Paid invoices" {
+		t.Errorf("unexpected folder metadata: %+v", loaded)
+	}
+	if loaded.Authentication == nil || loaded.Authentication.Type != domain.AuthenticationBearer || loaded.Authentication.Token != "{{token}}" {
+		t.Errorf("unexpected folder authentication: %+v", loaded.Authentication)
+	}
+}

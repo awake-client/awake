@@ -25,11 +25,18 @@ export function collectionScopeOf(url: string): string {
   if (segments.length < 2) {
     return '';
   }
-  const [root, name] = segments;
+  const [root, name, folder] = segments;
   if (!COLLECTION_ROOTS.includes(root) || !name) {
     return '';
   }
-  return `${root}/${name}`;
+  const collection = `${root}/${name}`;
+  if (folder && !folder.endsWith('.yaml')) {
+    const folderScope = `${collection}/${folder}`;
+    if (folderScope.split('/').length >= 3) {
+      return folderScope;
+    }
+  }
+  return collection;
 }
 
 /**

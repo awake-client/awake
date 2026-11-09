@@ -91,6 +91,18 @@ func isCollectionPath(cleaned string) bool {
 	return len(segments) == 2 && isRoot(segments[0])
 }
 
+// isFolderPath reports whether a cleaned path is a folder of a collection, such
+// as collections/billing/users.
+func isFolderPath(cleaned string) bool {
+	segments := strings.Split(path.Clean(cleaned), "/")
+	return len(segments) == 3 && isRoot(segments[0]) && isValidName(segments[2])
+}
+
+// isValidName reports whether a path segment is usable as a name.
+func isValidName(name string) bool {
+	return name != "" && name != "." && name != ".." && !strings.ContainsAny(name, `\:`)
+}
+
 // isRoot reports whether a cleaned path is one of the two collection roots.
 func isRoot(cleaned string) bool {
 	return cleaned == directoryName || cleaned == privateDirectoryName
@@ -295,9 +307,18 @@ func (repository *Repository) LoadCollection(relativePath string) (domain.Collec
 		return domain.Collection{}, ErrInvalidPath
 	}
 
-	directory, err := repository.resolve(relativePath)
+	cleaned := path.Clean(relativePath)
+	directory, err := repository.resolve(cleaned)
 	if err != nil {
 		return domain.Collection{}, err
+	}
+
+	if isFolderPath(cleaned) {
+		metadata, err := repository.loadFolder(directory)
+		if err != nil {
+			return domain.Collection{}, err
+		}
+		return metadata, nil
 	}
 
 	content, err := os.ReadFile(filepath.Join(directory, collectionFileName))
@@ -317,6 +338,33 @@ func (repository *Repository) LoadCollection(relativePath string) (domain.Collec
 	}
 
 	return collection, nil
+}
+
+// loadFolder reads the metadata of a folder: its display name, its default
+// variables and its authentication.
+func (repository *Repository) loadFolder(directory string) (domain.Collection, error) {
+	content, err := os.ReadFile(filepath.Join(directory, folderFileName))
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return domain.Collection{}, ErrEntryNotFound
+		}
+		return domain.Collection{}, fmt.Errorf("read folder metadata %s: %w", directory, err)
+	}
+
+	var metadata folderMetadata
+	if err := yaml.Unmarshal(content, &metadata); err != nil {
+		return domain.Collection{}, fmt.Errorf("%w: %v", domain.ErrInvalidCollection, err)
+	}
+	if strings.TrimSpace(metadata.Name) == "" {
+		return domain.Collection{}, domain.ErrInvalidCollection
+	}
+
+	return domain.Collection{
+		Name:           metadata.Name,
+		Variables:      metadata.Variables,
+		Authentication: metadata.Authentication,
+		Documentation:  metadata.Documentation,
+	}, nil
 }
 
 // CreateRequest writes a new request file and creates missing parent
@@ -390,6 +438,9 @@ func (repository *Repository) UpdateRequest(relativePath string, request domain.
 // name, documentation, variables and authentication.
 func (repository *Repository) UpdateCollection(relativePath string, collection domain.Collection) error {
 	cleaned := path.Clean(relativePath)
+	if isFolderPath(cleaned) {
+		return repository.updateFolder(cleaned, collection)
+	}
 	if !isCollectionPath(cleaned) {
 		return ErrInvalidPath
 	}
@@ -410,6 +461,34 @@ func (repository *Repository) UpdateCollection(relativePath string, collection d
 		return fmt.Errorf("encode collection %s: %w", relativePath, err)
 	}
 	return files.WriteAtomically(filepath.Join(directory, collectionFileName), content)
+}
+
+// updateFolder replaces the metadata of an existing folder: its display name,
+// its default variables and its authentication, which refine or replace those
+// of the collection it belongs to.
+func (repository *Repository) updateFolder(cleaned string, collection domain.Collection) error {
+	directory, err := repository.resolve(cleaned)
+	if err != nil {
+		return err
+	}
+	if info, err := os.Stat(directory); err != nil || !info.IsDir() {
+		return ErrEntryNotFound
+	}
+	if strings.TrimSpace(collection.Name) == "" {
+		return ErrInvalidPath
+	}
+
+	metadata := folderMetadata{
+		Name:           collection.Name,
+		Variables:      collection.Variables,
+		Authentication: collection.Authentication,
+		Documentation:  collection.Documentation,
+	}
+	content, err := yamlcodec.EncodeValue(metadata)
+	if err != nil {
+		return fmt.Errorf("encode folder %s: %w", cleaned, err)
+	}
+	return files.WriteAtomically(filepath.Join(directory, folderFileName), content)
 }
 
 func (repository *Repository) CreateCollection(relativePath string, collection domain.Collection) error {
@@ -656,7 +735,10 @@ func entryLess(first Entry, second Entry) bool {
 
 // folderMetadata is the content of folder.yaml.
 type folderMetadata struct {
-	Name string `yaml:"name"`
+	Name           string                 `yaml:"name"`
+	Variables      map[string]string      `yaml:"variables,omitempty"`
+	Authentication *domain.Authentication `yaml:"authentication,omitempty"`
+	Documentation  string                 `yaml:"documentation,omitempty"`
 }
 
 // isMetadataFile reports whether a file describes its directory rather than

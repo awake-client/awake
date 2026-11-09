@@ -2,11 +2,17 @@
   <header class="settings-header">
     <div class="title">
       <p class="eyebrow">
-        <app-icon [name]="isPrivate() ? 'lock' : 'box'" [size]="12" />
-        {{ isPrivate() ? 'Private collection' : 'Collection' }}
+        <app-icon [name]="isPrivate() ? 'lock' : isFolder() ? 'folder' : 'box'" [size]="12" />
+        @if (isPrivate()) {
+          Private folder
+        } @else if (isFolder()) {
+          Folder
+        } @else {
+          Collection
+        }
       </p>
-      <h1>{{ name() || 'Untitled collection' }}</h1>
-      <p class="path">{{ collectionPath() }}/collection.yaml</p>
+      <h1>{{ name() || (isFolder() ? 'Untitled folder' : 'Untitled collection') }}</h1>
+      <p class="path">{{ collectionPath() }}/{{ isFolder() ? 'folder' : 'collection' }}.yaml</p>
     </div>
     <div class="actions">
       @if (isDirty()) {
@@ -75,10 +81,12 @@
               (input)="name.set(inputValue($event))"
             />
           </label>
-          <div class="field">
-            <span class="field-label">Color</span>
-            <app-color-picker [value]="color()" (valueChange)="color.set($event)" />
-          </div>
+          @if (!isFolder()) {
+            <div class="field">
+              <span class="field-label">Color</span>
+              <app-color-picker [value]="color()" (valueChange)="color.set($event)" />
+            </div>
+          }
           <label class="field grow">
             <span class="field-label">Documentation</span>
             <textarea
@@ -95,15 +103,19 @@
             [queryParams]="{ scope: collectionPath() }"
           >
             <app-icon name="globe" [size]="14" />
-            Environments of this collection
+            @if (isFolder()) {
+              Environments of this folder
+            } @else {
+              Environments of this collection
+            }
             <app-icon name="chevron-right" [size]="12" />
           </a>
         }
 
         @case ('variables') {
           <p class="hint">
-            Default values for every request of the collection. An environment variable with the
-            same name takes precedence.
+            Default values for every request of the {{ isFolder() ? 'folder' : 'collection' }}. An
+            environment variable with the same name takes precedence.
           </p>
           <div class="rows">
             @for (variable of variables(); track $index) {

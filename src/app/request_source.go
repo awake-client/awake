@@ -2,6 +2,7 @@ package app
 
 import (
 	"errors"
+	"strings"
 
 	"github.com/awake-client/awake/src/domain"
 	"github.com/awake-client/awake/src/features/collections"
@@ -35,8 +36,16 @@ func (requestSource) LoadRequest(workspaceRoot string, relativePath string) (dom
 		return request, nil
 	}
 
+	// The authentication comes from the most specific scope of the request:
+	// the folder it belongs to, then the collection, or none when neither
+	// defines one.
 	inherited := &domain.Authentication{Type: domain.AuthenticationNone}
-	if scope := environments.ScopeOfRequest(relativePath); scope != "" {
+	scopes := environments.ScopesOfRequest(relativePath)
+	for index := len(scopes) - 1; index >= 0; index-- {
+		scope := scopes[index]
+		if scope == "" {
+			continue
+		}
 		collection, err := repository.LoadCollection(scope)
 		if err != nil && !errors.Is(err, collections.ErrEntryNotFound) {
 			return domain.Request{}, err
@@ -44,6 +53,7 @@ func (requestSource) LoadRequest(workspaceRoot string, relativePath string) (dom
 		if err == nil && collection.Authentication != nil && collection.Authentication.Type != domain.AuthenticationInherit {
 			copied := *collection.Authentication
 			inherited = &copied
+			break
 		}
 	}
 	request.Authentication = inherited
@@ -62,14 +72,20 @@ func (source requestSource) LoadVariableLayers(workspaceRoot string, requestPath
 
 	layers := []variables.Layer{{Source: "workspace", Values: configuration.Variables}}
 
-	scope := environments.ScopeOfRequest(requestPath)
-	if scope != "" {
+	scopes := environments.ScopesOfRequest(requestPath)
+
+	// Default variables of the collection and of the folder of the request,
+	// weakest first, before the environment layers refine them.
+	for _, scope := range scopes {
+		if scope == "" {
+			continue
+		}
 		collection, err := collections.NewRepository(workspaceRoot).LoadCollection(scope)
 		if err != nil && !errors.Is(err, collections.ErrEntryNotFound) {
 			return nil, err
 		}
 		if err == nil && len(collection.Variables) > 0 {
-			layers = append(layers, variables.Layer{Source: "collection", Values: collection.Variables})
+			layers = append(layers, variables.Layer{Source: scope, Values: collection.Variables})
 		}
 	}
 
@@ -77,14 +93,9 @@ func (source requestSource) LoadVariableLayers(workspaceRoot string, requestPath
 		return layers, nil
 	}
 
-	scopes := []string{""}
-	if scope != "" {
-		scopes = append(scopes, scope)
-	}
-
 	found := false
-	for _, environmentScope := range scopes {
-		repository, err := environments.NewScopedRepository(workspaceRoot, environmentScope)
+	for _, scope := range scopes {
+		repository, err := environments.NewScopedRepository(workspaceRoot, scope)
 		if err != nil {
 			return nil, err
 		}
@@ -98,8 +109,11 @@ func (source requestSource) LoadVariableLayers(workspaceRoot string, requestPath
 		found = true
 
 		label := "environment"
-		if environmentScope != "" {
+		if scope != "" {
 			label = "collection environment"
+			if len(strings.Split(scope, "/")) > 2 {
+				label = "folder environment"
+			}
 		}
 		layers = append(layers, variables.Layer{Source: label, Values: resolved.Shared.Variables})
 		if resolved.Local != nil {
@@ -107,7 +121,7 @@ func (source requestSource) LoadVariableLayers(workspaceRoot string, requestPath
 		}
 
 		if source.secrets != nil {
-			secretValues, err := source.secrets.Values(workspaceRoot, environmentScope, environmentFileName)
+			secretValues, err := source.secrets.Values(workspaceRoot, scope, environmentFileName)
 			if err != nil {
 				return nil, err
 			}

@@ -14,13 +14,25 @@ function summary(fileName: string, scope: string, local = false): ScopedSummary 
 describe('collectionScopeOf', () => {
   it('reads the collection of an open request', () => {
     expect(
+      collectionScopeOf('/workspace/request/collections/billing/invoices/list%20invoices.yaml'),
+    ).toBe('collections/billing/invoices');
+  });
+
+  it('reads the folder of a request inside a folder', () => {
+    expect(
       collectionScopeOf('/workspace/request/collections/billing/requests/list%20invoices.yaml'),
-    ).toBe('collections/billing');
+    ).toBe('collections/billing/requests');
   });
 
   it('reads the collection whose settings are open', () => {
     expect(collectionScopeOf('/workspace/collection/local/scratch?tab=variables')).toBe(
       'local/scratch',
+    );
+  });
+
+  it('reads the folder whose settings are open', () => {
+    expect(collectionScopeOf('/workspace/collection/collections/platform/users')).toBe(
+      'collections/platform/users',
     );
   });
 

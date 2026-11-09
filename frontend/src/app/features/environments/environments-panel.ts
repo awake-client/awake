@@ -1,4 +1,4 @@
-import { Component, DestroyRef, inject, signal } from '@angular/core';
+import { Component, DestroyRef, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
 import * as EnvironmentsService from '@bindings/github.com/awake-client/awake/src/features/environments/service';
@@ -23,9 +23,11 @@ export class EnvironmentsPanel {
   private readonly workspaceStore = inject(WorkspaceStore);
 
   protected readonly environments = signal<Summary[]>([]);
-  /** Empty for the global environments, else the collection being edited. */
+  /** Empty for the global environments, else the collection or folder being edited. */
   protected readonly scope = signal('');
   protected readonly scopes = signal<{ path: string; name: string }[]>([]);
+  /** True when the scope is a folder of a collection, not a collection itself. */
+  protected readonly isFolderScope = computed(() => this.scope().split('/').length > 2);
   /** Global environment names, to show which collection ones override them. */
   protected readonly globalNames = signal<Set<string>>(new Set());
   protected readonly selectedFileName = signal('');
@@ -102,14 +104,22 @@ export class EnvironmentsPanel {
       CollectionsService.List(rootPath, ''),
       CollectionsService.List(rootPath, 'local'),
     ]);
-    this.scopes.set(
-      [...(shared ?? []), ...(privateCollections ?? [])].map((collection) => ({
-        path: collection.Path,
-        name: collection.Path.startsWith('local/')
-          ? `${collection.Name} (private)`
-          : collection.Name,
-      })),
-    );
+    const entries = [...(shared ?? []), ...(privateCollections ?? [])];
+    const result: { path: string; name: string }[] = [];
+    for (const entry of entries) {
+      result.push({
+        path: entry.Path,
+        name: entry.Path.startsWith('local/') ? `${entry.Name} (private)` : entry.Name,
+      });
+      const children = await CollectionsService.List(rootPath, entry.Path);
+      for (const child of children ?? []) {
+        if (child.Kind !== 'directory') {
+          continue;
+        }
+        result.push({ path: child.Path, name: child.Name });
+      }
+    }
+    this.scopes.set(result);
   }
 
   private async loadEnvironments(): Promise<void> {

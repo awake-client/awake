@@ -32,7 +32,8 @@ func NewRepository(workspaceRoot string) *Repository {
 
 // NewScopedRepository returns the repository of a scope. An empty scope is
 // the workspace; otherwise the scope is a collection path such as
-// collections/billing or local/scratch, whose environments live in its own
+// collections/billing or local/scratch, or a folder of one such collection,
+// such as collections/billing/users, whose environments live in its own
 // environments directory.
 func NewScopedRepository(workspaceRoot string, scope string) (*Repository, error) {
 	if scope == "" {
@@ -47,31 +48,62 @@ func NewScopedRepository(workspaceRoot string, scope string) (*Repository, error
 	}, nil
 }
 
-// ValidateScope accepts a collection path: a root, shared or private, and a
-// collection directory name.
+// ValidateScope accepts a collection scope: a root, shared or private, and a
+// collection directory name. It also accepts a folder of such a collection,
+// with its folder directory name, so environments can be scoped to a folder.
 func ValidateScope(scope string) error {
 	segments := strings.Split(scope, "/")
-	if len(segments) != 2 || (segments[0] != sharedCollectionsRoot && segments[0] != privateCollectionsRoot) {
-		return ErrInvalidScope
+	valid := len(segments) == 2 || len(segments) == 3
+	if valid {
+		valid = (segments[0] == sharedCollectionsRoot || segments[0] == privateCollectionsRoot) &&
+			segments[1] != "" && segments[1] != "." && segments[1] != ".." &&
+			!strings.ContainsAny(segments[1], `\:`)
 	}
-	name := segments[1]
-	if name == "" || name == "." || name == ".." || strings.ContainsAny(name, `\:`) {
+	if valid && len(segments) == 3 {
+		valid = segments[2] != "" && segments[2] != "." && segments[2] != ".." &&
+			!strings.ContainsAny(segments[2], `\:`)
+	}
+	if !valid {
 		return ErrInvalidScope
 	}
 	return nil
 }
 
-// ScopeOfRequest returns the collection a request belongs to, as a scope.
+// ScopeOfRequest returns the scope a request belongs to, as a collection for a
+// request at its root, or as the folder containing it.
 func ScopeOfRequest(requestPath string) string {
+	scopes := ScopesOfRequest(requestPath)
+	if len(scopes) == 0 {
+		return ""
+	}
+	return scopes[len(scopes)-1]
+}
+
+// ScopesOfRequest returns the environment scopes a request belongs to, from
+// the weakest to the strongest: the global ones, then the collection, and the
+// folder of a request inside one, when it has one.
+func ScopesOfRequest(requestPath string) []string {
+	scopes := []string{""}
 	segments := strings.Split(requestPath, "/")
 	if len(segments) < 3 {
-		return ""
+		return scopes
 	}
-	scope := segments[0] + "/" + segments[1]
-	if ValidateScope(scope) != nil {
-		return ""
+	collection := segments[0] + "/" + segments[1]
+	if isValidName(segments[1]) && ValidateScope(collection) == nil {
+		scopes = append(scopes, collection)
 	}
-	return scope
+	if len(segments) >= 4 && !strings.HasSuffix(segments[2], fileExtension) {
+		folder := segments[0] + "/" + segments[1] + "/" + segments[2]
+		if isValidName(segments[2]) && ValidateScope(folder) == nil {
+			scopes = append(scopes, folder)
+		}
+	}
+	return scopes
+}
+
+// isValidName reports whether a scope segment is usable as a name.
+func isValidName(name string) bool {
+	return name != "" && name != "." && name != ".." && !strings.ContainsAny(name, `\:`)
 }
 
 // DirectoryPath returns the environments directory of the scope.

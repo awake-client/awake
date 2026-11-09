@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/awake-client/awake/src/domain"
 	"github.com/awake-client/awake/src/features/workspace"
 	"github.com/awake-client/awake/src/shared/variables"
 )
@@ -134,5 +135,78 @@ func TestLoadRequestAppliesLocalOverrides(t *testing.T) {
 	}
 	if len(request.Parameters) != 1 || request.Parameters[0].Value != "1" {
 		t.Errorf("parameters are not overridden and must stay shared, got %+v", request.Parameters)
+	}
+}
+
+func TestLoadVariableLayersFoldsIntoTheFolderOfARequest(t *testing.T) {
+	root := t.TempDir()
+	if _, err := workspace.NewService().Create(root, workspace.CreateOptions{Name: "Folders", Mode: workspace.ModeTeam}); err != nil {
+		t.Fatalf("create workspace: %v", err)
+	}
+	write := func(path string, content string) {
+		t.Helper()
+		full := filepath.Join(root, filepath.FromSlash(path))
+		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(full, []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write("environments/staging.yaml", "name: Staging\nvariables:\n  baseUrl: https://global.example.com\n  region: eu\n")
+	write("collections/billing/collection.yaml", "name: Billing\nvariables:\n  version: v2\n  region: collection-default\n")
+	write("collections/billing/users/folder.yaml", "name: Users\nvariables:\n  region: folder-default\n  pageSize: \"20\"\n")
+
+	source := requestSource{}
+	layers, err := source.LoadVariableLayers(root, "collections/billing/users/invoices/list.yaml", "staging")
+	if err != nil {
+		t.Fatalf("load layers: %v", err)
+	}
+	merged := map[string]string{}
+	for _, values := range variables.Maps(layers) {
+		for name, value := range values {
+			merged[name] = value
+		}
+	}
+	if merged["version"] != "v2" || merged["region"] != "eu" || merged["baseUrl"] != "https://global.example.com" || merged["pageSize"] != "20" {
+		t.Errorf("unexpected merged variables: %v", merged)
+	}
+}
+
+func TestLoadRequestInheritsTheFolderAuthentication(t *testing.T) {
+	root := t.TempDir()
+	if _, err := workspace.NewService().Create(root, workspace.CreateOptions{Name: "AuthFolders", Mode: workspace.ModeTeam}); err != nil {
+		t.Fatalf("create workspace: %v", err)
+	}
+	write := func(path string, content string) {
+		t.Helper()
+		full := filepath.Join(root, filepath.FromSlash(path))
+		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(full, []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write("collections/billing/collection.yaml", "name: Billing\nauthentication:\n  type: bearer\n  token: collection-token\n")
+	write("collections/billing/users/folder.yaml", "name: Users\nauthentication:\n  type: basic\n  username: folder-user\n")
+	write("collections/billing/users/invoices/list.yaml", "name: List\nmethod: GET\nurl: https://example.com\nauthentication:\n  type: inherit\n")
+	write("collections/billing/invoices.yaml", "name: Invoices\nmethod: GET\nurl: https://example.com\nauthentication:\n  type: inherit\n")
+
+	source := requestSource{}
+	inherited, err := source.LoadRequest(root, "collections/billing/users/invoices/list.yaml")
+	if err != nil {
+		t.Fatalf("load request: %v", err)
+	}
+	if inherited.Authentication == nil || inherited.Authentication.Type != domain.AuthenticationBasic || inherited.Authentication.Username != "folder-user" {
+		t.Fatalf("expected the folder authentication, got %+v", inherited.Authentication)
+	}
+
+	fallback, err := source.LoadRequest(root, "collections/billing/invoices.yaml")
+	if err != nil {
+		t.Fatalf("load request: %v", err)
+	}
+	if fallback.Authentication == nil || fallback.Authentication.Type != domain.AuthenticationBearer || fallback.Authentication.Token != "collection-token" {
+		t.Fatalf("expected the collection authentication fallback, got %+v", fallback.Authentication)
 	}
 }

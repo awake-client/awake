@@ -408,3 +408,58 @@ func TestSaveLocalVariablesReplacesTheOverrides(t *testing.T) {
 		t.Errorf("expected no local file for an empty list, got %v", err)
 	}
 }
+
+func TestValidateScopeAcceptsFolders(t *testing.T) {
+	for _, scope := range []string{"collections/billing", "local/scratch", "collections/platform/users"} {
+		if err := ValidateScope(scope); err != nil {
+			t.Errorf("expected %q to be valid, got %v", scope, err)
+		}
+	}
+	for _, scope := range []string{"", "billing", "collections/", "collections/billing/users/extra", "../secrets"} {
+		if err := ValidateScope(scope); err == nil {
+			t.Errorf("expected %q to be invalid", scope)
+		}
+	}
+}
+
+func TestScopesOfRequestReturnCollectionAndFolder(t *testing.T) {
+	scopes := ScopesOfRequest("collections/billing/invoices/list.yaml")
+	if len(scopes) != 3 || scopes[0] != "" || scopes[1] != "collections/billing" || scopes[2] != "collections/billing/invoices" {
+		t.Fatalf("unexpected scopes: %v", scopes)
+	}
+	if got := ScopeOfRequest("collections/billing/invoices/list.yaml"); got != "collections/billing/invoices" {
+		t.Fatalf("expected the folder scope, got %q", got)
+	}
+	if got := ScopeOfRequest("collections/billing/invoices.yaml"); got != "collections/billing" {
+		t.Fatalf("expected the collection scope, got %q", got)
+	}
+}
+
+func TestListAllReturnsEnvironmentsOfFolders(t *testing.T) {
+	workspaceRoot := t.TempDir()
+	writeFolderEnvironment := func(path string, content string) {
+		t.Helper()
+		directory := filepath.Join(workspaceRoot, filepath.FromSlash(path))
+		if err := os.MkdirAll(directory, 0o755); err != nil {
+			t.Fatalf("create folder environments directory: %v", err)
+		}
+		if err := os.WriteFile(filepath.Join(directory, "development.yaml"), []byte(content), 0o644); err != nil {
+			t.Fatalf("write %s: %v", path, err)
+		}
+	}
+	writeFolderEnvironment("collections/billing/environments", "name: Development\nvariables:\n  baseUrl: https://billing.example.com\n")
+	writeFolderEnvironment("collections/billing/users/environments", "name: Development\nvariables:\n  baseUrl: https://users.example.com\n")
+
+	summaries, err := NewService().ListAll(workspaceRoot)
+	if err != nil {
+		t.Fatalf("list all: %v", err)
+	}
+
+	found := map[string]bool{}
+	for _, summary := range summaries {
+		found[summary.Scope] = true
+	}
+	if !found["collections/billing"] || !found["collections/billing/users"] {
+		t.Fatalf("expected the collection and the folder scopes, got %v", summaries)
+	}
+}
