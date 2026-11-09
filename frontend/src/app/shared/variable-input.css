@@ -136,6 +136,13 @@ textarea::selection {
   overflow-wrap: normal;
 }
 
+/* A field scrolled to its end draws the last characters over its right
+   padding, up to the border. The clip box follows: it used to stop at the
+   padding edge and cut the very end of a long URL. */
+:host(.multiline.single-line) .highlight {
+  padding-right: 0;
+}
+
 :host(.multiline) textarea {
   height: auto;
   min-height: 38px;
