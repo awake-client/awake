@@ -1,6 +1,6 @@
 import { Component, DestroyRef, computed, effect, inject, signal, viewChild } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { NavigationEnd, Router, RouterLink, RouterOutlet } from '@angular/router';
 import { filter } from 'rxjs';
 import { ScopedSummary } from '@bindings/github.com/awake-client/awake/src/features/environments/models';
 import * as EnvironmentsService from '@bindings/github.com/awake-client/awake/src/features/environments/service';
@@ -56,11 +56,12 @@ const SIDEBAR_SECTIONS: SidebarSection[] = [
   selector: 'app-workspace-shell',
   host: {
     '(window:resize)': 'clampSidebar()',
+    '(document:click)': 'handleOutsideClick($event)',
+    '(document:keydown.escape)': 'closeTools()',
   },
   imports: [
     RouterOutlet,
     RouterLink,
-    RouterLinkActive,
     CollectionTree,
     CommandPalette,
     NewEntryDialog,
@@ -92,6 +93,13 @@ export class WorkspaceShell {
   protected readonly shortcuts = inject(Shortcuts);
   protected readonly defaultSidebarWidth = SIDEBAR_WIDTH.default;
   protected readonly sections = SIDEBAR_SECTIONS;
+  /** The workspace tools menu in the sidebar, closed by default. */
+  protected readonly toolsOpen = signal(false);
+  private readonly currentUrl = signal(this.router.url);
+  /** Tool matching the page on screen, if any. */
+  protected readonly activeSection = computed(
+    () => this.sections.find((section) => this.isSectionActive(section)) ?? null,
+  );
   protected readonly workspace = this.workspaceStore.workspace;
   protected readonly rootPath = computed(() => this.workspaceStore.rootPath() ?? '');
   /** Every environment of the workspace, with its scope. */
@@ -143,6 +151,7 @@ export class WorkspaceShell {
         takeUntilDestroyed(this.destroyRef),
       )
       .subscribe(() => {
+        this.currentUrl.set(this.router.url);
         const scope =
           collectionScopeOf(this.router.url) ||
           (this.tabs.tabs().length > 0 ? this.activeScope() : '');
@@ -205,6 +214,29 @@ export class WorkspaceShell {
 
   protected openCommandPalette(): void {
     void this.commandPalette()?.open();
+  }
+
+  protected isSectionActive(section: SidebarSection): boolean {
+    return this.currentUrl().startsWith(section.route);
+  }
+
+  protected toggleTools(): void {
+    this.toolsOpen.update((open) => !open);
+  }
+
+  protected closeTools(): void {
+    this.toolsOpen.set(false);
+  }
+
+  /** Closes the tools menu when the click lands outside it. */
+  protected handleOutsideClick(event: MouseEvent): void {
+    if (!this.toolsOpen()) {
+      return;
+    }
+    const target = event.target as HTMLElement | null;
+    if (!target?.closest('.sidebar-tools')) {
+      this.toolsOpen.set(false);
+    }
   }
 
   protected editEnvironment(environment: EnvironmentOption): void {

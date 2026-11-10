@@ -38,12 +38,40 @@
       (requestSelected)="openRequest($event)"
     />
 
-    <nav class="sidebar-sections" aria-label="Workspace tools">
-      @for (section of sections; track section.route) {
-        <a class="sidebar-section" [routerLink]="section.route" routerLinkActive="active">
-          <app-icon [name]="section.icon" [size]="15" />
-          <span>{{ section.label }}</span>
-        </a>
+    <nav class="sidebar-tools">
+      <button
+        type="button"
+        class="sidebar-section tools-trigger"
+        [class.open]="toolsOpen()"
+        [class.active]="activeSection() !== null"
+        aria-haspopup="menu"
+        [attr.aria-expanded]="toolsOpen()"
+        title="Workspace tools"
+        (click)="toggleTools()"
+      >
+        <app-icon name="menu" [size]="15" />
+        <span>Tools</span>
+        <app-icon class="chevron" name="chevron-down" [size]="12" />
+      </button>
+
+      @if (toolsOpen()) {
+        <div class="tools-menu" role="menu" aria-label="Workspace tools">
+          @for (section of sections; track section.route) {
+            <a
+              role="menuitem"
+              class="tools-item"
+              [routerLink]="section.route"
+              [class.active]="isSectionActive(section)"
+              (click)="closeTools()"
+            >
+              <app-icon [name]="section.icon" [size]="15" />
+              <span>{{ section.label }}</span>
+              @if (isSectionActive(section)) {
+                <app-icon class="check" name="check" [size]="13" />
+              }
+            </a>
+          }
+        </div>
       }
     </nav>
 

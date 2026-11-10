@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Workspace tools (Assistant, Environments, History, Git, Import / Export) are
+  grouped in a Tools menu at the bottom of the sidebar.
+
 ### Fixed
 
 - The body editor no longer scrolls twice: the code editor keeps its own
