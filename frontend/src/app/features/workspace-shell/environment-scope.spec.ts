@@ -66,7 +66,22 @@ describe('visibleEnvironments', () => {
     expect(names).toEqual(['development', 'staging', 'production']);
   });
 
-  it('offers only the global environments outside a collection', () => {
+  it('offers a folder environment with those of its collection and the global ones', () => {
+    const scoped = [
+      summary('development', ''),
+      summary('production', 'collections/billing'),
+      summary('users', 'collections/billing/invoices'),
+      summary('sandbox', 'collections/support'),
+    ];
+
+    const names = visibleEnvironments(scoped, 'collections/billing/invoices').map(
+      (option) => option.FileName,
+    );
+
+    expect(names).toEqual(['development', 'production', 'users']);
+  });
+
+  it('offers the global environments outside a collection', () => {
     const names = visibleEnvironments(scoped, '').map((option) => option.FileName);
 
     expect(names).toEqual(['development', 'staging']);

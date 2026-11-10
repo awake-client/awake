@@ -32,6 +32,22 @@ describe('EnvironmentStore', () => {
     expect(store.selected()).toBe('development');
   });
 
+  it('starts a folder never chosen in with the choice of its collection', () => {
+    const store = new EnvironmentStore();
+    store.useWorkspace(WORKSPACE);
+    store.useScope('collections/billing');
+    store.select('prodA');
+
+    store.useScope('collections/billing/invoices');
+    expect(store.selected()).toBe('prodA');
+
+    // A folder keeps its own choice once made.
+    store.select('sandbox');
+    store.useScope('collections/billing');
+    store.useScope('collections/billing/invoices');
+    expect(store.selected()).toBe('sandbox');
+  });
+
   it('keeps an explicit "no environment" chooser per collection', () => {
     const store = new EnvironmentStore();
     store.useWorkspace(WORKSPACE);

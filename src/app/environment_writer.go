@@ -71,13 +71,14 @@ func (writer environmentWriter) applySecret(workspaceRoot string, scope string, 
 	return writer.secrets.Set(workspaceRoot, scope, environmentFileName, change.Name, change.Value)
 }
 
+// mostSpecificEnvironment finds the environment a request runs with, from the
+// closest scope to the weakest: its folder, its collection, then the
+// workspace.
 func mostSpecificEnvironment(workspaceRoot string, requestPath string, environmentFileName string) (string, environments.ResolvedEnvironment, error) {
-	scopes := []string{""}
-	if scope := environments.ScopeOfRequest(requestPath); scope != "" {
-		scopes = []string{scope, ""}
-	}
+	scopes := environments.ScopesOfRequest(requestPath)
 
-	for _, scope := range scopes {
+	for index := len(scopes) - 1; index >= 0; index-- {
+		scope := scopes[index]
 		repository, err := environments.NewScopedRepository(workspaceRoot, scope)
 		if err != nil {
 			return "", environments.ResolvedEnvironment{}, err
@@ -95,13 +96,10 @@ func mostSpecificEnvironment(workspaceRoot string, requestPath string, environme
 }
 
 // ResolveEnvironmentName finds an environment visible to the request, in its
-// collection or globally, by file name first and then by display name,
-// ignoring case.
+// folder, its collection or globally, by file name first and then by display
+// name, ignoring case.
 func (environmentWriter) ResolveEnvironmentName(workspaceRoot string, requestPath string, name string) (string, string, error) {
-	scopes := []string{""}
-	if scope := environments.ScopeOfRequest(requestPath); scope != "" {
-		scopes = append(scopes, scope)
-	}
+	scopes := environments.ScopesOfRequest(requestPath)
 
 	summaries := make([]environments.Summary, 0)
 	for _, scope := range scopes {

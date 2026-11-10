@@ -31,9 +31,10 @@ export class EnvironmentStore {
   }
 
   /**
-   * Activates the slot of a collection: its remembered environment becomes
-   * the current one. A collection never chosen in starts from the global
-   * choice, so the environment selected before opening it carries over.
+   * Activates the slot of a collection or of one of its folders: its
+   * remembered environment becomes the current one. A scope never chosen in
+   * starts from the choice of its collection, then of the workspace, so the
+   * environment selected before opening it carries over.
    */
   useScope(scope: string): void {
     if (scope === this.scope) {
@@ -41,7 +42,10 @@ export class EnvironmentStore {
     }
     this.scope = scope;
     this.current.set(
-      this.slot(this.workspaceRoot, scope) ?? this.slot(this.workspaceRoot, '') ?? '',
+      this.slot(this.workspaceRoot, scope) ??
+        this.slot(this.workspaceRoot, parentScopeOf(scope)) ??
+        this.slot(this.workspaceRoot, '') ??
+        '',
     );
   }
 
@@ -61,6 +65,15 @@ export class EnvironmentStore {
 
 /** Selection per workspace, then per collection scope. */
 type Memory = Record<string, Record<string, string>>;
+
+/**
+ * Collection a folder scope inherits its choice from. A collection scope has
+ * no parent of its own and falls back to the workspace slot.
+ */
+function parentScopeOf(scope: string): string {
+  const segments = scope.split('/');
+  return segments.length > 2 ? segments.slice(0, 2).join('/') : '';
+}
 
 function writeMemory(workspaceRoot: string, scope: string, fileName: string): void {
   const memory = readMemory();

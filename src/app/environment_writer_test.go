@@ -56,6 +56,36 @@ func TestResolveEnvironmentNameMatchesFileOrDisplayName(t *testing.T) {
 	}
 }
 
+func TestResolveEnvironmentNameFindsCollectionEnvironmentOfAFolderRequest(t *testing.T) {
+	workspaceRoot := t.TempDir()
+	writeFile(t, filepath.Join(workspaceRoot, "collections", "billing", "environments", "sandbox.yaml"), "name: Billing sandbox\n")
+
+	writer := environmentWriter{}
+	fileName, _, err := writer.ResolveEnvironmentName(workspaceRoot, "collections/billing/invoices/list.yaml", "sandbox")
+	if err != nil || fileName != "sandbox" {
+		t.Fatalf("expected the collection environment, got %q (%v)", fileName, err)
+	}
+}
+
+func TestApplyEnvironmentChangesWritesTheCollectionEnvironmentOfAFolderRequest(t *testing.T) {
+	workspaceRoot := t.TempDir()
+	writeFile(t, filepath.Join(workspaceRoot, "collections", "billing", "environments", "sandbox.yaml"), "name: Sandbox\nvariables:\n  token: first\n")
+
+	writer := environmentWriter{}
+	changes := []domain.EnvironmentChange{{Name: "token", Value: "second"}}
+	if err := writer.ApplyEnvironmentChanges(workspaceRoot, "collections/billing/invoices/list.yaml", "sandbox", changes); err != nil {
+		t.Fatalf("apply environment changes: %v", err)
+	}
+
+	local, err := os.ReadFile(filepath.Join(workspaceRoot, "collections", "billing", "environments", "sandbox.local.yaml"))
+	if err != nil {
+		t.Fatalf("read local override: %v", err)
+	}
+	if !strings.Contains(string(local), "second") {
+		t.Errorf("expected the collection environment to keep the new value, got:\n%s", local)
+	}
+}
+
 func writeFile(t *testing.T, path string, content string) {
 	t.Helper()
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {

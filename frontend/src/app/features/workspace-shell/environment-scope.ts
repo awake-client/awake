@@ -40,14 +40,31 @@ export function collectionScopeOf(url: string): string {
 }
 
 /**
+ * Environment scopes visible from a page, from the weakest to the strongest:
+ * the global one, then the collection, then its folder. A folder scope keeps
+ * the environments of its collection, which its requests still inherit.
+ */
+export function visibleScopesOf(scope: string): string[] {
+  if (!scope) {
+    return [''];
+  }
+  const segments = scope.split('/');
+  if (segments.length > 2) {
+    return ['', segments.slice(0, 2).join('/'), scope];
+  }
+  return ['', scope];
+}
+
+/**
  * Environments offered in a context: the global ones, then those of its
- * collection. An environment of the same name in both scopes is offered once,
- * since the collection refines the global one.
+ * collection and of its folder. An environment of the same name in several
+ * scopes is offered once, since the closest scope refines the others.
  */
 export function visibleEnvironments(scoped: ScopedSummary[], scope: string): EnvironmentChoice[] {
+  const visibleScopes = new Set(visibleScopesOf(scope));
   const options = new Map<string, EnvironmentChoice>();
   for (const summary of scoped) {
-    if (summary.Scope !== '' && summary.Scope !== scope) {
+    if (summary.Scope !== '' && !visibleScopes.has(summary.Scope)) {
       continue;
     }
 

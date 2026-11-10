@@ -38,5 +38,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Importing an OpenCollection whose OAuth 2 password flow nests its client and
   resource owner credentials now keeps them, so Keycloak-style collections no
   longer fail with `domain: invalid collection`.
+- Requests inside a folder keep the environments of their collection: the
+  picker offers them and the title bar keeps the selected one, instead of
+  showing "No environment". Scripts writing environment variables find the
+  collection environment from a request in one of its folders.
 
 [Unreleased]: https://github.com/awake-client/awake/commits/main
