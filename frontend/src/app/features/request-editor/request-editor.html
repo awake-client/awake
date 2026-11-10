@@ -193,7 +193,7 @@
         }
       </nav>
 
-      <div class="tab-panel" role="tabpanel">
+      <div class="tab-panel" [class.fill]="activeTab() === 'body'" role="tabpanel">
         @switch (activeTab()) {
           @case ('parameters') {
             <div class="override-bar">

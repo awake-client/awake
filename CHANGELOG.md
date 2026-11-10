@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- The body editor no longer scrolls twice: the code editor keeps its own
+  scrollbar instead of also scrolling the tab panel.
+
 ## [0.5.0] - 2026-11-10
 
 ### Added

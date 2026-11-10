@@ -216,6 +216,24 @@
   padding: 18px 24px;
 }
 
+/* The body tab fills the panel instead of overflowing it: the code editor
+   scrolls on its own, so the panel must not scroll as well. */
+.tab-panel.fill {
+  display: flex;
+  flex-direction: column;
+  overflow: auto;
+}
+
+.tab-panel.fill > .override-bar {
+  flex: 0 0 auto;
+}
+
+.tab-panel.fill > .body-panel {
+  flex: 1;
+  height: auto;
+  min-height: 0;
+}
+
 /* Key/value lists ---------------------------------------------------------- */
 
 .entry-list {
