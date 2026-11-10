@@ -1,20 +1,21 @@
-import { Component, ElementRef, computed, inject, input, output, signal } from '@angular/core';
+import {
+  Component,
+  ElementRef,
+  computed,
+  inject,
+  input,
+  output,
+  signal,
+  viewChild,
+} from '@angular/core';
 import { Router } from '@angular/router';
 import { requestEntryCreation } from '@core/collection-events';
 import { Icon } from '@shared/icon';
-
-/** An environment offered by the picker. */
-export interface EnvironmentChoice {
-  FileName: string;
-  Name: string;
-  HasLocalOverrides: boolean;
-  /** True when the environment lives in a git ignored local file only. */
-  Private: boolean;
-  CollectionOnly: boolean;
-  Color: string;
-  /** Scopes defining it: '' for the global one, then the collection path. */
-  Scopes: string[];
-}
+import {
+  environmentOptions,
+  type EnvironmentChoice,
+  type EnvironmentSort,
+} from './environment-choice';
 
 /**
  * Environment picker of the title bar. A custom menu rather than a native
@@ -46,50 +47,96 @@ export interface EnvironmentChoice {
     </button>
 
     @if (isOpen()) {
-      <div class="menu" role="listbox" aria-label="Environments" (keydown)="handleKeydown($event)">
-        <p class="menu-title">Environment</p>
-        @for (option of options(); track option.FileName; let index = $index) {
-          <div
-            class="option-row"
-            [class.highlighted]="index === highlighted()"
-            (mouseenter)="highlighted.set(index)"
+      <div class="menu" (keydown)="handleKeydown($event)">
+        <div class="menu-header">
+          <label class="search">
+            <app-icon name="search" [size]="13" />
+            <input
+              #searchInput
+              type="search"
+              placeholder="Search environments"
+              aria-label="Search environments"
+              autocomplete="off"
+              spellcheck="false"
+              [value]="query()"
+              (input)="search($event)"
+            />
+          </label>
+          <button
+            type="button"
+            class="sort"
+            [title]="sort() === 'ascending' ? 'Sort Z to A' : 'Sort A to Z'"
+            [attr.aria-label]="
+              sort() === 'ascending' ? 'Sort environments Z to A' : 'Sort environments A to Z'
+            "
+            (click)="toggleSort()"
           >
-            <button
-              type="button"
-              role="option"
-              class="option"
-              [attr.aria-selected]="option.FileName === selected()"
-              (click)="choose(option.FileName)"
+            <app-icon
+              [name]="sort() === 'ascending' ? 'sort-ascending' : 'sort-descending'"
+              [size]="14"
+            />
+          </button>
+        </div>
+
+        <div class="options" role="listbox" aria-label="Environments">
+          @for (option of options(); track option.FileName; let index = $index) {
+            <div
+              class="option-row"
+              [class.highlighted]="index === highlighted()"
+              (mouseenter)="highlighted.set(index)"
             >
-              <span class="check" aria-hidden="true">
-                @if (option.FileName === selected()) {
-                  <app-icon name="check" [size]="13" />
-                }
-              </span>
-              <span class="option-dot" [attr.data-color]="option.Color || null"></span>
-              <span class="option-name">{{ option.Name }}</span>
-              @if (option.Private) {
-                <span class="badge">private</span>
-              } @else if (option.HasLocalOverrides) {
-                <span class="badge">local</span>
-              }
-              @if (option.CollectionOnly) {
-                <span class="badge">collection</span>
-              }
-            </button>
-            @if (option.FileName) {
               <button
                 type="button"
-                class="edit"
-                [title]="'Edit ' + option.Name"
-                [attr.aria-label]="'Edit ' + option.Name"
-                (click)="edit(option)"
+                role="option"
+                class="option"
+                [attr.aria-selected]="option.FileName === selected()"
+                (click)="choose(option.FileName)"
               >
-                <app-icon name="pencil" [size]="13" />
+                <span class="check" aria-hidden="true">
+                  @if (option.FileName === selected()) {
+                    <app-icon name="check" [size]="13" />
+                  }
+                </span>
+                <span class="option-dot" [attr.data-color]="option.Color || null"></span>
+                <span class="option-name">{{ option.Name }}</span>
+                @if (option.Private) {
+                  <span class="badge">private</span>
+                } @else if (option.HasLocalOverrides) {
+                  <span class="badge">local</span>
+                }
+                @if (option.CollectionOnly) {
+                  <span class="badge">collection</span>
+                }
               </button>
-            }
-          </div>
-        }
+              @if (option.FileName) {
+                <button
+                  type="button"
+                  class="pin"
+                  [class.pinned]="isPinned(option.FileName)"
+                  [title]="(isPinned(option.FileName) ? 'Unpin ' : 'Pin ') + option.Name"
+                  [attr.aria-label]="(isPinned(option.FileName) ? 'Unpin ' : 'Pin ') + option.Name"
+                  [attr.aria-pressed]="isPinned(option.FileName)"
+                  (click)="togglePin(option.FileName)"
+                >
+                  <app-icon name="pin" [size]="13" />
+                </button>
+                <button
+                  type="button"
+                  class="edit"
+                  [title]="'Edit ' + option.Name"
+                  [attr.aria-label]="'Edit ' + option.Name"
+                  (click)="edit(option)"
+                >
+                  <app-icon name="pencil" [size]="13" />
+                </button>
+              }
+            </div>
+          }
+          @if (options().length === 0) {
+            <p class="empty">No environment matches this search.</p>
+          }
+        </div>
+
         <hr />
         <button type="button" class="action" (click)="create()">
           <app-icon name="plus" [size]="14" />
@@ -109,27 +156,26 @@ export class EnvironmentPicker {
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
 
   readonly environments = input<EnvironmentChoice[]>([]);
+  /** File names the user pinned; they are offered first. */
+  readonly pinned = input<readonly string[]>([]);
   readonly selected = input('');
   readonly selectedChange = output<string>();
   /** Asks to edit an environment, from the pencil next to it. */
   readonly editRequested = output<EnvironmentChoice>();
+  /** Asks to pin or unpin an environment, from the pin next to it. */
+  readonly pinToggle = output<string>();
+
+  private readonly searchInput = viewChild<ElementRef<HTMLInputElement>>('searchInput');
 
   protected readonly isOpen = signal(false);
   protected readonly highlighted = signal(0);
+  protected readonly query = signal('');
+  protected readonly sort = signal<EnvironmentSort>('ascending');
 
-  /** "No environment" first, then every environment name. */
-  protected readonly options = computed<EnvironmentChoice[]>(() => [
-    {
-      FileName: '',
-      Name: 'No environment',
-      HasLocalOverrides: false,
-      Private: false,
-      CollectionOnly: false,
-      Color: '',
-      Scopes: [],
-    },
-    ...this.environments(),
-  ]);
+  /** "No environment" first, then the matching environments. */
+  protected readonly options = computed<EnvironmentChoice[]>(() =>
+    environmentOptions(this.environments(), this.pinned(), this.query(), this.sort()),
+  );
 
   protected readonly selectedColor = computed(
     () =>
@@ -148,9 +194,31 @@ export class EnvironmentPicker {
       this.isOpen.set(false);
       return;
     }
+    this.query.set('');
     const index = this.options().findIndex((option) => option.FileName === this.selected());
     this.highlighted.set(Math.max(0, index));
     this.isOpen.set(true);
+    setTimeout(() => this.searchInput()?.nativeElement.focus());
+  }
+
+  protected search(event: Event): void {
+    this.query.set((event.target as HTMLInputElement).value);
+    this.highlighted.set(0);
+  }
+
+  protected toggleSort(): void {
+    this.sort.update((sort) => (sort === 'ascending' ? 'descending' : 'ascending'));
+    this.highlighted.set(0);
+  }
+
+  protected isPinned(fileName: string): boolean {
+    return this.pinned().includes(fileName);
+  }
+
+  protected togglePin(fileName: string): void {
+    if (fileName) {
+      this.pinToggle.emit(fileName);
+    }
   }
 
   protected choose(fileName: string): void {
@@ -174,24 +242,30 @@ export class EnvironmentPicker {
   }
 
   protected handleKeydown(event: KeyboardEvent): void {
-    const count = this.options().length;
+    const options = this.options();
+    const count = options.length;
     switch (event.key) {
       case 'ArrowDown':
         event.preventDefault();
         if (!this.isOpen()) {
           this.toggle();
-        } else {
+        } else if (count > 0) {
           this.highlighted.update((index) => (index + 1) % count);
         }
         break;
       case 'ArrowUp':
         event.preventDefault();
-        this.highlighted.update((index) => (index - 1 + count) % count);
+        if (this.isOpen() && count > 0) {
+          this.highlighted.update((index) => (index - 1 + count) % count);
+        }
         break;
       case 'Enter':
         if (this.isOpen()) {
           event.preventDefault();
-          this.choose(this.options()[this.highlighted()].FileName);
+          const option = options[this.highlighted()];
+          if (option) {
+            this.choose(option.FileName);
+          }
         }
         break;
       case 'Escape':

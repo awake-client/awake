@@ -22,7 +22,8 @@ import { PromptDialog } from '@shared/prompt-dialog';
 import { ResizeHandle } from '@shared/resize-handle';
 import { formatVersion } from '@shared/version-label';
 import { collectionScopeOf, visibleEnvironments } from './environment-scope';
-import { EnvironmentChoice, EnvironmentPicker } from './environment-picker';
+import type { EnvironmentChoice } from './environment-choice';
+import { EnvironmentPicker } from './environment-picker';
 import { RequestTabs } from './request-tabs';
 import { ThemePicker } from './theme-picker';
 import { WorkspaceSwitcher } from './workspace-switcher';
@@ -102,6 +103,7 @@ export class WorkspaceShell {
     visibleEnvironments(this.scopedEnvironments(), this.activeScope()),
   );
   protected readonly selectedEnvironment = this.environmentStore.selected;
+  protected readonly pinnedEnvironments = this.environmentStore.pinned;
   protected readonly version = signal('');
   protected readonly versionLabel = computed(() => formatVersion(this.version()));
   protected readonly updateError = signal<string | null>(null);
@@ -211,6 +213,10 @@ export class WorkspaceShell {
 
   protected chooseEnvironment(fileName: string): void {
     this.environmentStore.select(fileName);
+  }
+
+  protected toggleEnvironmentPin(fileName: string): void {
+    this.environmentStore.togglePin(fileName);
   }
 
   protected switchWorkspace(): void {

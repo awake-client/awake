@@ -1,22 +1,27 @@
 import { Injectable, signal } from '@angular/core';
 
 const STORAGE_KEY = 'awake.environments';
+const PINS_KEY = 'awake.environment-pins';
 
 /**
  * Holds the environment selected for the open workspace and remembers the
  * choice per workspace and per collection, so switching tabs between
  * collections restores the environment chosen in each of them, and reopening
- * the application restores the last one. The memory stays on this computer:
- * it is a personal preference, not a setting shared through git.
+ * the application restores the last one. It also remembers the environments
+ * pinned in the picker. The memory stays on this computer: it is a personal
+ * preference, not a setting shared through git.
  */
 @Injectable({ providedIn: 'root' })
 export class EnvironmentStore {
   private readonly current = signal('');
+  private readonly pinnedFiles = signal<readonly string[]>([]);
   private workspaceRoot = '';
   /** Collection whose slot is active; empty for the global environments. */
   private scope = '';
 
   readonly selected = this.current.asReadonly();
+  /** File names pinned in the picker of the open workspace. */
+  readonly pinned = this.pinnedFiles.asReadonly();
 
   /**
    * Scopes the following selections to a workspace. Opening another
@@ -27,6 +32,7 @@ export class EnvironmentStore {
       this.workspaceRoot = workspaceRoot;
       this.scope = '';
       this.current.set(readMemory()[workspaceRoot]?.[''] ?? '');
+      this.pinnedFiles.set(readPins()[workspaceRoot] ?? []);
     }
   }
 
@@ -55,6 +61,19 @@ export class EnvironmentStore {
       return;
     }
     writeMemory(this.workspaceRoot, this.scope, fileName);
+  }
+
+  /** Pins or unpins an environment of the open workspace. */
+  togglePin(fileName: string): void {
+    if (!fileName || !this.workspaceRoot) {
+      return;
+    }
+    const pinned = this.pinnedFiles();
+    const next = pinned.includes(fileName)
+      ? pinned.filter((pinnedFile) => pinnedFile !== fileName)
+      : [...pinned, fileName];
+    this.pinnedFiles.set(next);
+    writePins(this.workspaceRoot, next);
   }
 
   /** Stored choice of a slot, undefined when the user never chose there. */
@@ -93,6 +112,42 @@ function readMemory(): Memory {
       return {};
     }
     return normalize(parsed as Record<string, unknown>);
+  } catch {
+    return {};
+  }
+}
+
+/** Pinned file names per workspace. */
+type Pins = Record<string, string[]>;
+
+function writePins(workspaceRoot: string, pinned: readonly string[]): void {
+  const pins = readPins();
+  pins[workspaceRoot] = [...pinned];
+
+  try {
+    localStorage.setItem(PINS_KEY, JSON.stringify(pins));
+  } catch {
+    // Storage may be unavailable; the pins still apply to this session.
+  }
+}
+
+function readPins(): Pins {
+  try {
+    const parsed: unknown = JSON.parse(localStorage.getItem(PINS_KEY) ?? '{}');
+    if (!parsed || typeof parsed !== 'object') {
+      return {};
+    }
+
+    const pins: Pins = {};
+    for (const [workspaceRoot, value] of Object.entries(parsed as Record<string, unknown>)) {
+      if (!Array.isArray(value)) {
+        continue;
+      }
+      pins[workspaceRoot] = value.filter(
+        (fileName): fileName is string => typeof fileName === 'string',
+      );
+    }
+    return pins;
   } catch {
     return {};
   }

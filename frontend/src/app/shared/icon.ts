@@ -58,6 +58,11 @@ const ICONS = {
   command: '<path d="M9 6a3 3 0 1 0-3 3h12a3 3 0 1 0-3-3v12a3 3 0 1 0 3-3H6a3 3 0 1 0 3 3Z"/>',
   copy: '<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V5a2 2 0 0 1 2-2h9a1 1 0 0 1 1 1v1"/>',
   pencil: '<path d="M4 20h4L18.5 9.5a2.1 2.1 0 0 0-3-3L5 17Z"/><path d="m13.5 6.5 3 3"/>',
+  pin: '<path d="M9 3h6"/><path d="M10 3v5l-3 4v2h10v-2l-3-4V3"/><path d="M12 14v7"/>',
+  'sort-ascending':
+    '<path d="M4 7h8"/><path d="M4 12h5"/><path d="M4 17h3"/><path d="M17 17V5"/><path d="m13 9 4-4 4 4"/>',
+  'sort-descending':
+    '<path d="M4 7h3"/><path d="M4 12h5"/><path d="M4 17h8"/><path d="M17 5v12"/><path d="m13 13 4 4 4-4"/>',
 } as const;
 
 export type IconName = keyof typeof ICONS;

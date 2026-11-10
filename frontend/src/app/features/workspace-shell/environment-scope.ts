@@ -1,5 +1,5 @@
 import { ScopedSummary } from '@bindings/github.com/awake-client/awake/src/features/environments/models';
-import { EnvironmentChoice } from './environment-picker';
+import type { EnvironmentChoice } from './environment-choice';
 
 /** Routes showing a request or a collection, whose environments are offered. */
 const REQUEST_ROUTE = '/workspace/request/';

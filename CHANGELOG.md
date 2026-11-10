@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Environment picker search, name sorting and pinned environments: pins stay
+  first in the list and are remembered per workspace on this computer.
 - Environment controlled authentication: the reserved `authType` and
   `grantType` variables choose how a request authenticates, so one request can
   switch between none, basic, bearer, API key and OAuth 2, and between OAuth 2

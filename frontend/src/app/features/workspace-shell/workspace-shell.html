@@ -12,9 +12,11 @@
   <div class="titlebar-end">
     <app-environment-picker
       [environments]="environments()"
+      [pinned]="pinnedEnvironments()"
       [selected]="selectedEnvironment()"
       (selectedChange)="chooseEnvironment($event)"
       (editRequested)="editEnvironment($event)"
+      (pinToggle)="toggleEnvironmentPin($event)"
     />
   </div>
 </header>

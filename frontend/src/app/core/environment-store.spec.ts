@@ -85,4 +85,30 @@ describe('EnvironmentStore', () => {
     store.useScope('collections/billing');
     expect(store.selected()).toBe('staging');
   });
+
+  it('remembers pinned environments per workspace', () => {
+    const store = new EnvironmentStore();
+    store.useWorkspace(WORKSPACE);
+    store.togglePin('production');
+    store.togglePin('staging');
+
+    expect(store.pinned()).toEqual(['production', 'staging']);
+
+    const second = new EnvironmentStore();
+    second.useWorkspace(WORKSPACE);
+    expect(second.pinned()).toEqual(['production', 'staging']);
+
+    second.togglePin('production');
+    expect(second.pinned()).toEqual(['staging']);
+  });
+
+  it('keeps the pins of each workspace separate', () => {
+    const store = new EnvironmentStore();
+    store.useWorkspace(WORKSPACE);
+    store.togglePin('production');
+
+    store.useWorkspace('/other');
+
+    expect(store.pinned()).toEqual([]);
+  });
 });
