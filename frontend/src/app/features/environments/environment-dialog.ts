@@ -17,7 +17,6 @@ import { EnvironmentEditor } from './environment-editor';
       class="environment-dialog"
       aria-labelledby="environment-dialog-title"
       (cancel)="$event.preventDefault(); close()"
-      (click)="closeOnBackdrop($event)"
     >
       @if (editing.request(); as request) {
         <header>
@@ -207,11 +206,5 @@ export class EnvironmentDialog {
 
   protected close(): void {
     this.editing.close();
-  }
-
-  protected closeOnBackdrop(event: MouseEvent): void {
-    if (event.target === this.dialog().nativeElement) {
-      this.close();
-    }
   }
 }
