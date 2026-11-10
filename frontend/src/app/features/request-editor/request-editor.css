@@ -431,6 +431,26 @@
   --method-color: var(--color-accent);
 }
 
+/* Copy the request in another format, such as a curl command. */
+.copy-as-picker {
+  position: relative;
+}
+
+.copy-as-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 240px;
+  padding: 6px;
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-raised);
+  box-shadow: var(--shadow-raised);
+}
+
 .kind-menu {
   position: absolute;
   top: calc(100% + 6px);

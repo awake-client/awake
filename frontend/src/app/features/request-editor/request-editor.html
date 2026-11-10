@@ -51,6 +51,29 @@
             [size]="15"
           />
         </button>
+        <div class="copy-as-picker">
+          <button
+            type="button"
+            class="icon-btn"
+            title="Copy the request as…"
+            aria-label="Copy the request as"
+            aria-haspopup="menu"
+            [attr.aria-expanded]="isCopyMenuOpen()"
+            [disabled]="isLoading()"
+            (click)="toggleCopyMenu($event)"
+          >
+            <app-icon name="copy" [size]="15" />
+          </button>
+          @if (isCopyMenuOpen()) {
+            <div class="copy-as-menu" role="menu" (click)="$event.stopPropagation()">
+              <p class="kind-menu-title">Copy as</p>
+              <button type="button" role="menuitem" class="stream-option" (click)="copyAsCurl()">
+                <app-icon name="code" [size]="14" />
+                <span><strong>cURL</strong> with headers and body</span>
+              </button>
+            </div>
+          }
+        </div>
       </div>
 
       <input

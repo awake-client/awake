@@ -30,6 +30,17 @@ export function CloseStream(identifier: string): $CancellablePromise<void> {
 }
 
 /**
+ * CopyAsCurl returns the request as a curl command, with its variables,
+ * headers, authentication and body resolved as Send would. Pre-request scripts
+ * are not run, since they may save variables in an environment. An OAuth 2
+ * token is obtained as for Send, so a flow that needs the user must be
+ * authorized first.
+ */
+export function CopyAsCurl(workspaceRoot: string, requestPath: string, environmentFileName: string): $CancellablePromise<string> {
+    return $Call.ByID(3581146040, workspaceRoot, requestPath, environmentFileName);
+}
+
+/**
  * DynamicVariables lists the placeholders, such as {{$uuid}}, that receive a
  * fresh value each time a request is sent.
  */

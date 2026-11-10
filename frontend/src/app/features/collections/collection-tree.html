@@ -55,12 +55,14 @@
     <button
       type="button"
       class="icon-btn"
-      [disabled]="hiddenEntries().length === 0"
-      aria-label="Show hidden collections"
-      title="Show hidden collections"
-      (click)="showHiddenCollections()"
+      [disabled]="hiddenCount() === 0 && !showHidden()"
+      [class.open]="showHidden()"
+      [attr.aria-pressed]="showHidden()"
+      [attr.aria-label]="showHidden() ? 'Hide the hidden collections' : 'Show the hidden collections'"
+      [title]="showHidden() ? 'Hide the hidden collections' : 'Show the hidden collections'"
+      (click)="toggleShowHidden()"
     >
-      <app-icon name="eye-off" [size]="14" />
+      <app-icon [name]="showHidden() ? 'eye' : 'eye-off'" [size]="14" />
     </button>
   </div>
 </div>
@@ -87,6 +89,7 @@
     [class.folder]="!isRequest(row)"
     [class.root]="row.depth === 0"
     [class.section]="row.section"
+    [class.dimmed]="isDimmed(row)"
     [attr.tabindex]="row.section ? -1 : 0"
     [attr.role]="row.section ? 'presentation' : 'treeitem'"
     [attr.aria-expanded]="isRequest(row) || row.section ? null : row.expanded"
@@ -215,10 +218,17 @@
         <app-icon name="globe" [size]="14" />
         New environment
       </button>
-      <button type="button" role="menuitem" class="menu-item" (click)="hideFromRowMenu()">
-        <app-icon name="eye-off" [size]="14" />
-        Hide collection
-      </button>
+      @if (isDimmed(menu.row)) {
+        <button type="button" role="menuitem" class="menu-item" (click)="unhideFromRowMenu()">
+          <app-icon name="eye" [size]="14" />
+          Unhide collection
+        </button>
+      } @else {
+        <button type="button" role="menuitem" class="menu-item" (click)="hideFromRowMenu()">
+          <app-icon name="eye-off" [size]="14" />
+          Hide collection
+        </button>
+      }
       <hr class="menu-separator" />
     } @else if (!isRequest(menu.row)) {
       <button type="button" role="menuitem" class="menu-item" (click)="openSettings()">

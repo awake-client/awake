@@ -152,7 +152,7 @@ function valueOf(parameters: PathParameter[] | null, name: string): string | und
   styleUrls: ['./request-editor.css', './request-layout.css', './request-response.css'],
   host: {
     '(document:keydown)': 'handleShortcut($event)',
-    '(document:click)': 'closeKindMenu()',
+    '(document:click)': 'closeMenus()',
   },
 })
 export class RequestEditor {
@@ -467,6 +467,7 @@ export class RequestEditor {
   protected readonly lastRunAt = signal<string | null>(null);
 
   protected readonly isKindMenuOpen = signal(false);
+  protected readonly isCopyMenuOpen = signal(false);
 
   /** Label of the method and protocol picker: the method, SSE or WS. */
   protected readonly kindLabel = computed(() => {
@@ -1291,11 +1292,39 @@ export class RequestEditor {
 
   protected toggleKindMenu(event: Event): void {
     event.stopPropagation();
+    this.isCopyMenuOpen.set(false);
     this.isKindMenuOpen.update((open) => !open);
   }
 
-  protected closeKindMenu(): void {
+  protected closeMenus(): void {
     this.isKindMenuOpen.set(false);
+    this.isCopyMenuOpen.set(false);
+  }
+
+  protected toggleCopyMenu(event: Event): void {
+    event.stopPropagation();
+    this.isKindMenuOpen.set(false);
+    this.isCopyMenuOpen.update((open) => !open);
+  }
+
+  protected async copyAsCurl(): Promise<void> {
+    this.isCopyMenuOpen.set(false);
+    if (this.isDirty() && !(await this.save())) {
+      return;
+    }
+
+    try {
+      const command = await HTTPClientService.CopyAsCurl(
+        this.workspaceStore.rootPath() ?? '',
+        this.requestPath(),
+        this.environmentStore.selected(),
+      );
+      await navigator.clipboard.writeText(command);
+      this.errorMessage.set(null);
+      this.statusMessage.set('cURL copied');
+    } catch (error) {
+      this.errorMessage.set(describeError(error));
+    }
   }
 
   protected chooseMethod(method: string): void {

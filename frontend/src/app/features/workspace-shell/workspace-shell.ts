@@ -1,4 +1,13 @@
-import { Component, DestroyRef, computed, effect, inject, signal, viewChild } from '@angular/core';
+import {
+  Component,
+  DestroyRef,
+  computed,
+  effect,
+  inject,
+  signal,
+  untracked,
+  viewChild,
+} from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { NavigationEnd, Router, RouterLink, RouterOutlet } from '@angular/router';
 import { filter } from 'rxjs';
@@ -164,15 +173,20 @@ export class WorkspaceShell {
         }
       });
 
-    // A selection hidden by the new context falls back to the default one.
+    // A selection hidden by the new context falls back to the default one,
+    // and a context offering a single environment selects it. The selection
+    // is read untracked, so choosing "No environment" afterwards sticks.
     effect(() => {
       if (!this.environmentsLoaded()) {
         return;
       }
       const options = this.environments();
-      const selected = this.environmentStore.selected();
-      if (selected && !options.some((option) => option.FileName === selected)) {
-        this.environmentStore.select(this.defaultEnvironment(options));
+      const selected = untracked(() => this.environmentStore.selected());
+      if (!options.some((option) => option.FileName === selected)) {
+        const fallback = this.defaultEnvironment(options);
+        if (fallback !== selected) {
+          this.environmentStore.select(fallback);
+        }
       }
     });
 
@@ -292,13 +306,17 @@ export class WorkspaceShell {
     }
   }
 
-  /** The environment configured as default, when it is offered here. */
+  /**
+   * The environment configured as default when it is offered here, otherwise
+   * the only environment offered, so a lone environment is used directly.
+   */
   private defaultEnvironment(options: EnvironmentOption[]): string {
     const defaultEnvironment =
       this.workspaceStore.workspace()?.configuration.DefaultEnvironment ?? '';
-    return options.some((option) => option.FileName === defaultEnvironment)
-      ? defaultEnvironment
-      : '';
+    if (options.some((option) => option.FileName === defaultEnvironment)) {
+      return defaultEnvironment;
+    }
+    return options.length === 1 ? options[0].FileName : '';
   }
 }
 

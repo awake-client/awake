@@ -89,8 +89,9 @@ export class CollectionTree {
   protected readonly selected = signal<string | null>(null);
   protected readonly isMenuOpen = signal(false);
   protected readonly rowMenu = signal<RowMenu | null>(null);
-  /** Collections the user hid, brought back by the show hidden button. */
-  protected readonly hiddenEntries = signal<Entry[]>([]);
+  /** Number of collections the user hid, shown dimmed on demand. */
+  protected readonly hiddenCount = signal(0);
+  protected readonly showHidden = this.hiddenCollections.showHidden;
   /** Folder that would receive the row being dragged. */
   protected readonly dropTarget = signal<string | null>(null);
   protected readonly dragged = signal<TreeRow | null>(null);
@@ -213,11 +214,14 @@ export class CollectionTree {
       this.childrenCache.clear();
       this.expandedPaths.clear();
       const rows: TreeRow[] = [];
-      const hidden: Entry[] = [];
+      const showHidden = this.showHidden();
+      let hiddenCount = 0;
       for (const entry of entries ?? []) {
         if (this.isHidden(entry)) {
-          hidden.push(entry);
-          continue;
+          hiddenCount++;
+          if (!showHidden) {
+            continue;
+          }
         }
         rows.push(...this.toRows([entry], 0));
       }
@@ -225,8 +229,10 @@ export class CollectionTree {
       const visiblePrivateEntries: Entry[] = [];
       for (const entry of privateEntries ?? []) {
         if (this.isHidden(entry)) {
-          hidden.push(entry);
-          continue;
+          hiddenCount++;
+          if (!showHidden) {
+            continue;
+          }
         }
         visiblePrivateEntries.push(entry);
       }
@@ -234,7 +240,7 @@ export class CollectionTree {
         rows.push(privateSectionRow(), ...this.toRows(visiblePrivateEntries, 0));
       }
       this.rows.set(rows);
-      this.hiddenEntries.set(hidden);
+      this.hiddenCount.set(hiddenCount);
 
       for (const path of previouslyExpanded) {
         const row = this.rows().find((candidate) => candidate.entry.Path === path);
@@ -260,18 +266,30 @@ export class CollectionTree {
     }
   }
 
-  /** Brings the hidden collections back into the tree, collapsed as usual. */
-  protected async showHiddenCollections(): Promise<void> {
-    if (this.hiddenEntries().length === 0) {
-      return;
+  /** Shows the hidden collections dimmed in the tree, or hides them again. */
+  protected toggleShowHidden(): void {
+    this.hiddenCollections.toggleShowHidden();
+    if (!this.showHidden()) {
+      const openRequest = this.openRequestPath();
+      if (openRequest && this.hiddenCollections.isInHidden(openRequest)) {
+        void this.router.navigate(['/workspace']);
+      }
     }
-    this.hiddenCollections.unhideAll();
+    this.refresh();
+  }
+
+  /** Reports whether a row belongs to a hidden collection shown dimmed. */
+  protected isDimmed(row: TreeRow): boolean {
+    return !row.section && this.hiddenCollections.isInHidden(row.entry.Path);
+  }
+
+  /** Makes a hidden collection a regular one again. */
+  protected async unhideCollection(row: TreeRow): Promise<void> {
+    this.hiddenCollections.unhide(row.entry.Path);
     const workspaceRoot = this.workspaceRoot();
-    if (!workspaceRoot) {
-      this.hiddenEntries.set([]);
-      return;
+    if (workspaceRoot) {
+      await this.reload(workspaceRoot);
     }
-    await this.reload(workspaceRoot);
   }
 
   /** Hides a collection from the tree, keeping its files on disk. */
@@ -282,6 +300,11 @@ export class CollectionTree {
     }
 
     this.hiddenCollections.hide(row.entry.Path);
+    if (this.showHidden()) {
+      // The collection stays on screen, dimmed.
+      await this.reload(workspaceRoot);
+      return;
+    }
     const contains = (path: string | null) =>
       !!path && (path === row.entry.Path || path.startsWith(`${row.entry.Path}/`));
     if (contains(this.openRequestPath())) {
@@ -370,6 +393,14 @@ export class CollectionTree {
     this.rowMenu.set(null);
     if (menu) {
       void this.hideCollection(menu.row);
+    }
+  }
+
+  protected unhideFromRowMenu(): void {
+    const menu = this.rowMenu();
+    this.rowMenu.set(null);
+    if (menu) {
+      void this.unhideCollection(menu.row);
     }
   }
 

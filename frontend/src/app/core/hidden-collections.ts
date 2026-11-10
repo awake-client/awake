@@ -15,6 +15,12 @@ export class HiddenCollectionsStore {
   /** Paths of the collections hidden in the open workspace. */
   readonly hiddenPaths = this.current.asReadonly();
 
+  /**
+   * Whether the tree shows the hidden collections anyway, dimmed. It lasts
+   * for the session only, so they are hidden again at the next start.
+   */
+  readonly showHidden = signal(false);
+
   /** Scopes the hidden collections to a workspace. */
   useWorkspace(workspaceRoot: string): void {
     if (workspaceRoot === this.workspaceRoot) {
@@ -48,6 +54,16 @@ export class HiddenCollectionsStore {
     }
     this.current.set([]);
     this.persist();
+  }
+
+  /** Reports whether a path is a hidden collection or lies inside one. */
+  isInHidden(path: string): boolean {
+    return this.current().some((hidden) => path === hidden || path.startsWith(`${hidden}/`));
+  }
+
+  /** Shows or hides again the hidden collections in the tree. */
+  toggleShowHidden(): void {
+    this.showHidden.update((shown) => !shown);
   }
 
   private persist(): void {
