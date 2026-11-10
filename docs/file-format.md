@@ -255,12 +255,29 @@ The `awake` helper provides:
 | `awake.environment.set(name, value)` | Saves a variable in the selected environment |
 | `awake.environment.unset(name)` | Removes a variable saved in the selected environment |
 | `awake.environments.get(name)` | Opens another environment by file or display name, with its own `get`, `set` and `unset` |
+| `awake.runRequest(path, options)` | Runs another saved request before this one and returns its response |
 
 `console.log`, `info`, `debug`, `warn` and `error` also write to the script
 logs.
 
 ```js
 awake.environments.get("Production").set("cookies", response.cookieHeader);
+```
+
+`awake.runRequest(path, { timeout })` runs a request of the workspace before the
+current one, such as a login whose token the next requests reuse. The path is
+the workspace-relative path shown by the tree, for example
+`collections/auth/login.yaml`. The call is only available to the pre-request
+script and runs synchronously; it returns the same object as `response`, so
+`awake.runRequest(path).json()` reads the body. `timeout` bounds that exchange
+in milliseconds, up to 60000, and the five second script timeout pauses while
+the nested request runs. The nested exchange never appears in the request
+history. A script cannot run the request it is in, nor chain more than one
+nested request.
+
+```js
+const login = awake.runRequest("collections/auth/login.yaml", { timeout: 2000 });
+request.headers["Authorization"] = "Bearer " + login.json().access_token;
 ```
 
 `awake.setVariable` only applies to that execution. `awake.environment.set`

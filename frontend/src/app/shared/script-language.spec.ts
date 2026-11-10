@@ -62,4 +62,20 @@ describe('diagnoseScript', () => {
     const [diagnostic] = diagnoseScript('console.wrn("x");', 'pre-request');
     expect(diagnostic.message).toContain('Did you mean "warn"?');
   });
+
+  it('accepts a request run from a pre-request script', () => {
+    const source = `
+      const login = awake.runRequest('collections/auth/login.yaml', { timeout: 2000 });
+      request.headers['Authorization'] = 'Bearer ' + login.json().access_token;
+    `;
+    expect(diagnoseScript(source, 'pre-request')).toEqual([]);
+  });
+
+  it('only offers runRequest to the pre-request script', () => {
+    const [diagnostic] = diagnoseScript(
+      `awake.runRequest('collections/auth/login.yaml');`,
+      'post-response',
+    );
+    expect(diagnostic.message).toContain('runRequest');
+  });
 });

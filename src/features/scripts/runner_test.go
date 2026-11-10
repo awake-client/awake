@@ -37,7 +37,7 @@ func TestBeforeRequestMutatesRequestAndVariables(t *testing.T) {
 		awake.setVariable("greeting", "hello");
 		awake.log("preparing", request.method);
 		awake.test("token is available", awake.getVariable("token") === "secret-token");
-	`, &request, variables, nil)
+	`, &request, variables, nil, nil)
 
 	if outcome.Error != "" {
 		t.Fatalf("unexpected script error: %s", outcome.Error)
@@ -96,7 +96,7 @@ func TestBeforeRequestReportsFailingAssertion(t *testing.T) {
 		awake.test("throws", () => { throw new Error("boom"); });
 		awake.test("returns false", () => false);
 		awake.test("returns true", () => true);
-	`, &request, map[string]string{}, nil)
+	`, &request, map[string]string{}, nil, nil)
 
 	if len(outcome.Tests) != 4 {
 		t.Fatalf("unexpected tests: %+v", outcome.Tests)
@@ -158,7 +158,7 @@ func TestRunnerInterruptsEndlessScripts(t *testing.T) {
 	request := domain.Request{Name: "List users", Method: domain.MethodGet, URL: "https://example.com"}
 
 	startedAt := time.Now()
-	outcome := runner.BeforeRequest("while (true) {}", &request, map[string]string{}, nil)
+	outcome := runner.BeforeRequest("while (true) {}", &request, map[string]string{}, nil, nil)
 
 	if outcome.Error == "" {
 		t.Fatal("expected the script to be interrupted")
@@ -171,7 +171,7 @@ func TestRunnerInterruptsEndlessScripts(t *testing.T) {
 func TestEmptyScriptReturnsAnEmptyOutcome(t *testing.T) {
 	request := domain.Request{Name: "List users", Method: domain.MethodGet, URL: "https://example.com"}
 
-	outcome := NewRunner().BeforeRequest("  \n ", &request, map[string]string{}, nil)
+	outcome := NewRunner().BeforeRequest("  \n ", &request, map[string]string{}, nil, nil)
 	if outcome.Error != "" || len(outcome.Logs) != 0 || len(outcome.Tests) != 0 {
 		t.Errorf("unexpected outcome: %+v", outcome)
 	}
@@ -233,7 +233,7 @@ func TestSetVariableOverridesAnExistingValue(t *testing.T) {
 	request := domain.Request{Method: domain.MethodGet, URL: "https://example.com"}
 	variables := map[string]string{"token": "old"}
 
-	outcome := NewRunner().BeforeRequest(`awake.setVariable("token", "new");`, &request, variables, nil)
+	outcome := NewRunner().BeforeRequest(`awake.setVariable("token", "new");`, &request, variables, nil, nil)
 
 	if outcome.Error != "" {
 		t.Fatalf("unexpected script error: %s", outcome.Error)
@@ -323,5 +323,137 @@ func TestScriptsChangeNamedEnvironments(t *testing.T) {
 	missing := NewRunner().AfterResponse(`awake.environments.get("staging");`, request, response, variables, environments)
 	if !strings.Contains(missing.Error, "environment not found") {
 		t.Errorf("expected a missing environment error, got %q", missing.Error)
+	}
+}
+
+func TestRunRequestExposesTheNestedResponse(t *testing.T) {
+	request := domain.Request{Name: "List users", Method: domain.MethodGet, URL: "https://example.com"}
+	variables := map[string]string{}
+
+	var calledPath string
+	var calledTimeout time.Duration
+	execute := func(path string, timeout time.Duration) (domain.ScriptResponse, error) {
+		calledPath = path
+		calledTimeout = timeout
+		return domain.ScriptResponse{
+			StatusCode: 200,
+			Status:     "200 OK",
+			Headers:    map[string][]string{"Content-Type": {"application/json"}},
+			Body:       `{"access_token":"abc"}`,
+			Encoding:   "utf-8",
+		}, nil
+	}
+
+	outcome := NewRunner().BeforeRequest(`
+		const login = awake.runRequest("collections/auth/login.yaml", { timeout: 1500 });
+		request.headers["Authorization"] = "Bearer " + login.json().access_token;
+		awake.setVariable("loginStatus", login.status);
+	`, &request, variables, nil, execute)
+
+	if outcome.Error != "" {
+		t.Fatalf("unexpected script error: %s", outcome.Error)
+	}
+	if calledPath != "collections/auth/login.yaml" {
+		t.Errorf("unexpected path: %q", calledPath)
+	}
+	if calledTimeout != 1500*time.Millisecond {
+		t.Errorf("unexpected timeout: %s", calledTimeout)
+	}
+	if headerValues(request.Headers)["Authorization"] != "Bearer abc" {
+		t.Errorf("unexpected authorization: %q", headerValues(request.Headers)["Authorization"])
+	}
+	if variables["loginStatus"] != "200" {
+		t.Errorf("unexpected variables: %v", variables)
+	}
+}
+
+func TestRunRequestDefaultsToTheClientTimeout(t *testing.T) {
+	request := domain.Request{Method: domain.MethodGet, URL: "https://example.com"}
+
+	var called bool
+	execute := func(_ string, timeout time.Duration) (domain.ScriptResponse, error) {
+		called = true
+		if timeout != 0 {
+			t.Errorf("expected no timeout, got %s", timeout)
+		}
+		return domain.ScriptResponse{StatusCode: 204}, nil
+	}
+
+	outcome := NewRunner().BeforeRequest(
+		`awake.runRequest("collections/auth/login.yaml");`,
+		&request,
+		map[string]string{},
+		nil,
+		execute,
+	)
+	if outcome.Error != "" {
+		t.Fatalf("unexpected script error: %s", outcome.Error)
+	}
+	if !called {
+		t.Error("expected the request to run")
+	}
+}
+
+func TestRunRequestReportsAFailure(t *testing.T) {
+	request := domain.Request{Method: domain.MethodGet, URL: "https://example.com"}
+
+	outcome := NewRunner().BeforeRequest(
+		`awake.runRequest("collections/auth/login.yaml"); awake.setVariable("unreachable", "yes");`,
+		&request,
+		map[string]string{},
+		nil,
+		func(string, time.Duration) (domain.ScriptResponse, error) {
+			return domain.ScriptResponse{}, errors.New("collections: entry not found")
+		},
+	)
+
+	if !strings.Contains(outcome.Error, "entry not found") {
+		t.Fatalf("expected the failure to surface, got %q", outcome.Error)
+	}
+}
+
+func TestRunRequestValidatesItsArguments(t *testing.T) {
+	request := domain.Request{Method: domain.MethodGet, URL: "https://example.com"}
+	execute := func(string, time.Duration) (domain.ScriptResponse, error) {
+		t.Error("the request must not run")
+		return domain.ScriptResponse{}, nil
+	}
+
+	for _, script := range []string{
+		`awake.runRequest();`,
+		`awake.runRequest("");`,
+		`awake.runRequest("collections/auth/login.yaml", { timeout: 0 });`,
+		`awake.runRequest("collections/auth/login.yaml", { timeout: -5 });`,
+	} {
+		outcome := NewRunner().BeforeRequest(script, &request, map[string]string{}, nil, execute)
+		if outcome.Error == "" {
+			t.Errorf("expected %q to fail", script)
+		}
+	}
+}
+
+// Regression: a request run from a script has its own timeout, so its duration
+// must not trip the five second budget of the script.
+func TestRunRequestPausesTheScriptTimeout(t *testing.T) {
+	runner := &Runner{timeout: 40 * time.Millisecond}
+	request := domain.Request{Method: domain.MethodGet, URL: "https://example.com"}
+	variables := map[string]string{}
+
+	outcome := runner.BeforeRequest(
+		`awake.runRequest("collections/auth/login.yaml", { timeout: 1000 }); awake.setVariable("done", "yes");`,
+		&request,
+		variables,
+		nil,
+		func(string, time.Duration) (domain.ScriptResponse, error) {
+			time.Sleep(120 * time.Millisecond)
+			return domain.ScriptResponse{StatusCode: 200}, nil
+		},
+	)
+
+	if outcome.Error != "" {
+		t.Fatalf("expected the request to pause the script timeout: %s", outcome.Error)
+	}
+	if variables["done"] != "yes" {
+		t.Errorf("expected the script to finish, got %v", variables)
 	}
 }

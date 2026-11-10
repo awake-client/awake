@@ -165,7 +165,7 @@ const consoleEntry: ApiEntry = {
   },
 };
 
-const awakeEntry: ApiEntry = {
+const awakeEntry = (kind: ScriptKind): ApiEntry => ({
   type: 'namespace',
   detail: 'Awake',
   documentation: 'Helpers provided by Awake.',
@@ -180,6 +180,17 @@ const awakeEntry: ApiEntry = {
       detail: '(name: string, assertion: boolean | (() => boolean | void)): void',
       documentation: 'Records an assertion. A function fails when it throws or returns false.',
     },
+    ...(kind === 'pre-request'
+      ? {
+          runRequest: {
+            type: 'method' as const,
+            detail: '(path: string, options?: { timeout?: number }): Response',
+            documentation:
+              'Runs another saved request before this one and returns its response. The path is relative to the workspace, such as collections/auth/login.yaml. The timeout, in milliseconds, bounds that request; the call stays out of the request history.',
+            returns: responseEntry,
+          },
+        }
+      : {}),
     getVariable: {
       type: 'method',
       detail: '(name: string): string | null',
@@ -212,7 +223,7 @@ const awakeEntry: ApiEntry = {
       },
     },
   },
-};
+});
 
 const variablesEntry: ApiEntry = {
   type: 'variable',
@@ -222,7 +233,7 @@ const variablesEntry: ApiEntry = {
 
 function globalsFor(kind: ScriptKind): Record<string, ApiEntry> {
   const globals: Record<string, ApiEntry> = {
-    awake: awakeEntry,
+    awake: awakeEntry(kind),
     console: consoleEntry,
     request: requestEntry(kind === 'pre-request'),
     variables: variablesEntry,

@@ -8,8 +8,10 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/awake-client/awake/src/domain"
+	"github.com/awake-client/awake/src/features/scripts"
 	"github.com/awake-client/awake/src/shared/variables"
 )
 
@@ -600,6 +602,7 @@ func (runner *fakeScriptRunner) BeforeRequest(
 	request *domain.Request,
 	variables map[string]string,
 	_ domain.EnvironmentResolver,
+	_ domain.ScriptRequestExecutor,
 ) domain.ScriptOutcome {
 	runner.preRequestCalls++
 	variables["scriptValue"] = "from-script"
@@ -917,5 +920,148 @@ func TestSendFillsPathParameters(t *testing.T) {
 	missing := newTestService(t, fakeSource{request: request, layers: layers})
 	if _, err := missing.Send(t.TempDir(), "collections/cms/publish.yaml", ""); !errors.Is(err, ErrMissingPathParameter) {
 		t.Errorf("expected ErrMissingPathParameter, got %v", err)
+	}
+}
+
+// routingSource returns the request matching the path, so a test can make one
+// request run another through its pre-request script.
+type routingSource struct {
+	requests map[string]domain.Request
+}
+
+func (source routingSource) LoadRequest(_ string, requestPath string) (domain.Request, error) {
+	request, found := source.requests[requestPath]
+	if !found {
+		return domain.Request{}, errors.New("request not found: " + requestPath)
+	}
+	return request, nil
+}
+
+func (source routingSource) LoadVariableLayers(_ string, _ string, _ string) ([]variables.Layer, error) {
+	return nil, nil
+}
+
+func TestScriptsRunAnotherRequestWithoutRecordingIt(t *testing.T) {
+	var loginCalls, dataCalls int
+	var authorization string
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		switch request.URL.Path {
+		case "/login":
+			loginCalls++
+			writer.Header().Set("Content-Type", "application/json")
+			_, _ = writer.Write([]byte(`{"access_token":"abc"}`))
+		case "/data":
+			dataCalls++
+			authorization = request.Header.Get("Authorization")
+			_, _ = writer.Write([]byte("ok"))
+		}
+	}))
+	defer server.Close()
+
+	source := routingSource{requests: map[string]domain.Request{
+		"collections/main.yaml": {
+			Name:   "Main",
+			Method: domain.MethodGet,
+			URL:    server.URL + "/data",
+			Scripts: &domain.Scripts{PreRequest: `
+				const login = awake.runRequest("collections/auth/login.yaml", { timeout: 5000 });
+				request.headers["Authorization"] = "Bearer " + login.json().access_token;
+			`},
+		},
+		"collections/auth/login.yaml": {
+			Name:   "Login",
+			Method: domain.MethodPost,
+			URL:    server.URL + "/login",
+			Scripts: &domain.Scripts{
+				PostResponse: "awake.test('logged in', response.status === 200);",
+			},
+		},
+	}}
+
+	responseStore, err := newStoreAt(t.TempDir())
+	if err != nil {
+		t.Fatalf("create response store: %v", err)
+	}
+	recorder := &fakeRecorder{}
+	service := newServiceWithStore(source, responseStore, recorder)
+	SetScriptRunner(service, scripts.NewRunner())
+
+	response, err := service.Send(t.TempDir(), "collections/main.yaml", "")
+	if err != nil {
+		t.Fatalf("send request: %v", err)
+	}
+	defer service.Close(response.ID)
+
+	if response.PreRequestOutcome.Error != "" {
+		t.Fatalf("unexpected pre-request error: %s", response.PreRequestOutcome.Error)
+	}
+	if loginCalls != 1 || dataCalls != 1 {
+		t.Errorf("unexpected calls: login=%d data=%d", loginCalls, dataCalls)
+	}
+	if authorization != "Bearer abc" {
+		t.Errorf("unexpected authorization: %q", authorization)
+	}
+	if len(recorder.entries) != 1 || recorder.entries[0].RequestPath != "collections/main.yaml" {
+		t.Errorf("only the sent request belongs to the history: %+v", recorder.entries)
+	}
+}
+
+func TestScriptsRefuseToRunTheRequestTheyAreIn(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		_, _ = writer.Write([]byte("ok"))
+	}))
+	defer server.Close()
+
+	source := routingSource{requests: map[string]domain.Request{
+		"collections/main.yaml": {
+			Name:    "Main",
+			Method:  domain.MethodGet,
+			URL:     server.URL,
+			Scripts: &domain.Scripts{PreRequest: `awake.runRequest("collections/main.yaml");`},
+		},
+	}}
+
+	service := newTestService(t, source)
+	SetScriptRunner(service, scripts.NewRunner())
+
+	response, err := service.Send(t.TempDir(), "collections/main.yaml", "")
+	if err != nil {
+		t.Fatalf("send request: %v", err)
+	}
+	defer service.Close(response.ID)
+
+	if !strings.Contains(response.PreRequestOutcome.Error, "already running") {
+		t.Errorf("expected the cycle to be refused, got %q", response.PreRequestOutcome.Error)
+	}
+}
+
+func TestScriptsBoundTheNestedRequestTimeout(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		time.Sleep(300 * time.Millisecond)
+		_, _ = writer.Write([]byte("slow"))
+	}))
+	defer server.Close()
+
+	source := routingSource{requests: map[string]domain.Request{
+		"collections/main.yaml": {
+			Name:    "Main",
+			Method:  domain.MethodGet,
+			URL:     server.URL,
+			Scripts: &domain.Scripts{PreRequest: `awake.runRequest("collections/login.yaml", { timeout: 30 });`},
+		},
+		"collections/login.yaml": {Name: "Login", Method: domain.MethodPost, URL: server.URL},
+	}}
+
+	service := newTestService(t, source)
+	SetScriptRunner(service, scripts.NewRunner())
+
+	response, err := service.Send(t.TempDir(), "collections/main.yaml", "")
+	if err != nil {
+		t.Fatalf("send request: %v", err)
+	}
+	defer service.Close(response.ID)
+
+	if !strings.Contains(response.PreRequestOutcome.Error, "context deadline exceeded") {
+		t.Errorf("expected the nested request to time out, got %q", response.PreRequestOutcome.Error)
 	}
 }

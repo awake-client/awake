@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -62,6 +63,7 @@ type ScriptRunner interface {
 		request *domain.Request,
 		variables map[string]string,
 		environments domain.EnvironmentResolver,
+		execute domain.ScriptRequestExecutor,
 	) domain.ScriptOutcome
 	AfterResponse(
 		script string,
@@ -145,6 +147,25 @@ func SetEnvironmentWriter(service *Service, writer EnvironmentWriter) {
 
 // Send executes a request and streams its body to the response store.
 func (service *Service) Send(workspaceRoot string, requestPath string, environmentFileName string) (Response, error) {
+	return service.send(workspaceRoot, requestPath, environmentFileName, sendOptions{
+		chain:         []string{requestPath},
+		recordHistory: true,
+	})
+}
+
+// sendOptions adjust one exchange. A script that runs another request uses
+// them to bound the nested exchange and to keep it out of the history.
+type sendOptions struct {
+	// timeout bounds the exchange; zero falls back to the client default.
+	timeout time.Duration
+	// chain lists the requests already running, outermost first, so a script
+	// cannot run a request that is already in progress, nor chain too deep.
+	chain []string
+	// recordHistory writes the exchange to the request history.
+	recordHistory bool
+}
+
+func (service *Service) send(workspaceRoot string, requestPath string, environmentFileName string, options sendOptions) (Response, error) {
 	request, err := service.source.LoadRequest(workspaceRoot, requestPath)
 	if err != nil {
 		return Response{}, err
@@ -163,7 +184,7 @@ func (service *Service) Send(workspaceRoot string, requestPath string, environme
 	}
 
 	environments := service.environmentResolver(workspaceRoot, requestPath)
-	layers, preRequestOutcome := service.runPreRequest(&request, layers, environments)
+	layers, preRequestOutcome := service.runPreRequest(workspaceRoot, requestPath, environmentFileName, &request, layers, environments, options)
 	service.saveEnvironmentChanges(workspaceRoot, requestPath, environmentFileName, &preRequestOutcome)
 
 	oauth2Token, err := service.oauth2Token(workspaceRoot, requestPath, environmentFileName, request, layers)
@@ -171,7 +192,10 @@ func (service *Service) Send(workspaceRoot string, requestPath string, environme
 		return Response{}, err
 	}
 
-	httpRequest, err := buildHTTPRequest(request, layers, oauth2Token)
+	ctx, cancel := service.exchangeContext(options.timeout)
+	defer cancel()
+
+	httpRequest, err := buildHTTPRequestWithContext(ctx, request, layers, oauth2Token)
 	if err != nil {
 		return Response{}, err
 	}
@@ -189,7 +213,7 @@ func (service *Service) Send(workspaceRoot string, requestPath string, environme
 		if expirer, ok := service.oauth2.(OAuth2TokenExpirer); ok {
 			expirer.ExpireAccessToken(workspaceRoot, requestPath, environmentFileName)
 			if freshToken, tokenErr := service.oauth2Token(workspaceRoot, requestPath, environmentFileName, request, layers); tokenErr == nil && freshToken != oauth2Token {
-				if retried, buildErr := buildHTTPRequest(request, layers, freshToken); buildErr == nil {
+				if retried, buildErr := buildHTTPRequestWithContext(ctx, request, layers, freshToken); buildErr == nil {
 					httpResponse.Body.Close()
 					sent = captureSentRequest(retried, resolvedAuthentication(request.Authentication))
 					startedAt = time.Now()
@@ -211,12 +235,33 @@ func (service *Service) Send(workspaceRoot string, requestPath string, environme
 	response.PreRequestOutcome = preRequestOutcome
 	response.PostResponseOutcome = service.runPostResponse(request, response, layers, environments)
 	service.saveEnvironmentChanges(workspaceRoot, requestPath, environmentFileName, &response.PostResponseOutcome)
-	response.HistoryWarning = service.recordHistory(workspaceRoot, requestPath, environmentFileName, request, sent, response)
+	if options.recordHistory {
+		response.HistoryWarning = service.recordHistory(workspaceRoot, requestPath, environmentFileName, request, sent, response)
+	}
 
 	return response, nil
 }
 
-func (service *Service) runPreRequest(request *domain.Request, layers []map[string]string, environments domain.EnvironmentResolver) ([]map[string]string, domain.ScriptOutcome) {
+// exchangeContext bounds one exchange. A zero timeout keeps the default of the
+// HTTP client.
+func (service *Service) exchangeContext(timeout time.Duration) (context.Context, context.CancelFunc) {
+	if timeout <= 0 {
+		return context.WithCancel(context.Background())
+	}
+	return context.WithTimeout(context.Background(), timeout)
+}
+
+// runPreRequest runs the pre-request script, which may run other requests
+// through awake.runRequest.
+func (service *Service) runPreRequest(
+	workspaceRoot string,
+	requestPath string,
+	environmentFileName string,
+	request *domain.Request,
+	layers []map[string]string,
+	environments domain.EnvironmentResolver,
+	options sendOptions,
+) ([]map[string]string, domain.ScriptOutcome) {
 	if request.Scripts == nil || strings.TrimSpace(request.Scripts.PreRequest) == "" {
 		return layers, domain.ScriptOutcome{}
 	}
@@ -224,13 +269,93 @@ func (service *Service) runPreRequest(request *domain.Request, layers []map[stri
 		return layers, domain.ScriptOutcome{Error: "script runner is not configured"}
 	}
 
+	execute := func(path string, timeout time.Duration) (domain.ScriptResponse, error) {
+		return service.runScriptRequest(workspaceRoot, path, environmentFileName, timeout, options.chain)
+	}
+
 	// The script works on the merged values and the result is appended as the
 	// highest precedence layer, so a variable it sets wins over the
 	// environment for this request only.
 	variables := mergeLayers(layers)
-	outcome := service.scripts.BeforeRequest(request.Scripts.PreRequest, request, variables, environments)
+	outcome := service.scripts.BeforeRequest(request.Scripts.PreRequest, request, variables, environments, execute)
 
 	return append(layers, variables), outcome
+}
+
+// maximumScriptChain bounds how many requests a script may run in a row,
+// counting the request the user sent, so a chain of scripts cannot run for
+// ever.
+const maximumScriptChain = 2
+
+// runScriptRequest runs a request asked for by awake.runRequest and returns
+// the response view the script reads. The exchange stays out of the request
+// history and its response file is released once the preview is read.
+func (service *Service) runScriptRequest(
+	workspaceRoot string,
+	requestPath string,
+	environmentFileName string,
+	timeout time.Duration,
+	chain []string,
+) (domain.ScriptResponse, error) {
+	path, err := scriptRequestPath(requestPath)
+	if err != nil {
+		return domain.ScriptResponse{}, err
+	}
+	if timeout > DefaultTimeout {
+		return domain.ScriptResponse{}, fmt.Errorf(
+			"awake.runRequest: timeout is at most %d milliseconds",
+			DefaultTimeout.Milliseconds(),
+		)
+	}
+	for _, running := range chain {
+		if normalizeScriptPath(running) == path {
+			return domain.ScriptResponse{}, fmt.Errorf("awake.runRequest: %s is already running", path)
+		}
+	}
+	if len(chain) >= maximumScriptChain {
+		return domain.ScriptResponse{}, fmt.Errorf(
+			"awake.runRequest: %s is too deep; a script may run a request, but that request cannot run another one through its own script",
+			path,
+		)
+	}
+
+	response, err := service.send(workspaceRoot, path, environmentFileName, sendOptions{
+		timeout: timeout,
+		chain:   append(append([]string(nil), chain...), path),
+	})
+	if err != nil {
+		return domain.ScriptResponse{}, fmt.Errorf("awake.runRequest %s: %w", path, err)
+	}
+	defer service.Close(response.ID)
+
+	return domain.ScriptResponse{
+		StatusCode:           response.StatusCode,
+		Status:               response.Status,
+		Headers:              response.Headers,
+		Body:                 response.Preview,
+		Encoding:             response.Encoding,
+		DurationMilliseconds: response.DurationMilliseconds,
+	}, nil
+}
+
+// scriptRequestPath checks and normalizes the workspace-relative path a script
+// uses, such as "collections/auth/login.yaml".
+func scriptRequestPath(requestPath string) (string, error) {
+	path := normalizeScriptPath(requestPath)
+	if !strings.HasSuffix(path, ".yaml") {
+		return "", fmt.Errorf(
+			"awake.runRequest: %q is not a request path; use the workspace-relative path, such as collections/auth/login.yaml",
+			requestPath,
+		)
+	}
+	return path, nil
+}
+
+// normalizeScriptPath accepts the separators and the leading "./" a script
+// may write, so a path compares equal to the one the workspace stores.
+func normalizeScriptPath(requestPath string) string {
+	path := filepath.ToSlash(strings.TrimSpace(requestPath))
+	return strings.TrimPrefix(path, "./")
 }
 
 func (service *Service) runPostResponse(request domain.Request, response Response, layers []map[string]string, environments domain.EnvironmentResolver) domain.ScriptOutcome {
@@ -484,10 +609,6 @@ func readPreview(path string, size int64) ([]byte, error) {
 	}
 
 	return buffer[:read], nil
-}
-
-func buildHTTPRequest(request domain.Request, layers []map[string]string, oauth2Token string) (*http.Request, error) {
-	return buildHTTPRequestWithContext(context.Background(), request, layers, oauth2Token)
 }
 
 func buildHTTPRequestWithContext(parent context.Context, request domain.Request, layers []map[string]string, oauth2Token string) (*http.Request, error) {

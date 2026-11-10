@@ -564,7 +564,10 @@
                 JavaScript hooks run inside the application. A failing script does not abort the
                 request; its error is reported with the response. The runtime is interrupted after
                 five seconds. Use <code>awake.environment.set(name, value)</code> to save a value,
-                such as a token, in the selected environment.
+                such as a token, in the selected environment. A pre-request script can run another
+                request first with
+                <code>awake.runRequest('collections/auth/login.yaml')</code>; pass
+                <code>{{ '{' }} timeout: 2000 {{ '}' }}</code> to bound it, in milliseconds.
               </p>
 
               <section class="script-field">

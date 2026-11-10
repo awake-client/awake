@@ -32,23 +32,25 @@ func NewRunner() *Runner {
 
 // BeforeRequest runs the pre-request script. It may mutate the request and
 // the variable map; the caller applies the variable map as the highest
-// precedence layer before interpolation.
-func (runner *Runner) BeforeRequest(script string, request *domain.Request, variables map[string]string, environments domain.EnvironmentResolver) domain.ScriptOutcome {
+// precedence layer before interpolation. execute runs the requests the script
+// asks for with awake.runRequest; it is nil when the feature is unavailable.
+func (runner *Runner) BeforeRequest(script string, request *domain.Request, variables map[string]string, environments domain.EnvironmentResolver, execute domain.ScriptRequestExecutor) domain.ScriptOutcome {
 	if strings.TrimSpace(script) == "" {
 		return domain.ScriptOutcome{}
 	}
 
 	runtime := goja.New()
 	outcome := domain.ScriptOutcome{}
+	deadline := newScriptDeadline(runtime, runner.timeout)
 	requestObject := requestToObject(runtime, request)
 	variablesObject := variablesToObject(runtime, variables)
-	installHelper(runtime, variablesObject, environments, &outcome)
+	installHelper(runtime, variablesObject, environments, &outcome, execute, deadline)
 	installConsole(runtime, &outcome)
 
 	runtime.Set("request", requestObject)
 	runtime.Set("variables", variablesObject)
 
-	run(runtime, script, runner.timeout, &outcome)
+	run(runtime, script, deadline, &outcome)
 
 	applyRequestObject(runtime, requestObject, request)
 	readVariables(variablesObject, variables)
@@ -64,32 +66,76 @@ func (runner *Runner) AfterResponse(script string, request domain.Request, respo
 
 	runtime := goja.New()
 	outcome := domain.ScriptOutcome{}
+	deadline := newScriptDeadline(runtime, runner.timeout)
 	variablesObject := variablesToObject(runtime, variables)
-	installHelper(runtime, variablesObject, environments, &outcome)
+	installHelper(runtime, variablesObject, environments, &outcome, nil, deadline)
 	installConsole(runtime, &outcome)
 
 	runtime.Set("request", requestToObject(runtime, &request))
 	runtime.Set("response", responseToObject(runtime, response))
 	runtime.Set("variables", variablesObject)
 
-	run(runtime, script, runner.timeout, &outcome)
+	run(runtime, script, deadline, &outcome)
 	readVariables(variablesObject, variables)
 
 	return outcome
 }
 
-func run(runtime *goja.Runtime, script string, timeout time.Duration, outcome *domain.ScriptOutcome) {
-	timer := time.AfterFunc(timeout, func() {
-		runtime.Interrupt("script timed out")
-	})
-	defer timer.Stop()
+func run(runtime *goja.Runtime, script string, deadline *scriptDeadline, outcome *domain.ScriptOutcome) {
+	defer deadline.stop()
 
 	if _, err := runtime.RunString(script); err != nil {
 		outcome.Error = err.Error()
 	}
 }
 
-func installHelper(runtime *goja.Runtime, variablesObject *goja.Object, environments domain.EnvironmentResolver, outcome *domain.ScriptOutcome) {
+// scriptDeadline bounds how long a script runs. It stops counting while the
+// script waits on a request it runs, whose own timeout applies instead, so a
+// slow login call does not trip the script timeout.
+type scriptDeadline struct {
+	runtime   *goja.Runtime
+	timer     *time.Timer
+	expiresAt time.Time
+	remaining time.Duration
+	paused    bool
+}
+
+func newScriptDeadline(runtime *goja.Runtime, timeout time.Duration) *scriptDeadline {
+	deadline := &scriptDeadline{runtime: runtime, remaining: timeout}
+	deadline.arm()
+	return deadline
+}
+
+func (deadline *scriptDeadline) arm() {
+	deadline.paused = false
+	deadline.expiresAt = time.Now().Add(deadline.remaining)
+	deadline.timer = time.AfterFunc(deadline.remaining, func() {
+		deadline.runtime.Interrupt("script timed out")
+	})
+}
+
+func (deadline *scriptDeadline) pause() {
+	if deadline.paused {
+		return
+	}
+	deadline.paused = true
+	if deadline.timer.Stop() {
+		deadline.remaining = time.Until(deadline.expiresAt)
+	}
+}
+
+func (deadline *scriptDeadline) resume() {
+	if !deadline.paused {
+		return
+	}
+	deadline.arm()
+}
+
+func (deadline *scriptDeadline) stop() {
+	deadline.timer.Stop()
+}
+
+func installHelper(runtime *goja.Runtime, variablesObject *goja.Object, environments domain.EnvironmentResolver, outcome *domain.ScriptOutcome, execute domain.ScriptRequestExecutor, deadline *scriptDeadline) {
 	helper := runtime.NewObject()
 
 	_ = helper.Set("log", logFunction(outcome, ""))
@@ -125,6 +171,12 @@ func installHelper(runtime *goja.Runtime, variablesObject *goja.Object, environm
 		outcome.Tests = append(outcome.Tests, test)
 		return goja.Undefined()
 	})
+
+	// Only the pre-request script may run another request, and only when the
+	// caller connected an executor to it.
+	if execute != nil {
+		_ = helper.Set("runRequest", runRequestFunction(runtime, execute, deadline))
+	}
 
 	// The variables object is the single source of truth while the script
 	// runs, so awake.setVariable and direct writes to variables agree.
@@ -174,6 +226,56 @@ func installHelper(runtime *goja.Runtime, variablesObject *goja.Object, environm
 }
 
 var errEnvironmentsUnavailable = errors.New("other environments are not available to this script")
+
+// runRequestFunction implements awake.runRequest(path, options). The call is
+// synchronous: the script receives the response once the request is over.
+func runRequestFunction(runtime *goja.Runtime, execute domain.ScriptRequestExecutor, deadline *scriptDeadline) func(goja.FunctionCall) goja.Value {
+	return func(call goja.FunctionCall) goja.Value {
+		pathValue := call.Argument(0)
+		if goja.IsUndefined(pathValue) || goja.IsNull(pathValue) {
+			panic(runtime.NewTypeError("awake.runRequest: a request path is required, such as collections/auth/login.yaml"))
+		}
+		path := strings.TrimSpace(pathValue.String())
+		if path == "" {
+			panic(runtime.NewTypeError("awake.runRequest: a request path is required, such as collections/auth/login.yaml"))
+		}
+
+		timeout, err := requestTimeout(runtime, call.Argument(1))
+		if err != nil {
+			panic(runtime.NewGoError(err))
+		}
+
+		// The nested exchange runs under its own timeout; the script waits for
+		// it without spending its own budget.
+		deadline.pause()
+		response, err := execute(path, timeout)
+		deadline.resume()
+		if err != nil {
+			panic(runtime.NewGoError(err))
+		}
+
+		return responseToObject(runtime, response)
+	}
+}
+
+// requestTimeout reads the timeout option of awake.runRequest, in
+// milliseconds, zero meaning the default of the HTTP client.
+func requestTimeout(runtime *goja.Runtime, options goja.Value) (time.Duration, error) {
+	if options == nil || goja.IsUndefined(options) || goja.IsNull(options) {
+		return 0, nil
+	}
+
+	timeout := options.ToObject(runtime).Get("timeout")
+	if timeout == nil || goja.IsUndefined(timeout) || goja.IsNull(timeout) {
+		return 0, nil
+	}
+
+	milliseconds := timeout.ToInteger()
+	if milliseconds <= 0 {
+		return 0, errors.New("awake.runRequest: timeout must be a positive number of milliseconds")
+	}
+	return time.Duration(milliseconds) * time.Millisecond, nil
+}
 
 // namedEnvironment is the handle returned by awake.environments.get. Its
 // changes are saved like those of awake.environment but do not affect the

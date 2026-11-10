@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"regexp"
 	"strings"
+	"time"
 )
 
 // ErrInvalidRequest is returned when a request file is malformed.
@@ -365,6 +366,11 @@ type ScriptOutcome struct {
 	// EnvironmentError explains why the environment changes were not saved.
 	EnvironmentError string
 }
+
+// ScriptRequestExecutor runs another saved request from a pre-request script.
+// The path is relative to the workspace, such as
+// "collections/auth/login.yaml". A zero timeout leaves the default in place.
+type ScriptRequestExecutor func(path string, timeout time.Duration) (ScriptResponse, error)
 
 // ScriptResponse is the response view exposed to post-response scripts. Body
 // contains the preview (or the base64 preview for binary responses).
