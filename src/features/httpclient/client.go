@@ -156,6 +156,12 @@ func (service *Service) Send(workspaceRoot string, requestPath string, environme
 	}
 	layers := variables.Maps(labeledLayers)
 
+	// The environment may choose the authentication of the request; the
+	// pre-request script still sees, and can refine, the resulting settings.
+	if err := applyEnvironmentAuthentication(&request, layers); err != nil {
+		return Response{}, err
+	}
+
 	environments := service.environmentResolver(workspaceRoot, requestPath)
 	layers, preRequestOutcome := service.runPreRequest(&request, layers, environments)
 	service.saveEnvironmentChanges(workspaceRoot, requestPath, environmentFileName, &preRequestOutcome)

@@ -153,6 +153,103 @@ func TestSendUsesBasicAuthentication(t *testing.T) {
 	}
 }
 
+func TestSendUsesEnvironmentAuthenticationType(t *testing.T) {
+	var authorization string
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		authorization = request.Header.Get("Authorization")
+		writer.WriteHeader(http.StatusNoContent)
+	}))
+	defer server.Close()
+
+	service := newTestService(t, fakeSource{
+		request: domain.Request{
+			Name:   "Switch",
+			Method: domain.MethodGet,
+			URL:    server.URL,
+			Authentication: &domain.Authentication{
+				Type:     domain.AuthenticationBasic,
+				Username: "{{user}}",
+				Password: "{{password}}",
+				Token:    "{{token}}",
+			},
+		},
+		layers: []map[string]string{{"authType": "bearer", "token": "environment-token"}},
+	})
+
+	response, err := service.Send(t.TempDir(), "collections/switch.yaml", "production")
+	if err != nil {
+		t.Fatalf("send request: %v", err)
+	}
+	defer service.Close(response.ID)
+
+	if authorization != "Bearer environment-token" {
+		t.Errorf("unexpected authorization %q", authorization)
+	}
+}
+
+func TestSendUsesEnvironmentOAuth2GrantType(t *testing.T) {
+	var authorization string
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		authorization = request.Header.Get("Authorization")
+		writer.WriteHeader(http.StatusNoContent)
+	}))
+	defer server.Close()
+
+	provider := &fakeOAuth2Provider{token: "provider-token"}
+	service := newTestService(t, fakeSource{
+		request: domain.Request{
+			Name:   "List users",
+			Method: domain.MethodGet,
+			URL:    server.URL,
+			Authentication: &domain.Authentication{
+				Type:             domain.AuthenticationOAuth2,
+				GrantType:        domain.OAuth2GrantAuthorizationCode,
+				AuthorizationURL: "{{authorizationUrl}}",
+				TokenURL:         "{{tokenUrl}}",
+				ClientID:         "{{clientId}}",
+			},
+		},
+		layers: []map[string]string{{
+			"authType":         "oauth2",
+			"grantType":        "client_credential",
+			"authorizationUrl": "https://example.com/authorize",
+			"tokenUrl":         "https://example.com/token",
+			"clientId":         "environment-client",
+		}},
+	})
+	SetOAuth2Provider(service, provider)
+
+	response, err := service.Send(t.TempDir(), "collections/users/list.yaml", "production")
+	if err != nil {
+		t.Fatalf("send request: %v", err)
+	}
+	defer service.Close(response.ID)
+
+	if authorization != "Bearer provider-token" {
+		t.Errorf("unexpected authorization %q", authorization)
+	}
+	if provider.authentication.GrantType != domain.OAuth2GrantClientCredentials {
+		t.Errorf("expected the environment grant type, got %q", provider.authentication.GrantType)
+	}
+}
+
+func TestSendRejectsUnknownEnvironmentAuthenticationType(t *testing.T) {
+	service := newTestService(t, fakeSource{
+		request: domain.Request{
+			Name:           "Unknown",
+			Method:         domain.MethodGet,
+			URL:            "https://example.com",
+			Authentication: &domain.Authentication{Type: domain.AuthenticationNone},
+		},
+		layers: []map[string]string{{"authType": "token"}},
+	})
+
+	_, err := service.Send(t.TempDir(), "collections/unknown.yaml", "production")
+	if err == nil || !strings.Contains(err.Error(), "authType") {
+		t.Fatalf("expected an error naming authType, got %v", err)
+	}
+}
+
 func TestSendStoresLargeBodyAndReadsItInChunks(t *testing.T) {
 	content := strings.Repeat("a", PreviewSize+250<<10)
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {

@@ -361,7 +361,7 @@ authentication:
 
 OAuth2 stores client configuration in the YAML but keeps tokens out of the
 workspace: they stay in memory for the session. Supported grants:
-authorization code with PKCE, client credentials.
+authorization code with PKCE, client credentials and resource owner password.
 
 ```yaml
 authentication:
@@ -375,6 +375,41 @@ authentication:
   redirectUrl: http://127.0.0.1:53682/callback
   audience: https://api.example.com
 ```
+
+### Environment controlled authentication
+
+Two variables are reserved in every scope, including environments: `authType`
+and `grantType`. When an environment defines them, they choose how its requests
+authenticate, without editing the request file. The credential fields stay in
+the request and read ordinary variables as usual.
+
+```yaml
+# environments/production.yaml
+name: Production
+variables:
+  authType: oauth2
+  grantType: client_credentials
+  tokenUrl: "{{identityUrl}}/token"
+  clientId: production-client
+  clientSecret: "{{clientSecret}}"
+```
+
+```yaml
+# the request keeps its credential layout, whatever the environment
+authentication:
+  type: none
+  tokenUrl: "{{tokenUrl}}"
+  clientId: "{{clientId}}"
+  clientSecret: "{{clientSecret}}"
+```
+
+`authType` accepts `none`, `basic`, `bearer`, `apiKey` (also written `apikey`)
+and `oauth2`. `grantType` accepts `authorizationCode`,
+`clientCredentials` (also `client_credential`) and `password` (also
+`resource_owner_password_credentials`). A value outside these lists fails the
+request with an error naming the variable. The environment closest to the
+request wins, following the usual resolution order; a pre-request script runs
+after this choice and may still adjust the request.
 
 | Field | Description |
 | --- | --- |

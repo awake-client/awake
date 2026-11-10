@@ -134,6 +134,10 @@ func (service *Service) OpenStream(workspaceRoot string, requestPath string, env
 	}
 	layers := variables.Maps(labeledLayers)
 
+	if err := applyEnvironmentAuthentication(&request, layers); err != nil {
+		return Stream{}, err
+	}
+
 	layers, preRequestOutcome := service.runPreRequest(&request, layers, service.environmentResolver(workspaceRoot, requestPath))
 	service.saveEnvironmentChanges(workspaceRoot, requestPath, environmentFileName, &preRequestOutcome)
 
