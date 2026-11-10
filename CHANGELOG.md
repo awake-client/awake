@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-11-10
+
+### Added
+
+- The request editor copies the request as a `curl` command, with its
+  variables, headers, authentication and body resolved as sending would.
+- A context that offers a single environment selects it automatically, instead
+  of leaving the request without one.
+
+### Changed
+
+- The eye button shows the hidden collections dimmed in the tree instead of
+  bringing them back, and the row menu of a dimmed collection unhides it.
+
+### Fixed
+
+- Choosing "No environment" after switching context keeps that choice instead
+  of selecting the default environment again.
+
 ## [0.7.0] - 2026-11-10
 
 ### Added
@@ -134,7 +153,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   showing "No environment". Scripts writing environment variables find the
   collection environment from a request in one of its folders.
 
-[Unreleased]: https://github.com/awake-client/awake/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/awake-client/awake/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/awake-client/awake/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/awake-client/awake/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/awake-client/awake/compare/v0.5.1...v0.6.0
 [0.5.1]: https://github.com/awake-client/awake/compare/v0.5.0...v0.5.1
