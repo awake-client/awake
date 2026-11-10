@@ -228,6 +228,10 @@
       <hr class="menu-separator" />
     }
     @if (isRequest(menu.row)) {
+      <button type="button" role="menuitem" class="menu-item" (click)="copyPathFromRowMenu()">
+        <app-icon name="copy" [size]="14" />
+        Copy path
+      </button>
       <button type="button" role="menuitem" class="menu-item" (click)="duplicateFromRowMenu()">
         <app-icon name="layers" [size]="14" />
         Duplicate

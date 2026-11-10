@@ -2,6 +2,7 @@ import { ScrollingModule } from '@angular/cdk/scrolling';
 import { Component, DestroyRef, effect, inject, input, output, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { NavigationEnd, Router } from '@angular/router';
+import { Clipboard } from '@wailsio/runtime';
 import { filter } from 'rxjs';
 import * as HistoryService from '@bindings/github.com/awake-client/awake/src/features/history/service';
 import * as CollectionsService from '@bindings/github.com/awake-client/awake/src/features/collections/service';
@@ -413,6 +414,25 @@ export class CollectionTree {
     this.rowMenu.set(null);
     if (menu) {
       void this.duplicateRequest(menu.row);
+    }
+  }
+
+  /** Copies the workspace-relative path of a request, for awake.runRequest. */
+  protected copyPathFromRowMenu(): void {
+    const menu = this.rowMenu();
+    this.rowMenu.set(null);
+    if (!menu) {
+      return;
+    }
+
+    void this.copyPath(menu.row.entry.Path);
+  }
+
+  private async copyPath(path: string): Promise<void> {
+    try {
+      await Clipboard.SetText(path);
+    } catch (error) {
+      this.errorMessage.set(describeError(error));
     }
   }
 
