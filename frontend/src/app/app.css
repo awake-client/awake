@@ -4,19 +4,27 @@
   overflow: hidden;
 }
 
-/* On macOS the window uses an inset title bar. Screens without their own
-   title bar (such as the workspace picker) get a transparent strip at the top
-   so the window can still be dragged. The workspace shell paints above it and
-   declares its own drag region. */
+/* On macOS and Windows the window is drawn by the web content. Screens
+   without their own title bar (such as the workspace picker) get a transparent
+   strip at the top so the window can still be dragged. The workspace shell
+   paints above it and declares its own drag region. */
 .drag-region {
   display: none;
 }
 
-html[data-platform='darwin'] .drag-region {
+html[data-platform='darwin'] .drag-region,
+html[data-platform='windows'] .drag-region {
   display: block;
   position: fixed;
   inset: 0 0 auto;
-  height: 38px;
   z-index: 0;
   --wails-draggable: drag;
+}
+
+html[data-platform='darwin'] .drag-region {
+  height: 38px;
+}
+
+html[data-platform='windows'] .drag-region {
+  height: var(--titlebar-height);
 }

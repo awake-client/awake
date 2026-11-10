@@ -18,7 +18,7 @@ vi.mock('@wailsio/runtime', () => ({
   },
 }));
 
-import { detectPlatform } from './platform';
+import { detectPlatform, isWindowsPlatform } from './platform';
 
 describe('detectPlatform', () => {
   beforeEach(() => {
@@ -33,6 +33,14 @@ describe('detectPlatform', () => {
 
     expect(document.documentElement.dataset['platform']).toBe('darwin');
     expect(document.documentElement.dataset['fullscreen']).toBe('false');
+  });
+
+  it('reports a Windows host', async () => {
+    await detectPlatform();
+    expect(isWindowsPlatform()).toBe(false);
+
+    document.documentElement.dataset['platform'] = 'windows';
+    expect(isWindowsPlatform()).toBe(true);
   });
 
   it('follows the fullscreen events of the window', async () => {

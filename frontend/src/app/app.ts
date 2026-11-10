@@ -2,9 +2,10 @@ import { Component, inject } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 import { suppressDefaultContextMenu } from '@core/context-menu';
 import { ThemeStore } from '@core/theme-store';
+import { WindowControls } from '@shared/window-controls';
 
 @Component({
-  imports: [RouterOutlet],
+  imports: [RouterOutlet, WindowControls],
   selector: 'app-root',
   styleUrl: './app.css',
   templateUrl: './app.html',

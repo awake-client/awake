@@ -4,6 +4,7 @@ package app
 
 import (
 	"embed"
+	"runtime"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
@@ -56,7 +57,7 @@ func Run(frontendAssets embed.FS) error {
 		return err
 	}
 
-	instance.Window.NewWithOptions(application.WebviewWindowOptions{
+	windowOptions := application.WebviewWindowOptions{
 		Title:            mainWindowTitle,
 		Width:            mainWindowWidth,
 		Height:           mainWindowHeight,
@@ -69,7 +70,18 @@ func Run(frontendAssets embed.FS) error {
 			TitleBar: application.MacTitleBarHiddenInset,
 		},
 		URL: "/",
-	})
+	}
+
+	// Windows draws the web title bar itself. The native frame only follows
+	// the operating system theme, set once at startup, while the application
+	// theme is chosen in the window: a frameless window keeps its shadow,
+	// rounded corners and resize borders, and the web header matches the
+	// theme with its own minimize, maximize and close buttons.
+	if runtime.GOOS == "windows" {
+		windowOptions.Frameless = true
+	}
+
+	instance.Window.NewWithOptions(windowOptions)
 
 	return instance.Run()
 }

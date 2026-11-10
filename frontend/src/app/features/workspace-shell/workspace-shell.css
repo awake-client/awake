@@ -35,6 +35,17 @@
   padding-top: 0;
 }
 
+/* Windows uses a frameless window whose caption buttons are drawn in the web
+   title bar, over the right edge: keep the environment picker clear of them. */
+:host-context(html[data-platform='windows']) .titlebar {
+  padding-right: 146px;
+}
+
+/* A fullscreen window has no caption buttons. */
+:host-context(html[data-platform='windows'][data-fullscreen='true']) .titlebar {
+  padding-right: 14px;
+}
+
 .titlebar a,
 .titlebar button,
 .titlebar label,

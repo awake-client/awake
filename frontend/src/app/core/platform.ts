@@ -47,3 +47,12 @@ export function isMacPlatform(): boolean {
   }
   return /mac/i.test(navigator.userAgent);
 }
+
+/**
+ * Reports whether the host is Windows, from the platform detected at startup.
+ * The main window is frameless there, so the web title bar draws the window
+ * buttons itself.
+ */
+export function isWindowsPlatform(): boolean {
+  return document.documentElement.dataset['platform'] === 'windows';
+}
