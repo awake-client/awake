@@ -129,7 +129,7 @@ export class CollectionTree {
         filter((event) => event instanceof NavigationEnd),
         takeUntilDestroyed(),
       )
-      .subscribe(() => this.syncSelectionWithRoute());
+      .subscribe(() => void this.syncSelectionWithRoute());
 
     window.addEventListener(COLLECTIONS_CHANGED_EVENT, collectionsChanged);
     window.addEventListener('awake:open-collection', openCollection);
@@ -243,6 +243,10 @@ export class CollectionTree {
           await this.toggle(row);
         }
       }
+
+      // The page may already show a request, opened before the tree finished
+      // loading, such as the one restored when the workspace opens.
+      await this.syncSelectionWithRoute();
     } catch (error) {
       this.errorMessage.set(describeError(error));
     } finally {
@@ -623,7 +627,12 @@ export class CollectionTree {
     return url.startsWith(prefix) ? decodeURIComponent(url.slice(prefix.length)) : null;
   }
 
-  private syncSelectionWithRoute(): void {
+  /**
+   * Highlights the page on screen and unfolds the folder of an open request,
+   * so a request opened from the search palette, the history or a tab is also
+   * visible in the tree.
+   */
+  private async syncSelectionWithRoute(): Promise<void> {
     const openRequest = this.openRequestPath();
     const settingsPrefix = '/workspace/collection/';
     const url = this.router.url.split(/[?#]/)[0];
@@ -631,6 +640,7 @@ export class CollectionTree {
       this.selected.set(decodeURIComponent(url.slice(settingsPrefix.length)));
     } else if (openRequest) {
       this.selected.set(openRequest);
+      await this.revealDirectory(openRequest.slice(0, openRequest.lastIndexOf('/')));
     } else if (this.selected()?.endsWith('.yaml')) {
       this.selected.set(null);
     }

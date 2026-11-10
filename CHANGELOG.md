@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- A request opened from the search palette, the history or a tab unfolds its
+  folder in the collection tree, so it is also visible there.
+
 ## [0.4.0] - 2026-11-10
 
 ### Added
