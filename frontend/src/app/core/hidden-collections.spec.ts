@@ -24,6 +24,18 @@ describe('HiddenCollectionsStore', () => {
     expect(store.isHidden('collections/billing')).toBe(false);
   });
 
+  it('brings every hidden collection back at once', () => {
+    const store = new HiddenCollectionsStore();
+    store.useWorkspace(WORKSPACE);
+
+    store.hide('collections/billing');
+    store.hide('local/notes');
+    expect(store.hiddenPaths()).toEqual(['collections/billing', 'local/notes']);
+
+    store.unhideAll();
+    expect(store.hiddenPaths()).toEqual([]);
+  });
+
   it('keeps the hidden collections after a restart', () => {
     const first = new HiddenCollectionsStore();
     first.useWorkspace(WORKSPACE);

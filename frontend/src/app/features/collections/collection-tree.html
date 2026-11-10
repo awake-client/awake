@@ -52,31 +52,16 @@
         </div>
       }
     </div>
-    <div class="menu-anchor">
-      <button
-        type="button"
-        class="icon-btn"
-        [disabled]="hiddenEntries().length === 0"
-        [class.open]="isHiddenMenuOpen()"
-        aria-label="Hidden collections"
-        title="Hidden collections"
-        aria-haspopup="menu"
-        [attr.aria-expanded]="isHiddenMenuOpen()"
-        (click)="toggleHiddenMenu($event)"
-      >
-        <app-icon name="eye-off" [size]="14" />
-      </button>
-      @if (isHiddenMenuOpen()) {
-        <div class="menu" role="menu" (click)="$event.stopPropagation()">
-          @for (entry of hiddenEntries(); track entry.Path) {
-            <button type="button" role="menuitem" class="menu-item" (click)="revealHidden(entry)">
-              <app-icon name="box" [size]="14" />
-              {{ entry.Name }}
-            </button>
-          }
-        </div>
-      }
-    </div>
+    <button
+      type="button"
+      class="icon-btn"
+      [disabled]="hiddenEntries().length === 0"
+      aria-label="Show hidden collections"
+      title="Show hidden collections"
+      (click)="showHiddenCollections()"
+    >
+      <app-icon name="eye-off" [size]="14" />
+    </button>
   </div>
 </div>
 

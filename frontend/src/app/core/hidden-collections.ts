@@ -41,6 +41,15 @@ export class HiddenCollectionsStore {
     this.persist();
   }
 
+  /** Brings every hidden collection back, so the tree shows them again. */
+  unhideAll(): void {
+    if (this.current().length === 0) {
+      return;
+    }
+    this.current.set([]);
+    this.persist();
+  }
+
   private persist(): void {
     if (!this.workspaceRoot) {
       return;

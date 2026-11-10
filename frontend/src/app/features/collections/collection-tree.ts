@@ -88,9 +88,8 @@ export class CollectionTree {
   protected readonly selected = signal<string | null>(null);
   protected readonly isMenuOpen = signal(false);
   protected readonly rowMenu = signal<RowMenu | null>(null);
-  /** Collections the user hid, offered by the hidden collections menu. */
+  /** Collections the user hid, brought back by the show hidden button. */
   protected readonly hiddenEntries = signal<Entry[]>([]);
-  protected readonly isHiddenMenuOpen = signal(false);
   /** Folder that would receive the row being dragged. */
   protected readonly dropTarget = signal<string | null>(null);
   protected readonly dragged = signal<TreeRow | null>(null);
@@ -118,7 +117,6 @@ export class CollectionTree {
     };
     const closeMenu = () => {
       this.isMenuOpen.set(false);
-      this.isHiddenMenuOpen.set(false);
       this.rowMenu.set(null);
     };
 
@@ -261,25 +259,18 @@ export class CollectionTree {
     }
   }
 
-  protected toggleHiddenMenu(event: Event): void {
-    event.stopPropagation();
-    this.isHiddenMenuOpen.update((open) => !open);
-  }
-
-  /** Unhides a collection from the hidden menu and unfolds it again. */
-  protected async revealHidden(entry: Entry): Promise<void> {
-    this.isHiddenMenuOpen.set(false);
-    this.hiddenCollections.unhide(entry.Path);
+  /** Brings the hidden collections back into the tree, collapsed as usual. */
+  protected async showHiddenCollections(): Promise<void> {
+    if (this.hiddenEntries().length === 0) {
+      return;
+    }
+    this.hiddenCollections.unhideAll();
     const workspaceRoot = this.workspaceRoot();
     if (!workspaceRoot) {
+      this.hiddenEntries.set([]);
       return;
     }
     await this.reload(workspaceRoot);
-    const row = this.rows().find((candidate) => candidate.entry.Path === entry.Path);
-    if (row && !row.expanded) {
-      await this.toggle(row);
-    }
-    this.selected.set(entry.Path);
   }
 
   /** Hides a collection from the tree, keeping its files on disk. */
