@@ -785,3 +785,24 @@ func TestUpdateCollectionWritesFolderMetadata(t *testing.T) {
 		t.Errorf("unexpected folder authentication: %+v", loaded.Authentication)
 	}
 }
+
+func TestLoadCollectionFallsBackToTheFolderName(t *testing.T) {
+	workspaceRoot := t.TempDir()
+	writeTestFile(t, workspaceRoot, "collections/citadel/badging-dialog/clockings-info/info.yaml", "name: Info\nmethod: GET\nurl: https://example.com\n")
+	repository := NewRepository(workspaceRoot)
+
+	loaded, err := repository.LoadCollection("collections/citadel/badging-dialog/clockings-info")
+	if err != nil {
+		t.Fatalf("load folder without metadata: %v", err)
+	}
+	if loaded.Name != "clockings-info" {
+		t.Errorf("expected the directory name, got %q", loaded.Name)
+	}
+	if len(loaded.Variables) != 0 || loaded.Authentication != nil || loaded.Documentation != "" {
+		t.Errorf("expected an empty configuration, got %+v", loaded)
+	}
+
+	if _, err := repository.LoadCollection("collections/citadel/missing"); !errors.Is(err, ErrEntryNotFound) {
+		t.Errorf("a missing folder must stay not found, got %v", err)
+	}
+}

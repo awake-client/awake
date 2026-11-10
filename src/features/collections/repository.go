@@ -318,9 +318,10 @@ func (repository *Repository) LoadRequest(relativePath string) (domain.Request, 
 	return request, nil
 }
 
-// LoadCollection reads and validates a collection metadata file. A collection
-// directory without metadata is valid and returns ErrEntryNotFound so callers
-// can fall back to the directory name.
+// LoadCollection reads and validates the metadata of a collection or folder.
+// A collection directory without metadata is valid and returns ErrEntryNotFound
+// so callers can fall back to the directory name. A folder without folder.yaml
+// falls back to its directory name until its settings are saved.
 func (repository *Repository) LoadCollection(relativePath string) (domain.Collection, error) {
 	if strings.HasSuffix(relativePath, fileExtension) {
 		return domain.Collection{}, ErrInvalidPath
@@ -413,12 +414,18 @@ func (repository *Repository) inheritedAuthenticationFrom(directory string) (Inh
 }
 
 // loadFolder reads the metadata of a folder: its display name, its default
-// variables and its authentication.
+// variables and its authentication. A folder created outside Awake, such as by
+// an import, has no folder.yaml yet: it falls back to its directory name until
+// its settings are saved.
 func (repository *Repository) loadFolder(directory string) (domain.Collection, error) {
 	content, err := os.ReadFile(filepath.Join(directory, folderFileName))
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			return domain.Collection{}, ErrEntryNotFound
+			info, statErr := os.Stat(directory)
+			if statErr != nil || !info.IsDir() {
+				return domain.Collection{}, ErrEntryNotFound
+			}
+			return domain.Collection{Name: filepath.Base(directory)}, nil
 		}
 		return domain.Collection{}, fmt.Errorf("read folder metadata %s: %w", directory, err)
 	}

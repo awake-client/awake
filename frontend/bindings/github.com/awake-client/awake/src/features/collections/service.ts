@@ -56,7 +56,8 @@ export function List(workspaceRoot: string, relativePath: string): $CancellableP
 
 /**
  * LoadCollection returns collection metadata, or ErrEntryNotFound when the
- * directory has no collection file.
+ * directory has no collection file. A folder without folder.yaml falls back to
+ * its directory name.
  */
 export function LoadCollection(workspaceRoot: string, relativePath: string): $CancellablePromise<domain$0.Collection> {
     return $Call.ByID(1059055795, workspaceRoot, relativePath);

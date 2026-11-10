@@ -34,7 +34,8 @@ func (service *Service) SaveRequestOverride(workspaceRoot string, relativePath s
 }
 
 // LoadCollection returns collection metadata, or ErrEntryNotFound when the
-// directory has no collection file.
+// directory has no collection file. A folder without folder.yaml falls back to
+// its directory name.
 func (service *Service) LoadCollection(workspaceRoot string, relativePath string) (domain.Collection, error) {
 	return NewRepository(workspaceRoot).LoadCollection(relativePath)
 }
