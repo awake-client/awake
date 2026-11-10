@@ -235,6 +235,12 @@
         Hide collection
       </button>
       <hr class="menu-separator" />
+    } @else if (!isRequest(menu.row)) {
+      <button type="button" role="menuitem" class="menu-item" (click)="openSettings()">
+        <app-icon name="settings" [size]="14" />
+        Folder settings
+      </button>
+      <hr class="menu-separator" />
     }
     @if (isRequest(menu.row)) {
       <button type="button" role="menuitem" class="menu-item" (click)="duplicateFromRowMenu()">

@@ -139,7 +139,7 @@ export class CollectionSettings {
       return;
     }
     if (draft.Name === '') {
-      this.errorMessage.set('A collection needs a name.');
+      this.errorMessage.set(`A ${this.isFolder() ? 'folder' : 'collection'} needs a name.`);
       return;
     }
 

@@ -351,6 +351,7 @@ export class CollectionTree {
     }
   }
 
+  /** Opens the settings of the collection or folder of the row. */
   protected openSettings(): void {
     const menu = this.rowMenu();
     this.rowMenu.set(null);
