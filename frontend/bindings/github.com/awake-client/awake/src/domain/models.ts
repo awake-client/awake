@@ -84,6 +84,12 @@ export enum BodyType {
 export interface Collection {
     "Name": string;
     "Variables": { [_ in string]?: string } | null;
+
+    /**
+     * Headers are the default headers of every request in the collection or
+     * folder. A request header with the same name wins.
+     */
+    "Headers": Header[] | null;
     "Authentication": Authentication | null;
     "Documentation": string;
 

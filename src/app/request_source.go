@@ -32,6 +32,15 @@ func (requestSource) LoadRequest(workspaceRoot string, relativePath string) (dom
 		return domain.Request{}, err
 	}
 	request = override.ApplyTo(request)
+
+	// Default headers of the collection and folders come first, so the
+	// headers of the request override them.
+	inheritedHeaders, err := repository.ResolveInheritedHeaders(relativePath)
+	if err != nil {
+		return domain.Request{}, err
+	}
+	request.Headers = append(inheritedHeaders, request.Headers...)
+
 	if request.Authentication == nil || request.Authentication.Type != domain.AuthenticationInherit {
 		return request, nil
 	}

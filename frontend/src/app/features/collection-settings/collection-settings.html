@@ -57,6 +57,17 @@
     <button
       type="button"
       role="tab"
+      [class.active]="tab() === 'headers'"
+      (click)="tab.set('headers')"
+    >
+      Headers
+      @if (headers().length > 0) {
+        <span class="count">{{ headers().length }}</span>
+      }
+    </button>
+    <button
+      type="button"
+      role="tab"
       [class.active]="tab() === 'authentication'"
       (click)="tab.set('authentication')"
     >
@@ -151,6 +162,54 @@
           <button type="button" class="btn btn-sm add" (click)="addVariable()">
             <app-icon name="plus" [size]="14" />
             Add variable
+          </button>
+        }
+
+        @case ('headers') {
+          <p class="hint">
+            Default headers for every request of the {{ isFolder() ? 'folder' : 'collection' }}. A
+            header of the same name on a request overrides them.
+          </p>
+          <div class="rows">
+            @for (header of headers(); track $index) {
+              <div class="row header-row">
+                <input
+                  type="checkbox"
+                  [checked]="header.Enabled"
+                  (change)="updateHeader($index, 'Enabled', isChecked($event))"
+                  aria-label="Enable header"
+                />
+                <input
+                  class="input mono"
+                  type="text"
+                  [value]="header.Name"
+                  (input)="updateHeader($index, 'Name', inputValue($event))"
+                  placeholder="Header-Name"
+                  spellcheck="false"
+                />
+                <app-variable-input
+                  [value]="header.Value"
+                  (valueChange)="updateHeader($index, 'Value', $event)"
+                  placeholder="value"
+                  ariaLabel="Header value"
+                />
+                <button
+                  type="button"
+                  class="icon-btn danger"
+                  title="Remove header"
+                  aria-label="Remove header"
+                  (click)="removeHeader($index)"
+                >
+                  <app-icon name="trash" [size]="14" />
+                </button>
+              </div>
+            } @empty {
+              <p class="hint">No header yet.</p>
+            }
+          </div>
+          <button type="button" class="btn btn-sm add" (click)="addHeader()">
+            <app-icon name="plus" [size]="14" />
+            Add header
           </button>
         }
 

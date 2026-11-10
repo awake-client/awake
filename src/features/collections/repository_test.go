@@ -743,6 +743,38 @@ func TestResolveInheritedAuthenticationWithoutAncestorReturnsNone(t *testing.T) 
 	}
 }
 
+func TestResolveInheritedHeadersStacksScopesFromTheCollectionDown(t *testing.T) {
+	workspaceRoot := t.TempDir()
+	writeTestFile(t, workspaceRoot, "collections/billing/collection.yaml", "name: Billing\nheaders:\n  - {name: Accept, value: application/json, enabled: true}\n  - {name: X-Api-Version, value: v1, enabled: true}\n")
+	writeTestFile(t, workspaceRoot, "collections/billing/users/folder.yaml", "name: Users\nheaders:\n  - {name: X-Scope, value: users, enabled: true}\n")
+	writeTestFile(t, workspaceRoot, "collections/billing/users/admins/folder.yaml", "name: Admins\nheaders:\n  - {name: X-Scope, value: admins, enabled: true}\n")
+
+	repository := NewRepository(workspaceRoot)
+	headers, err := repository.ResolveInheritedHeaders("collections/billing/users/admins/report.yaml")
+	if err != nil {
+		t.Fatalf("resolve headers: %v", err)
+	}
+
+	expected := []domain.Header{
+		{Name: "Accept", Value: "application/json", Enabled: true},
+		{Name: "X-Api-Version", Value: "v1", Enabled: true},
+		{Name: "X-Scope", Value: "users", Enabled: true},
+		{Name: "X-Scope", Value: "admins", Enabled: true},
+	}
+	if len(headers) != len(expected) {
+		t.Fatalf("expected %d headers, got %+v", len(expected), headers)
+	}
+	for index, header := range headers {
+		if header != expected[index] {
+			t.Errorf("header %d: expected %+v, got %+v", index, expected[index], header)
+		}
+	}
+
+	if _, err := repository.ResolveInheritedHeaders("collections/billing/collection.yaml"); !errors.Is(err, ErrInvalidPath) {
+		t.Errorf("a metadata file is not a request, got %v", err)
+	}
+}
+
 func TestUpdateCollectionWritesFolderMetadata(t *testing.T) {
 	workspaceRoot := t.TempDir()
 	repository := NewRepository(workspaceRoot)
@@ -757,6 +789,7 @@ func TestUpdateCollectionWritesFolderMetadata(t *testing.T) {
 	updated := domain.Collection{
 		Name:           "Invoices",
 		Variables:      map[string]string{"pageSize": "20"},
+		Headers:        []domain.Header{{Name: "Accept", Value: "application/json", Enabled: true}},
 		Documentation:  "Paid invoices",
 		Authentication: &domain.Authentication{Type: domain.AuthenticationBearer, Token: "{{token}}"},
 	}
@@ -768,7 +801,7 @@ func TestUpdateCollectionWritesFolderMetadata(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read folder metadata: %v", err)
 	}
-	for _, expected := range []string{"name: Invoices", "variables:", "authentication:", "type: bearer"} {
+	for _, expected := range []string{"name: Invoices", "variables:", "headers:", "name: Accept", "authentication:", "type: bearer"} {
 		if !strings.Contains(string(content), expected) {
 			t.Errorf("expected folder metadata to contain %q, got:\n%s", expected, content)
 		}
@@ -780,6 +813,9 @@ func TestUpdateCollectionWritesFolderMetadata(t *testing.T) {
 	}
 	if loaded.Name != "Invoices" || loaded.Variables["pageSize"] != "20" || loaded.Documentation != "Paid invoices" {
 		t.Errorf("unexpected folder metadata: %+v", loaded)
+	}
+	if len(loaded.Headers) != 1 || loaded.Headers[0].Name != "Accept" || loaded.Headers[0].Value != "application/json" {
+		t.Errorf("unexpected folder headers: %+v", loaded.Headers)
 	}
 	if loaded.Authentication == nil || loaded.Authentication.Type != domain.AuthenticationBearer || loaded.Authentication.Token != "{{token}}" {
 		t.Errorf("unexpected folder authentication: %+v", loaded.Authentication)

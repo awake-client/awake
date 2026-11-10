@@ -6,6 +6,7 @@ import {
   Authentication,
   AuthenticationType,
   Collection,
+  Header,
   OAuth2GrantType,
 } from '@bindings/github.com/awake-client/awake/src/domain/models';
 import { notifyCollectionsChanged } from '@core/collection-events';
@@ -17,7 +18,7 @@ import { ColorPicker } from '@shared/color-picker';
 import { Icon } from '@shared/icon';
 import { VariableInput } from '@shared/variable-input';
 
-type SettingsTab = 'overview' | 'variables' | 'authentication';
+type SettingsTab = 'overview' | 'variables' | 'headers' | 'authentication';
 
 interface VariableRow {
   name: string;
@@ -50,6 +51,7 @@ export class CollectionSettings {
   protected readonly documentation = signal('');
   protected readonly color = signal('');
   protected readonly variables = signal<VariableRow[]>([]);
+  protected readonly headers = signal<Header[]>([]);
   protected readonly authentication = signal<Authentication>(emptyAuthentication());
   /** What a folder inherits from the folders and collection above it. */
   protected readonly inheritedAuthentication = signal<Authentication | null>(null);
@@ -85,11 +87,13 @@ export class CollectionSettings {
     } else if (!this.isFolder() && authentication.Type === AuthenticationType.AuthenticationNone) {
       storedAuthentication = null;
     }
+    const headers = this.headers().filter((header) => header.Name.trim() !== '');
     return {
       Name: this.name().trim(),
       Documentation: this.documentation(),
       Color: this.color(),
       Variables: Object.keys(variables).length > 0 ? variables : null,
+      Headers: headers.length > 0 ? headers : null,
       Authentication: storedAuthentication,
     };
   });
@@ -106,7 +110,12 @@ export class CollectionSettings {
     });
     this.route.queryParamMap.pipe(takeUntilDestroyed()).subscribe((query) => {
       const tab = query.get('tab');
-      if (tab === 'overview' || tab === 'variables' || tab === 'authentication') {
+      if (
+        tab === 'overview' ||
+        tab === 'variables' ||
+        tab === 'headers' ||
+        tab === 'authentication'
+      ) {
         this.tab.set(tab);
       }
     });
@@ -128,8 +137,32 @@ export class CollectionSettings {
     this.variables.update((variables) => variables.filter((_, position) => position !== index));
   }
 
+  protected addHeader(): void {
+    this.headers.update((headers) => [...headers, { Name: '', Value: '', Enabled: true }]);
+  }
+
+  protected updateHeader(
+    index: number,
+    field: 'Name' | 'Value' | 'Enabled',
+    value: string | boolean,
+  ): void {
+    this.headers.update((headers) =>
+      headers.map((header, position) =>
+        position === index ? ({ ...header, [field]: value } as Header) : header,
+      ),
+    );
+  }
+
+  protected removeHeader(index: number): void {
+    this.headers.update((headers) => headers.filter((_, position) => position !== index));
+  }
+
   protected inputValue(event: Event): string {
     return (event.target as HTMLInputElement | HTMLTextAreaElement).value;
+  }
+
+  protected isChecked(event: Event): boolean {
+    return (event.target as HTMLInputElement).checked;
   }
 
   protected async save(): Promise<void> {
@@ -190,6 +223,7 @@ export class CollectionSettings {
           value: value ?? '',
         })),
       );
+      this.headers.set(collection.Headers ?? []);
       this.authentication.set({
         ...emptyAuthentication(),
         ...(collection.Authentication ?? {}),

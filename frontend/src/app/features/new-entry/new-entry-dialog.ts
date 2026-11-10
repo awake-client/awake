@@ -399,6 +399,7 @@ export class NewEntryDialog {
         await CollectionsService.CreateCollection(rootPath, path, {
           Name: name,
           Variables: null,
+          Headers: null,
           Authentication: null,
           Documentation: '',
           Color: this.color(),

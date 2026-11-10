@@ -318,6 +318,42 @@ func (repository *Repository) LoadRequest(relativePath string) (domain.Request, 
 	return request, nil
 }
 
+// ResolveInheritedHeaders returns the default headers a request receives from
+// its collection and its folders, weakest first: the collection, then each
+// folder down to the one holding the request. A request header with the same
+// name overrides them, because headers are applied in order.
+func (repository *Repository) ResolveInheritedHeaders(requestPath string) ([]domain.Header, error) {
+	if !isRequestPath(requestPath) {
+		return nil, ErrInvalidPath
+	}
+
+	var layers [][]domain.Header
+	directory := path.Dir(path.Clean(requestPath))
+	for directory != "." && directory != "/" {
+		if !isRoot(directory) {
+			metadata, err := repository.LoadCollection(directory)
+			if err != nil && !errors.Is(err, ErrEntryNotFound) {
+				return nil, err
+			}
+			if err == nil && len(metadata.Headers) > 0 {
+				layers = append(layers, metadata.Headers)
+			}
+		}
+
+		parent := path.Dir(directory)
+		if parent == directory {
+			break
+		}
+		directory = parent
+	}
+
+	headers := make([]domain.Header, 0)
+	for index := len(layers) - 1; index >= 0; index-- {
+		headers = append(headers, layers[index]...)
+	}
+	return headers, nil
+}
+
 // LoadCollection reads and validates the metadata of a collection or folder.
 // A collection directory without metadata is valid and returns ErrEntryNotFound
 // so callers can fall back to the directory name. A folder without folder.yaml
@@ -441,6 +477,7 @@ func (repository *Repository) loadFolder(directory string) (domain.Collection, e
 	return domain.Collection{
 		Name:           metadata.Name,
 		Variables:      metadata.Variables,
+		Headers:        metadata.Headers,
 		Authentication: metadata.Authentication,
 		Documentation:  metadata.Documentation,
 	}, nil
@@ -560,6 +597,7 @@ func (repository *Repository) updateFolder(cleaned string, collection domain.Col
 	metadata := folderMetadata{
 		Name:           collection.Name,
 		Variables:      collection.Variables,
+		Headers:        collection.Headers,
 		Authentication: collection.Authentication,
 		Documentation:  collection.Documentation,
 	}
@@ -816,6 +854,7 @@ func entryLess(first Entry, second Entry) bool {
 type folderMetadata struct {
 	Name           string                 `yaml:"name"`
 	Variables      map[string]string      `yaml:"variables,omitempty"`
+	Headers        []domain.Header        `yaml:"headers,omitempty"`
 	Authentication *domain.Authentication `yaml:"authentication,omitempty"`
 	Documentation  string                 `yaml:"documentation,omitempty"`
 }

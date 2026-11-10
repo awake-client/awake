@@ -139,6 +139,14 @@ h1 {
   gap: 8px;
 }
 
+.header-row {
+  grid-template-columns: auto minmax(140px, 34%) minmax(0, 1fr) auto;
+}
+
+.header-row input[type='checkbox'] {
+  margin: 0 2px;
+}
+
 .add {
   align-self: flex-start;
 }

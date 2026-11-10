@@ -155,17 +155,24 @@ undefined variable is an error, not an empty string.
 name: Platform
 variables:
   apiVersion: v1
+headers:
+  - {name: Accept, value: application/json, enabled: true}
 authentication:
   type: inherit
 documentation: |
   Requests for the platform API.
 ```
 
+- `headers` are default headers sent with every request below, after the
+  request's own headers are applied: a request header with the same name wins.
+  A folder's headers win over those of its collection and come after those of
+  its parent folders. Disabled headers are not sent.
+
 The directory tree defines nesting. A collection directory without a
 `collection.yaml` is valid and inherits the parent metadata. A folder may hold a
-`folder.yaml` with a display name, default variables and its own authentication;
-the settings of the closest folder, then of the collection, apply to the
-requests below it.
+`folder.yaml` with a display name, default variables, default headers and its
+own authentication; the settings of the closest folder, then of the collection,
+apply to the requests below it.
 
 ## Requests
 

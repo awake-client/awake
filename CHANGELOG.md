@@ -11,6 +11,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - A request opened from the search palette, the history or a tab unfolds its
   folder in the collection tree, so it is also visible there.
+- Default headers per collection and folder, edited in a new Headers tab. They
+  are sent with every request below, and a request header of the same name
+  wins; a folder's headers win over those of its collection.
 
 ## [0.4.0] - 2026-11-10
 

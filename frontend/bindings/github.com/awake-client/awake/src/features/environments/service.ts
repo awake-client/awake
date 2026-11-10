@@ -25,7 +25,8 @@ export function Clone(workspaceRoot: string, scope: string, sourceFileName: stri
 }
 
 /**
- * Delete removes a shared environment and its local overrides.
+ * Delete removes an environment and its local file, whether it is shared or
+ * private.
  */
 export function Delete(workspaceRoot: string, scope: string, fileName: string): $CancellablePromise<void> {
     return $Call.ByID(3698020771, workspaceRoot, scope, fileName);

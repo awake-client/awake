@@ -150,6 +150,52 @@ func TestLoadRequestInheritsAuthenticationWithoutWritingIt(t *testing.T) {
 	}
 }
 
+func TestLoadRequestAddsTheCollectionAndFolderHeaders(t *testing.T) {
+	root := t.TempDir()
+	if _, err := workspace.NewService().Create(root, workspace.CreateOptions{Name: "Headers", Mode: workspace.ModeTeam}); err != nil {
+		t.Fatalf("create workspace: %v", err)
+	}
+	write := func(path string, content string) {
+		t.Helper()
+		full := filepath.Join(root, filepath.FromSlash(path))
+		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(full, []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write("collections/billing/collection.yaml", "name: Billing\nheaders:\n  - {name: Accept, value: application/json, enabled: true}\n  - {name: X-Scope, value: collection, enabled: true}\n")
+	write("collections/billing/users/folder.yaml", "name: Users\nheaders:\n  - {name: X-Scope, value: folder, enabled: true}\n  - {name: X-Folder, value: users, enabled: true}\n")
+	write("collections/billing/users/list.yaml", "name: List\nmethod: GET\nurl: https://example.com\nheaders:\n  - {name: X-Scope, value: request, enabled: true}\n  - {name: X-Own, value: request, enabled: true}\n")
+
+	loaded, err := requestSource{}.LoadRequest(root, "collections/billing/users/list.yaml")
+	if err != nil {
+		t.Fatalf("load request: %v", err)
+	}
+
+	names := make([]string, 0, len(loaded.Headers))
+	for _, header := range loaded.Headers {
+		names = append(names, header.Name+"="+header.Value)
+	}
+	expected := []string{
+		"Accept=application/json",
+		"X-Scope=collection",
+		"X-Scope=folder",
+		"X-Folder=users",
+		"X-Scope=request",
+		"X-Own=request",
+	}
+	if len(names) != len(expected) {
+		t.Fatalf("expected headers %v, got %v", expected, names)
+	}
+	for index, name := range names {
+		if name != expected[index] {
+			t.Errorf("header %d: expected %q, got %q", index, expected[index], name)
+		}
+	}
+}
+
 func TestLoadRequestAppliesLocalOverrides(t *testing.T) {
 	root := t.TempDir()
 	write := func(path string, content string) {
