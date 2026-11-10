@@ -1,5 +1,5 @@
 import { ScopedSummary } from '@bindings/github.com/awake-client/awake/src/features/environments/models';
-import { collectionScopeOf, visibleEnvironments } from './environment-scope';
+import { collectionScopeOf, owningCollectionOf, visibleEnvironments } from './environment-scope';
 
 function summary(
   fileName: string,
@@ -46,6 +46,20 @@ describe('collectionScopeOf', () => {
     expect(collectionScopeOf('/workspace')).toBe('');
     expect(collectionScopeOf('/workspace/git')).toBe('');
     expect(collectionScopeOf('/workspace/environments')).toBe('');
+  });
+});
+
+describe('owningCollectionOf', () => {
+  it('keeps the collection of a collection scope', () => {
+    expect(owningCollectionOf('collections/billing')).toBe('collections/billing');
+  });
+
+  it('drops the folder of a folder scope', () => {
+    expect(owningCollectionOf('collections/billing/invoices')).toBe('collections/billing');
+  });
+
+  it('stays empty outside a collection', () => {
+    expect(owningCollectionOf('')).toBe('');
   });
 });
 

@@ -159,6 +159,8 @@ export class EnvironmentPicker {
   /** File names the user pinned; they are offered first. */
   readonly pinned = input<readonly string[]>([]);
   readonly selected = input('');
+  /** Collection receiving a new environment; empty for a global one. */
+  readonly scope = input('');
   readonly selectedChange = output<string>();
   /** Asks to edit an environment, from the pencil next to it. */
   readonly editRequested = output<EnvironmentChoice>();
@@ -233,7 +235,7 @@ export class EnvironmentPicker {
 
   protected create(): void {
     this.isOpen.set(false);
-    requestEntryCreation({ kind: 'environment' });
+    requestEntryCreation({ kind: 'environment', scope: this.scope() });
   }
 
   protected manage(): void {

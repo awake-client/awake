@@ -40,6 +40,14 @@ export function collectionScopeOf(url: string): string {
 }
 
 /**
+ * The collection of a scope: the folder is dropped, since a new environment
+ * is stored at the collection level, which its folders inherit.
+ */
+export function owningCollectionOf(scope: string): string {
+  return scope.split('/').slice(0, 2).join('/');
+}
+
+/**
  * Environment scopes visible from a page, from the weakest to the strongest:
  * the global one, then the collection, then its folder. A folder scope keeps
  * the environments of its collection, which its requests still inherit.

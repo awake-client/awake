@@ -21,7 +21,7 @@ import { Icon, IconName } from '@shared/icon';
 import { PromptDialog } from '@shared/prompt-dialog';
 import { ResizeHandle } from '@shared/resize-handle';
 import { formatVersion } from '@shared/version-label';
-import { collectionScopeOf, visibleEnvironments } from './environment-scope';
+import { collectionScopeOf, owningCollectionOf, visibleEnvironments } from './environment-scope';
 import type { EnvironmentChoice } from './environment-choice';
 import { EnvironmentPicker } from './environment-picker';
 import { RequestTabs } from './request-tabs';
@@ -110,6 +110,8 @@ export class WorkspaceShell {
   protected readonly environments = computed(() =>
     visibleEnvironments(this.scopedEnvironments(), this.activeScope()),
   );
+  /** Collection of the page on screen, receiving a new environment. */
+  protected readonly environmentScope = computed(() => owningCollectionOf(this.activeScope()));
   protected readonly selectedEnvironment = this.environmentStore.selected;
   protected readonly pinnedEnvironments = this.environmentStore.pinned;
   protected readonly version = signal('');
