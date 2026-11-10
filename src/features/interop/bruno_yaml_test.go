@@ -240,6 +240,66 @@ http:
 	}
 }
 
+func TestReadBrunoYAMLOAuth2PasswordGrantReadsNestedCredentials(t *testing.T) {
+	root := t.TempDir()
+
+	writeBrunoYAMLTestFile(t, root, "opencollection.yml", `
+opencollection: 1.0.0
+
+info:
+  name: probayes-keycloak
+request:
+  auth:
+    type: oauth2
+    flow: resource_owner_password_credentials
+    accessTokenUrl: "{{keycloakUrl}}/token"
+    credentials:
+      clientId: "{{clientId}}"
+      placement: body
+    resourceOwner:
+      username: "{{username}}"
+      password: "{{password}}"
+`)
+
+	writeBrunoYAMLTestFile(t, root, "Get By Id.yml", `
+info:
+  name: Get By Id
+  type: http
+http:
+  method: GET
+  url: "{{baseUrl}}/simulations"
+  auth: inherit
+`)
+
+	collections, err := ReadBrunoDirectory(root)
+	if err != nil {
+		t.Fatalf("read bruno yaml directory: %v", err)
+	}
+	if len(collections) != 1 {
+		t.Fatalf("expected one collection, got %d", len(collections))
+	}
+
+	authentication := collections[0].Authentication
+	if authentication == nil ||
+		authentication.Type != domain.AuthenticationOAuth2 ||
+		authentication.GrantType != domain.OAuth2GrantPassword {
+		t.Fatalf("unexpected authentication: %+v", authentication)
+	}
+	if authentication.ClientID != "{{clientId}}" || authentication.Username != "{{username}}" {
+		t.Errorf("expected the nested credentials, got %+v", authentication)
+	}
+	if authentication.TokenURL != "{{keycloakUrl}}/token" {
+		t.Errorf("unexpected token URL %q", authentication.TokenURL)
+	}
+
+	// The imported authentication must pass the collection validation, or the
+	// import stops with "domain: invalid collection".
+	collection := domain.Collection{Name: collections[0].Name, Authentication: authentication}
+	if err := collection.Validate(); err != nil {
+		t.Fatalf("the imported authentication must be valid: %v", err)
+	}
+}
+
 func writeBrunoYAMLTestFile(t *testing.T, root string, relativePath string, content string) {
 	t.Helper()
 

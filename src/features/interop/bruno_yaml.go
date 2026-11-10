@@ -110,6 +110,23 @@ type brunoYAMLAuth struct {
 	ClientSecret     string `yaml:"clientSecret"`
 	Scope            string `yaml:"scope"`
 	Audience         string `yaml:"audience"`
+
+	// OpenCollection nests the OAuth 2 credentials.
+	Credentials   *brunoYAMLAuthCredentials   `yaml:"credentials"`
+	ResourceOwner *brunoYAMLAuthResourceOwner `yaml:"resourceOwner"`
+}
+
+// brunoYAMLAuthCredentials holds the client credentials of an OAuth 2 flow.
+type brunoYAMLAuthCredentials struct {
+	ClientID     string `yaml:"clientId"`
+	ClientSecret string `yaml:"clientSecret"`
+}
+
+// brunoYAMLAuthResourceOwner holds the resource owner credentials of the
+// OAuth 2 password flow.
+type brunoYAMLAuthResourceOwner struct {
+	Username string `yaml:"username"`
+	Password string `yaml:"password"`
 }
 
 type brunoYAMLVariable struct {
@@ -552,13 +569,35 @@ func (auth *brunoYAMLAuth) authentication() *domain.Authentication {
 			Location: location,
 		}
 	case "oauth2":
+		clientID := auth.ClientID
+		clientSecret := auth.ClientSecret
+		username := auth.Username
+		password := auth.Password
+		if auth.Credentials != nil {
+			if clientID == "" {
+				clientID = auth.Credentials.ClientID
+			}
+			if clientSecret == "" {
+				clientSecret = auth.Credentials.ClientSecret
+			}
+		}
+		if auth.ResourceOwner != nil {
+			if username == "" {
+				username = auth.ResourceOwner.Username
+			}
+			if password == "" {
+				password = auth.ResourceOwner.Password
+			}
+		}
 		return &domain.Authentication{
 			Type:             domain.AuthenticationOAuth2,
+			Username:         username,
+			Password:         password,
 			GrantType:        brunoYAMLOAuth2Grant(auth.Flow),
 			AuthorizationURL: auth.AuthorizationURL,
 			TokenURL:         auth.AccessTokenURL,
-			ClientID:         auth.ClientID,
-			ClientSecret:     auth.ClientSecret,
+			ClientID:         clientID,
+			ClientSecret:     clientSecret,
 			Scopes:           brunoYAMLScopes(auth.Scope),
 			RedirectURL:      auth.CallbackURL,
 			Audience:         auth.Audience,
