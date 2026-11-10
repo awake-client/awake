@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-11-10
+
+### Added
+
+- The pre-request script editor completes the request paths of the workspace
+  inside `awake.runRequest("…")`, so the path no longer has to be typed from
+  memory. The members of `awake` keep completing as before.
+- The row menu of a request copies its workspace-relative path, such as
+  `collections/auth/login.yaml`, ready to paste in a script.
+
+### Fixed
+
+- Creating an environment from the environment picker while a request is open
+  preselects the scope of that request's collection, instead of Global.
+
+### Changed
+
+- The Scripts tab no longer shows the help paragraph above its editors.
+- The environment dropdown is 30 pixels wider, so environment names are less
+  often truncated.
+
 ## [0.6.0] - 2026-11-10
 
 ### Added
@@ -113,7 +134,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   showing "No environment". Scripts writing environment variables find the
   collection environment from a request in one of its folders.
 
-[Unreleased]: https://github.com/awake-client/awake/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/awake-client/awake/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/awake-client/awake/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/awake-client/awake/compare/v0.5.1...v0.6.0
 [0.5.1]: https://github.com/awake-client/awake/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/awake-client/awake/compare/v0.4.0...v0.5.0
