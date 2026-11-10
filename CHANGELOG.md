@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-11-10
+
+### Added
+
+- A pre-request script can run another saved request with
+  `awake.runRequest("collections/auth/login.yaml", { timeout: 2000 })`, for
+  example to log in and reuse the token. The response comes back synchronously,
+  with the same fields as `response`, and the nested exchange stays out of the
+  request history.
+
+### Fixed
+
+- The hidden collections button of the tree header brings every hidden
+  collection back at once, instead of opening a menu to reveal them one by one.
+
+### Changed
+
+- On Windows the title bar is drawn by the application: it follows the light or
+  dark theme chosen in Awake and draws its own minimize, maximize and close
+  buttons. The native bar could only follow the system theme, set at startup.
+- The collection tree scrolls with the wheel or the trackpad without showing a
+  scrollbar.
+
 ## [0.5.1] - 2026-11-10
 
 ### Added
@@ -90,7 +113,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   showing "No environment". Scripts writing environment variables find the
   collection environment from a request in one of its folders.
 
-[Unreleased]: https://github.com/awake-client/awake/compare/v0.5.1...HEAD
+[Unreleased]: https://github.com/awake-client/awake/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/awake-client/awake/compare/v0.5.1...v0.6.0
 [0.5.1]: https://github.com/awake-client/awake/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/awake-client/awake/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/awake-client/awake/compare/v0.3.0...v0.4.0
