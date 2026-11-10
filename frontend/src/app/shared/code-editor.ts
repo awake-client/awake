@@ -201,6 +201,8 @@ export class CodeEditor {
   readonly placeholder = input('');
   /** For JavaScript, the script whose globals are completed and checked. */
   readonly scriptKind = input<ScriptKind>('post-response');
+  /** Request paths a pre-request script can pass to awake.runRequest. */
+  readonly scriptRequests = input<readonly string[]>([]);
   readonly valueChange = output<string>();
 
   constructor() {
@@ -221,7 +223,9 @@ export class CodeEditor {
             syntaxHighlighting(highlightStyle),
             theme,
             keymap.of([...defaultKeymap, ...historyKeymap, ...foldKeymap, indentWithTab]),
-            this.language.of(languageExtension(this.lang(), this.scriptKind())),
+            this.language.of(
+              languageExtension(this.lang(), this.scriptKind(), this.scriptRequests()),
+            ),
             this.editable.of(editableExtension(this.readOnly())),
             placeholderExtension(this.placeholder()),
             EditorView.updateListener.of((update) => {
@@ -243,7 +247,7 @@ export class CodeEditor {
       }
     });
     effect(() => {
-      const extension = languageExtension(this.lang(), this.scriptKind());
+      const extension = languageExtension(this.lang(), this.scriptKind(), this.scriptRequests());
       this.view?.dispatch({ effects: this.language.reconfigure(extension) });
     });
     effect(() => {
@@ -255,10 +259,14 @@ export class CodeEditor {
   }
 }
 
-function languageExtension(language: CodeLanguage, scriptKind: ScriptKind): Extension {
+function languageExtension(
+  language: CodeLanguage,
+  scriptKind: ScriptKind,
+  scriptRequests: readonly string[],
+): Extension {
   switch (language) {
     case 'javascript':
-      return scriptLanguage(scriptKind);
+      return scriptLanguage(scriptKind, scriptRequests);
     case 'json':
       return json();
     case 'xml':

@@ -38,6 +38,10 @@ const CALL_ARGUMENTS = /\((?:[^()'"`]|'[^']*'|"[^"]*")*\)/g;
 const IDENTIFIER_CHAIN = /^[A-Za-z_$][\w$]*(?:\(\))?(?:\s*\.\s*[A-Za-z_$][\w$]*(?:\(\))?)*$/;
 const CHAIN_BEFORE_CURSOR =
   /(?:[A-Za-z_$][\w$]*(?:\((?:[^()'"`]|'[^']*'|"[^"]*")*\))?\s*\.\s*)*[A-Za-z_$]*$/;
+/** The callee whose first argument is a request path. */
+const RUN_REQUEST_CALLEE = /^awake\s*\.\s*runRequest$/;
+/** What a request path is made of, so the completion replaces all of it. */
+const REQUEST_PATH = /^[\w./-]*$/;
 
 const requestEntry = (editable: boolean): ApiEntry => ({
   type: 'variable',
@@ -247,13 +251,17 @@ function globalsFor(kind: ScriptKind): Record<string, ApiEntry> {
 /**
  * JavaScript support for request scripts: highlighting, completions and
  * documentation for the Awake API, and diagnostics for syntax errors and
- * misspelled API members.
+ * misspelled API members. A pre-request script also completes the request
+ * paths given to awake.runRequest, when the workspace has some.
  */
-export function scriptLanguage(kind: ScriptKind): Extension {
+export function scriptLanguage(kind: ScriptKind, requests: readonly string[] = []): Extension {
   const globals = globalsFor(kind);
   return [
     javascript(),
     javascriptLanguage.data.of({ autocomplete: apiCompletions(globals) }),
+    ...(kind === 'pre-request' && requests.length > 0
+      ? [javascriptLanguage.data.of({ autocomplete: requestCompletions(requests) })]
+      : []),
     autocompletion({ activateOnTyping: true }),
     closeBrackets(),
     Prec.high(keymap.of([...closeBracketsKeymap, ...completionKeymap])),
@@ -309,6 +317,55 @@ function toCompletion(name: string, entry: ApiEntry): Completion {
     info: entry.documentation,
     boost: 1,
   };
+}
+
+/** Completes the first argument of awake.runRequest with a request path. */
+function requestCompletions(requests: readonly string[]) {
+  return (context: CompletionContext): CompletionResult | null => {
+    const from = runRequestPathStart(context.state, context.pos);
+    if (from === null || !REQUEST_PATH.test(context.state.sliceDoc(from, context.pos))) {
+      return null;
+    }
+    return {
+      from,
+      options: requests.map((request) => ({ label: request, type: 'text', detail: 'Request' })),
+      validFor: REQUEST_PATH,
+    };
+  };
+}
+
+/**
+ * Where the path string starts, when the cursor sits in the first argument of
+ * awake.runRequest. Null anywhere else, including its other arguments.
+ */
+function runRequestPathStart(state: EditorState, position: number): number | null {
+  const node = syntaxTree(state).resolveInner(position, -1);
+  if (node.name !== 'String' && node.name !== 'TemplateString') {
+    return null;
+  }
+  const argumentsList = node.parent;
+  const call = argumentsList?.parent;
+  if (!argumentsList || argumentsList.name !== 'ArgList' || call?.name !== 'CallExpression') {
+    return null;
+  }
+  const callee = call.firstChild;
+  if (
+    !callee ||
+    callee.name !== 'MemberExpression' ||
+    !RUN_REQUEST_CALLEE.test(state.sliceDoc(callee.from, callee.to))
+  ) {
+    return null;
+  }
+  // The path is the first argument; a timeout object follows it.
+  let argument = argumentsList.firstChild;
+  while (argument && argument.name === '(') {
+    argument = argument.nextSibling;
+  }
+  if (argument?.from !== node.from) {
+    return null;
+  }
+  const start = node.from + 1;
+  return position >= start ? start : null;
 }
 
 /**

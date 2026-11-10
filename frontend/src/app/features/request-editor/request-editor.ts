@@ -84,6 +84,9 @@ const RESPONSE_MIN_WIDTH = 560;
 /** Width the request pane keeps when the response sits beside it. */
 const REQUEST_MIN_WIDTH = 360;
 
+/** Request paths offered to awake.runRequest, like the search palette. */
+const SCRIPT_REQUEST_LIMIT = 500;
+
 /** Reason phrases for the statuses shown from the history. */
 const STATUS_TEXTS: Record<number, string> = {
   200: 'OK',
@@ -310,6 +313,8 @@ export class RequestEditor {
   );
   protected readonly preRequestScript = signal('');
   protected readonly postResponseScript = signal('');
+  /** Request paths the pre-request script can pass to awake.runRequest. */
+  protected readonly scriptRequests = signal<readonly string[]>([]);
   protected readonly activeTab = signal<EditorTab>('parameters');
   protected readonly oauth2Status = signal<OAuth2Status | null>(null);
   protected readonly oauth2Busy = signal(false);
@@ -520,6 +525,9 @@ export class RequestEditor {
     // Follow the request when it moves in the tree, keeping unsaved edits.
     const collectionsChanged = (event: Event) => {
       void this.loadInheritedAuthentication(this.requestPath());
+      if (this.activeTab() === 'scripts') {
+        void this.loadScriptRequests();
+      }
       const moved = (event as CustomEvent<CollectionsChange | null>).detail?.moved;
       const path = this.requestPath();
       if (moved && path && (path === moved.from || path.startsWith(`${moved.from}/`))) {
@@ -603,6 +611,33 @@ export class RequestEditor {
 
   protected selectTab(tab: EditorTab): void {
     this.activeTab.set(tab);
+    if (tab === 'scripts') {
+      void this.loadScriptRequests();
+    }
+  }
+
+  /**
+   * Loads the request paths a pre-request script can pass to
+   * awake.runRequest. The current request is left out so a script cannot run
+   * itself.
+   */
+  private async loadScriptRequests(): Promise<void> {
+    const workspaceRoot = this.workspaceStore.rootPath();
+    if (!workspaceRoot) {
+      this.scriptRequests.set([]);
+      return;
+    }
+
+    try {
+      const entries =
+        (await CollectionsService.SearchRequests(workspaceRoot, '', SCRIPT_REQUEST_LIMIT)) ?? [];
+      const currentPath = this.requestPath();
+      this.scriptRequests.set(
+        entries.map((entry) => entry.Path).filter((path) => path !== currentPath),
+      );
+    } catch {
+      this.scriptRequests.set([]);
+    }
   }
 
   protected async save(): Promise<boolean> {
