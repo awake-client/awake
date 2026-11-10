@@ -2,14 +2,19 @@ import { Component, computed, input, output, signal } from '@angular/core';
 import { Icon } from './icon';
 import { VariableInput } from './variable-input';
 
-/** A value made only of references, such as `{{password}}` or `{{$uuid}}`. */
-const REFERENCES_ONLY = /^\s*(\{\{\s*\$?[A-Za-z_][A-Za-z0-9_]*\s*\}\}\s*)+$/;
+/**
+ * True when the text holds a variable reference, complete (`{{password}}`) or
+ * still being typed (`{{pass`). Such a value is not a secret itself: it tells
+ * where to read the secret, so it stays visible while it is edited.
+ */
+export function referencesVariables(value: string): boolean {
+  return value.includes('{{');
+}
 
 /**
  * Field for a secret value. It is masked by default and an eye button shows
  * it, with the `{{variables}}` highlighting of the other fields. A value
- * made only of variable references is not a secret itself, so it starts
- * visible.
+ * referencing a variable is not a secret itself, so it is always visible.
  */
 @Component({
   selector: 'app-secret-input',
@@ -23,16 +28,18 @@ const REFERENCES_ONLY = /^\s*(\{\{\s*\$?[A-Za-z_][A-Za-z0-9_]*\s*\}\}\s*)+$/;
       [masked]="!visible()"
       (valueChange)="valueChange.emit($event)"
     />
-    <button
-      type="button"
-      class="reveal"
-      [title]="visible() ? 'Hide' : 'Show'"
-      [attr.aria-label]="visible() ? 'Hide the value' : 'Show the value'"
-      [attr.aria-pressed]="visible()"
-      (click)="toggle()"
-    >
-      <app-icon [name]="visible() ? 'eye-off' : 'eye'" [size]="15" />
-    </button>
+    @if (!refersToVariable()) {
+      <button
+        type="button"
+        class="reveal"
+        [title]="visible() ? 'Hide' : 'Show'"
+        [attr.aria-label]="visible() ? 'Hide the value' : 'Show the value'"
+        [attr.aria-pressed]="visible()"
+        (click)="toggle()"
+      >
+        <app-icon [name]="visible() ? 'eye-off' : 'eye'" [size]="15" />
+      </button>
+    }
   `,
   styles: `
     :host {
@@ -77,9 +84,10 @@ export class SecretInput {
   /** Explicit choice of the user; `null` means automatic. */
   private readonly revealed = signal<boolean | null>(null);
 
-  protected readonly visible = computed(
-    () => this.revealed() ?? REFERENCES_ONLY.test(this.value()),
-  );
+  /** A reference is never hidden, even after the user hid a literal secret. */
+  protected readonly refersToVariable = computed(() => referencesVariables(this.value()));
+
+  protected readonly visible = computed(() => this.refersToVariable() || this.revealed() === true);
 
   protected toggle(): void {
     this.revealed.set(!this.visible());

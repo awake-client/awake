@@ -20,6 +20,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - The environment editor stays open when the page behind it is clicked; only
   its close button or the Escape key closes it.
+- Password and client secret fields show a value that references a variable
+  instead of masking it, including while the reference is being typed.
 
 ## [0.3.0] - 2026-11-10
 
