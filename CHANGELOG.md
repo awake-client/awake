@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-11-10
+
 ### Added
 
 - A request opened from the search palette, the history or a tab unfolds its
@@ -71,6 +73,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   showing "No environment". Scripts writing environment variables find the
   collection environment from a request in one of its folders.
 
-[Unreleased]: https://github.com/awake-client/awake/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/awake-client/awake/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/awake-client/awake/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/awake-client/awake/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/awake-client/awake/compare/v0.2.3...v0.3.0
