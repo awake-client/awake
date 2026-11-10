@@ -118,6 +118,12 @@
   flex: 1;
   min-height: 0;
   height: 100%;
+  /* The tree scrolls with the wheel or trackpad, without a visible bar. */
+  scrollbar-width: none;
+}
+
+.tree-viewport::-webkit-scrollbar {
+  display: none;
 }
 
 /* Rows keep a 1px transparent border so adjacent highlights never touch. */
