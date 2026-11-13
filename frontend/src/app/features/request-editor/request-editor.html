@@ -212,6 +212,9 @@
             @if (tab === 'headers' && headers().length > 0) {
               <span class="tab-count">{{ headers().length }}</span>
             }
+            @if (tabInUse()[tab]; as title) {
+              <span class="in-use-dot" [title]="title" [attr.aria-label]="title"></span>
+            }
           </button>
         }
       </nav>

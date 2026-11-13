@@ -13,9 +13,10 @@ import { notifyCollectionsChanged } from '@core/collection-events';
 import { Shortcuts } from '@core/shortcuts';
 import { VariableStore } from '@core/variable-store';
 import { WorkspaceStore } from '@core/workspace-store';
-import { AuthEditor } from '@shared/auth-editor';
+import { AuthEditor, describeAuthentication } from '@shared/auth-editor';
 import { OAuth2Actions } from '../oauth2/oauth2-actions';
 import { ColorPicker } from '@shared/color-picker';
+import { applyEnvironmentAuthentication } from '@shared/environment-authentication';
 import { Icon } from '@shared/icon';
 import { VariableInput } from '@shared/variable-input';
 
@@ -107,6 +108,20 @@ export class CollectionSettings {
     return authentication.Type === AuthenticationType.AuthenticationInherit
       ? this.inheritedAuthentication()
       : authentication;
+  });
+  /** What the authentication tab sends, for its dot; empty when nothing. */
+  protected readonly authenticationInUse = computed(() => {
+    const values = new Map<string, string>();
+    for (const [name, variable] of this.variableStore.variables()) {
+      values.set(name, variable.value);
+    }
+    const authentication = applyEnvironmentAuthentication(
+      this.effectiveAuthentication(),
+      values,
+    ).authentication;
+    return authentication && authentication.Type !== AuthenticationType.AuthenticationNone
+      ? describeAuthentication(authentication)
+      : '';
   });
   /** Bumped when the settings are loaded or saved, so OAuth 2 status reloads. */
   protected readonly savedRevision = signal(0);

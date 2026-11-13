@@ -56,10 +56,11 @@ import {
 } from '@shared/url-query';
 import { VariableStore } from '@core/variable-store';
 import { WorkspaceStore } from '@core/workspace-store';
-import { AuthEditor } from '@shared/auth-editor';
+import { AuthEditor, describeAuthentication } from '@shared/auth-editor';
 import { CodeEditor, CodeLanguage, prettyJson } from '@shared/code-editor';
 import { looksLikeMarkup, prettyMarkup } from '@shared/markup-format';
 import { ResizeHandle } from '@shared/resize-handle';
+import { applyEnvironmentAuthentication } from '@shared/environment-authentication';
 import { Icon } from '@shared/icon';
 import { VariableInput } from '@shared/variable-input';
 import { RequestHistory } from './request-history/request-history';
@@ -279,6 +280,37 @@ export class RequestEditor {
       ? (this.localParameters() ?? [])
       : this.parameters(),
   );
+  /**
+   * Tabs whose settings are in use, marked with a dot titled with what they
+   * hold: an authentication sent, a body, scripts or documentation.
+   */
+  protected readonly tabInUse = computed<Partial<Record<EditorTab, string>>>(() => {
+    const inUse: Partial<Record<EditorTab, string>> = {};
+
+    const values = new Map<string, string>();
+    for (const [name, variable] of this.variableStore.variables()) {
+      values.set(name, variable.value);
+    }
+    const authentication = applyEnvironmentAuthentication(
+      this.effectiveAuthentication(),
+      values,
+    ).authentication;
+    if (authentication && authentication.Type !== AuthenticationType.AuthenticationNone) {
+      inUse.authentication = describeAuthentication(authentication);
+    }
+
+    const body = this.localBody() ?? this.body();
+    if (body.Type && body.Type !== BodyType.BodyNone) {
+      inUse.body = 'Sends a body';
+    }
+    if (this.preRequestScript().trim() || this.postResponseScript().trim()) {
+      inUse.scripts = 'Runs scripts';
+    }
+    if (this.documentation().trim()) {
+      inUse.documentation = 'Documented';
+    }
+    return inUse;
+  });
   protected readonly shownBody = computed(() =>
     this.bodySource() === 'local' ? (this.localBody() ?? emptyBody()) : this.body(),
   );

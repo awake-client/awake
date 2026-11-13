@@ -72,6 +72,9 @@
       (click)="tab.set('authentication')"
     >
       Authentication
+      @if (authenticationInUse(); as title) {
+        <span class="in-use-dot" [title]="title" [attr.aria-label]="title"></span>
+      }
     </button>
   </nav>
 
