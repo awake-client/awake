@@ -85,6 +85,45 @@
   box-shadow: var(--shadow-card);
 }
 
+.usage-banner {
+  display: flex;
+  gap: 10px;
+  padding: 11px 14px;
+  border: 1px solid var(--color-accent-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-accent-soft);
+  color: var(--color-text);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+}
+
+.usage-banner app-icon {
+  flex: 0 0 auto;
+  margin-top: 2px;
+  color: var(--color-accent);
+}
+
+.usage-banner p {
+  margin: 0;
+}
+
+.usage-banner strong {
+  color: var(--color-text-strong);
+}
+
+.usage-banner code {
+  font-family: var(--font-mono);
+}
+
+.usage-banner.invalid {
+  border-color: color-mix(in srgb, var(--color-danger) 40%, transparent);
+  background: color-mix(in srgb, var(--color-danger) 8%, transparent);
+}
+
+.usage-banner.invalid app-icon {
+  color: var(--color-danger);
+}
+
 .inherit-card {
   display: flex;
   gap: 12px;

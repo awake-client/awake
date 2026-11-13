@@ -123,15 +123,27 @@ func (service *Service) loadConfiguration(workspaceRoot string, entryPath string
 	if err != nil {
 		return configuration{}, "", err
 	}
-	if authentication.Type != domain.AuthenticationOAuth2 {
-		return configuration{}, "", ErrInvalidConfiguration
-	}
-
 	labeledLayers, err := service.source.LoadVariableLayers(workspaceRoot, entryPath, environmentFileName)
 	if err != nil {
 		return configuration{}, "", err
 	}
 	layers := variables.Maps(labeledLayers)
+
+	// The environment may switch the authentication with authType and
+	// grantType, exactly as when the request is sent.
+	merged := map[string]string{}
+	for _, layer := range layers {
+		for name, value := range layer {
+			merged[name] = value
+		}
+	}
+	authentication, err = domain.ApplyEnvironmentAuthentication(authentication, merged)
+	if err != nil {
+		return configuration{}, "", err
+	}
+	if authentication.Type != domain.AuthenticationOAuth2 {
+		return configuration{}, "", ErrInvalidConfiguration
+	}
 
 	resolved, err := resolveConfiguration(authentication, layers)
 	if err != nil {

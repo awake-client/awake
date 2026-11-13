@@ -1,10 +1,13 @@
-import { Component, input, linkedSignal, output } from '@angular/core';
+import { Component, computed, inject, input, linkedSignal, output } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import {
   Authentication,
   AuthenticationType,
   OAuth2GrantType,
 } from '@bindings/github.com/awake-client/awake/src/domain/models';
+import { EnvironmentStore } from '@core/environment-store';
+import { VariableStore } from '@core/variable-store';
+import { applyEnvironmentAuthentication } from './environment-authentication';
 import { Icon, IconName } from './icon';
 import { SecretInput } from './secret-input';
 import { VariableInput } from './variable-input';
@@ -92,6 +95,32 @@ export class AuthEditor {
    */
   protected readonly value = linkedSignal(() => this.authentication());
 
+  private readonly variableStore = inject(VariableStore);
+  protected readonly environmentStore = inject(EnvironmentStore);
+
+  /**
+   * The authentication sent with the active environment: the one edited
+   * here or the inherited one, with the type and grant chosen by the
+   * reserved `authType` and `grantType` variables.
+   */
+  protected readonly inUse = computed(() => {
+    const authentication = this.value();
+    const configured =
+      authentication.Type === AuthenticationType.AuthenticationInherit
+        ? this.inherited()
+        : authentication;
+    const values = new Map<string, string>();
+    for (const [name, variable] of this.variableStore.variables()) {
+      values.set(name, variable.value);
+    }
+    return applyEnvironmentAuthentication(configured, values);
+  });
+
+  /** Where a reserved variable comes from, such as "collection environment". */
+  protected variableSource(name: string): string {
+    return this.variableStore.variables().get(name)?.source ?? 'environment';
+  }
+
   protected readonly AuthenticationType = AuthenticationType;
   protected readonly OAuth2GrantType = OAuth2GrantType;
   protected readonly describe = describeAuthentication;
@@ -104,15 +133,10 @@ export class AuthEditor {
 
   /**
    * OAuth 2 actions apply to the authentication actually sent: the one of the
-   * request, or the inherited one when the request inherits it.
+   * request or the inherited one, as switched by the environment.
    */
   protected showsOAuth2Actions(): boolean {
-    const authentication = this.value();
-    const effective =
-      authentication.Type === AuthenticationType.AuthenticationInherit
-        ? this.inherited()
-        : authentication;
-    return effective?.Type === AuthenticationType.AuthenticationOAuth2;
+    return this.inUse().authentication?.Type === AuthenticationType.AuthenticationOAuth2;
   }
 
   protected collectionLink(): string[] {

@@ -14,6 +14,33 @@
   }
 </div>
 
+@if (inUse(); as usage) {
+  @if (usage.invalid; as invalid) {
+    <div class="usage-banner invalid" role="alert">
+      <app-icon name="alert" [size]="15" />
+      <p>
+        <code>{{ invalid.name }}</code> is set to <code>{{ invalid.value }}</code> in the
+        {{ variableSource(invalid.name) }}, which is not accepted: requests fail until it is fixed.
+      </p>
+    </div>
+  } @else if (usage.overriddenBy.length > 0) {
+    <div class="usage-banner" role="status">
+      <app-icon name="key" [size]="15" />
+      <p>
+        With the <strong>{{ environmentStore.selected() }}</strong> environment, requests use
+        <strong>{{ describe(usage.authentication) }}</strong
+        >. It is set by
+        @for (name of usage.overriddenBy; track name; let last = $last) {
+          <code>{{ name }}</code
+          >{{ last ? '' : ' and ' }}
+        }
+        in the {{ variableSource(usage.overriddenBy[0]) }}, so the type chosen here is not the one
+        sent.
+      </p>
+    </div>
+  }
+}
+
 @switch (value().Type) {
   @case (AuthenticationType.AuthenticationInherit) {
     <div class="inherit-card">

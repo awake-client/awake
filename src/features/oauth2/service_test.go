@@ -475,3 +475,29 @@ func TestTokenEndpointErrorNamesTheEndpointAndTheStatus(t *testing.T) {
 		t.Errorf("a plain text body must be quoted on one line: %v", err)
 	}
 }
+
+func TestTheEnvironmentCanSwitchTheAuthenticationToOAuth2(t *testing.T) {
+	tokenServer := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		_ = request.ParseForm()
+		if request.Form.Get("grant_type") != "client_credentials" {
+			t.Errorf("expected the grant of the environment, got %q", request.Form.Get("grant_type"))
+		}
+		writer.Header().Set("Content-Type", "application/json")
+		_, _ = writer.Write([]byte(`{"access_token":"switched"}`))
+	}))
+	defer tokenServer.Close()
+
+	request := clientCredentialsRequest(tokenServer.URL)
+	request.Authentication.Type = domain.AuthenticationBearer
+	request.Authentication.GrantType = domain.OAuth2GrantPassword
+	source := fakeSource{
+		request: request,
+		layers:  []map[string]string{{"authType": "oauth2", "grantType": "client_credentials"}},
+	}
+	service := NewServiceWithDependencies(source, fakeBrowser{}, tokenServer.Client())
+
+	status, err := service.Authorize("/workspace", "collections/keycloak", "prod")
+	if err != nil || !status.HasToken || status.GrantType != domain.OAuth2GrantClientCredentials {
+		t.Fatalf("expected the environment to choose OAuth 2 client credentials, got %+v, %v", status, err)
+	}
+}

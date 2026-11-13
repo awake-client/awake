@@ -17,7 +17,9 @@ import { Status } from '@bindings/github.com/awake-client/awake/src/features/oau
 import * as OAuth2Service from '@bindings/github.com/awake-client/awake/src/features/oauth2/service';
 import { EnvironmentStore } from '@core/environment-store';
 import { TokenViewer, ViewedToken } from '@core/token-viewer';
+import { VariableStore } from '@core/variable-store';
 import { WorkspaceStore } from '@core/workspace-store';
+import { applyEnvironmentAuthentication } from '@shared/environment-authentication';
 import { describeExpiry } from '@shared/expiry';
 import { Icon } from '@shared/icon';
 
@@ -128,6 +130,7 @@ export class OAuth2Actions {
   private readonly workspaceStore = inject(WorkspaceStore);
   private readonly environmentStore = inject(EnvironmentStore);
   private readonly tokenViewer = inject(TokenViewer);
+  private readonly variableStore = inject(VariableStore);
 
   /** Request file, or directory of a collection or folder. */
   readonly entryPath = input.required<string>();
@@ -140,6 +143,15 @@ export class OAuth2Actions {
    * edits. Returning false cancels.
    */
   readonly beforeAuthorize = input<() => Promise<boolean>>(async () => true);
+
+  /** The authentication sent, once the environment chose its type and grant. */
+  private readonly inUse = computed(() => {
+    const values = new Map<string, string>();
+    for (const [name, variable] of this.variableStore.variables()) {
+      values.set(name, variable.value);
+    }
+    return applyEnvironmentAuthentication(this.authentication(), values).authentication;
+  });
 
   protected readonly status = signal<Status | null>(null);
   protected readonly busy = signal(false);
@@ -156,7 +168,7 @@ export class OAuth2Actions {
     inject(DestroyRef).onDestroy(() => clearInterval(timer));
 
     effect(() => {
-      const authentication = this.authentication();
+      const authentication = this.inUse();
       this.entryPath();
       this.revision();
       this.environmentStore.selected();
@@ -168,7 +180,7 @@ export class OAuth2Actions {
   }
 
   protected usesBrowser(): boolean {
-    const grantType = this.authentication()?.GrantType;
+    const grantType = this.inUse()?.GrantType;
     return !grantType || grantType === OAuth2GrantType.OAuth2GrantAuthorizationCode;
   }
 
@@ -248,7 +260,7 @@ export class OAuth2Actions {
   private async refresh(): Promise<void> {
     const rootPath = this.workspaceStore.rootPath();
     const entryPath = this.entryPath();
-    const authentication = this.authentication();
+    const authentication = this.inUse();
     if (
       !rootPath ||
       !entryPath ||

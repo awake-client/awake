@@ -89,19 +89,30 @@
             autocomplete="off"
             spellcheck="false"
           />
-          <input
-            type="text"
-            [name]="'variableValue' + $index"
-            [ngModel]="variable.value"
-            [class.overridden]="localNames().has(variable.name.trim())"
-            [title]="
-              localNames().has(variable.name.trim()) ? 'Overridden by a local override below' : ''
-            "
-            (ngModelChange)="updateVariable($index, 'value', $event)"
-            placeholder="https://example.com"
-            autocomplete="off"
-            spellcheck="false"
-          />
+          @if (reserved(variable.name); as definition) {
+            <app-select
+              [class.overridden]="localNames().has(variable.name.trim())"
+              [options]="selectOptions(definition)"
+              [value]="reservedValue(variable)"
+              [ariaLabel]="'Value of ' + definition.name"
+              placeholder="Choose a value"
+              (valueChange)="updateVariable($index, 'value', $event)"
+            />
+          } @else {
+            <input
+              type="text"
+              [name]="'variableValue' + $index"
+              [ngModel]="variable.value"
+              [class.overridden]="localNames().has(variable.name.trim())"
+              [title]="
+                localNames().has(variable.name.trim()) ? 'Overridden by a local override below' : ''
+              "
+              (ngModelChange)="updateVariable($index, 'value', $event)"
+              placeholder="https://example.com"
+              autocomplete="off"
+              spellcheck="false"
+            />
+          }
           <button
             type="button"
             class="icon-button"
@@ -110,9 +121,27 @@
           >
             Remove
           </button>
+          @if (reserved(variable.name); as definition) {
+            <p class="reserved-note">
+              <app-icon name="key" [size]="12" />
+              {{ definition.description }}
+            </p>
+          }
         </div>
       }
     </div>
+  }
+
+  @if (missingReserved().length > 0) {
+    <p class="reserved-add">
+      <span>Choose the authentication for this environment:</span>
+      @for (definition of missingReserved(); track definition.name) {
+        <button type="button" class="ghost-button" (click)="addReserved(definition.name)">
+          <app-icon name="plus" [size]="12" />
+          {{ definition.name }}
+        </button>
+      }
+    </p>
   }
 </article>
 
@@ -129,7 +158,7 @@
       over the variables above, and scripts save here with <code>awake.environment.set</code>.
     </p>
 
-    @if (variables().length === 0) {
+    @if (localVariables().length === 0) {
       <p class="section-empty">No local override.</p>
     } @else {
       <div class="variable-rows">
@@ -144,15 +173,25 @@
               autocomplete="off"
               spellcheck="false"
             />
-            <input
-              type="text"
-              [name]="'localValue' + $index"
-              [ngModel]="variable.value"
-              (ngModelChange)="updateVariable($index, 'value', $event, 'local')"
-              placeholder="https://example.com"
-              autocomplete="off"
-              spellcheck="false"
-            />
+            @if (reserved(variable.name); as definition) {
+              <app-select
+                [options]="selectOptions(definition)"
+                [value]="reservedValue(variable)"
+                [ariaLabel]="'Value of ' + definition.name"
+                placeholder="Choose a value"
+                (valueChange)="updateVariable($index, 'value', $event, 'local')"
+              />
+            } @else {
+              <input
+                type="text"
+                [name]="'localValue' + $index"
+                [ngModel]="variable.value"
+                (ngModelChange)="updateVariable($index, 'value', $event, 'local')"
+                placeholder="https://example.com"
+                autocomplete="off"
+                spellcheck="false"
+              />
+            }
             <button
               type="button"
               class="icon-button"
@@ -161,6 +200,12 @@
             >
               Remove
             </button>
+            @if (reserved(variable.name); as definition) {
+              <p class="reserved-note">
+                <app-icon name="key" [size]="12" />
+                {{ definition.description }}
+              </p>
+            }
           </div>
         }
       </div>

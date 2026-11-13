@@ -18,7 +18,14 @@ import { EnvironmentStore } from '@core/environment-store';
 import { Prompt } from '@core/prompt';
 import { WorkspaceStore } from '@core/workspace-store';
 import { ColorPicker } from '@shared/color-picker';
+import {
+  RESERVED_VARIABLES,
+  ReservedVariable,
+  parseReservedValue,
+  reservedVariable,
+} from '@shared/environment-authentication';
 import { Icon } from '@shared/icon';
+import { Select, SelectOption } from '@shared/select';
 import { SecretInput } from '@shared/secret-input';
 import { slugify } from '@shared/slug';
 
@@ -39,7 +46,7 @@ export const ENVIRONMENTS_CHANGED_EVENT = 'awake:environments-changed';
  */
 @Component({
   selector: 'app-environment-editor',
-  imports: [FormsModule, Icon, ColorPicker, SecretInput],
+  imports: [FormsModule, Icon, ColorPicker, SecretInput, Select],
   templateUrl: './environment-editor.html',
   styleUrl: './environment-editor.css',
 })
@@ -105,6 +112,35 @@ export class EnvironmentEditor {
         void this.loadEnvironment(scope, fileName);
       });
     });
+  }
+
+  /** Reserved variables not declared yet, offered as shortcuts. */
+  protected readonly missingReserved = computed(() => {
+    const declared = new Set(
+      [...this.variables(), ...this.localVariables()].map((variable) => variable.name.trim()),
+    );
+    return Object.values(RESERVED_VARIABLES).filter((definition) => !declared.has(definition.name));
+  });
+
+  protected reserved(name: string): ReservedVariable | null {
+    return reservedVariable(name);
+  }
+
+  protected selectOptions(definition: ReservedVariable): SelectOption[] {
+    return definition.options.map((option) => ({ ...option, hint: option.value }));
+  }
+
+  /** The option matching a value written in another accepted spelling. */
+  protected reservedValue(variable: VariableRow): string {
+    return parseReservedValue(variable.name, variable.value) ?? variable.value.trim();
+  }
+
+  protected addReserved(name: string): void {
+    const definition = RESERVED_VARIABLES[name];
+    this.variables.update((variables) => [
+      ...variables,
+      { name, value: definition?.options[0]?.value ?? '' },
+    ]);
   }
 
   protected addVariable(list: VariableList = 'shared'): void {

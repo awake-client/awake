@@ -109,6 +109,37 @@ input:focus {
   gap: 6px;
 }
 
+.reserved-note {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: -2px 0 4px;
+  font-size: var(--text-sm);
+  color: var(--color-text-subtle);
+}
+
+.reserved-note app-icon {
+  color: var(--color-accent);
+}
+
+.reserved-add {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 10px 0 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-subtle);
+}
+
+.reserved-add .ghost-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--font-mono);
+}
+
 .secret-add {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
