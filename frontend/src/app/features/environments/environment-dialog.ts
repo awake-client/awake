@@ -17,6 +17,7 @@ import { EnvironmentEditor } from './environment-editor';
       class="environment-dialog"
       aria-labelledby="environment-dialog-title"
       (cancel)="$event.preventDefault(); close()"
+      (keydown)="handleShortcut($event)"
     >
       @if (editing.request(); as request) {
         <header>
@@ -165,6 +166,19 @@ import { EnvironmentEditor } from './environment-editor';
 export class EnvironmentDialog {
   protected readonly editing = inject(EnvironmentEditing);
   private readonly dialog = viewChild.required<ElementRef<HTMLDialogElement>>('dialog');
+  private readonly editor = viewChild(EnvironmentEditor);
+
+  /**
+   * Ctrl+S or Cmd+S saves the environment. The event stops here so the page
+   * under the dialog, such as a request, does not save too.
+   */
+  protected handleShortcut(event: KeyboardEvent): void {
+    if ((event.metaKey || event.ctrlKey) && !event.altKey && event.key.toLowerCase() === 's') {
+      event.preventDefault();
+      event.stopPropagation();
+      void this.editor()?.save();
+    }
+  }
 
   protected readonly fileName = signal('');
   protected readonly scopes = signal<string[]>([]);

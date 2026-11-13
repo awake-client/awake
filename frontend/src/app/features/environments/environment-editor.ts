@@ -196,6 +196,11 @@ export class EnvironmentEditor {
     return this.secretStates().some((state) => state.Name === name && state.IsSet);
   }
 
+  /** Saves the environment, as the Save button does; used by Ctrl+S / Cmd+S. */
+  save(): Promise<void> {
+    return this.saveEnvironment();
+  }
+
   protected async saveEnvironment(): Promise<void> {
     const rootPath = this.workspaceStore.rootPath();
     const fileName = this.fileName();
