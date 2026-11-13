@@ -164,8 +164,14 @@ export class CollectionTree {
     return entry.Kind === Kind.KindCollection && this.hiddenCollections.isHidden(entry.Path);
   }
 
-  protected async activate(row: TreeRow): Promise<void> {
+  protected async activate(row: TreeRow, event?: MouseEvent): Promise<void> {
     if (row.section) {
+      return;
+    }
+    // The second click of a double click on a collection or folder is left
+    // to the double click, which opens the settings, so the row does not
+    // fold back.
+    if (event && event.detail > 1 && !this.isRequest(row)) {
       return;
     }
     if (this.isRequest(row)) {
@@ -659,10 +665,20 @@ export class CollectionTree {
   }
 
   /** A double click keeps the request open in its own tab. */
-  protected pin(row: TreeRow): void {
+  /**
+   * A double click pins a request in the tabs, and opens the settings of a
+   * collection or folder.
+   */
+  protected openOnDoubleClick(row: TreeRow): void {
+    if (row.section) {
+      return;
+    }
     if (this.isRequest(row)) {
       this.tabsStore.pin(row.entry.Path);
+      return;
     }
+    this.selected.set(row.entry.Path);
+    void this.router.navigate(['/workspace/collection', ...row.entry.Path.split('/')]);
   }
 
   protected trackByPath(_index: number, row: TreeRow): string {
