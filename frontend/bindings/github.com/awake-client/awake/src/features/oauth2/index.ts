@@ -7,5 +7,6 @@ export {
 };
 
 export type {
-    Status
+    Status,
+    TokenDetails
 } from "./models.js";

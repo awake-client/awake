@@ -15,25 +15,36 @@ import { Call as $Call, CancellablePromise as $CancellablePromise } from "@wails
 import * as $models from "./models.js";
 
 /**
- * Authorize runs the configured flow. For the authorization code flow it opens
+ * Authorize runs the flow configured for an entry: a request, or a collection
+ * or folder given by its directory path. For the authorization code flow it opens
  * the browser and waits for the loopback callback. For client credentials it
  * contacts the token endpoint directly.
  */
-export function Authorize(workspaceRoot: string, requestPath: string, environmentFileName: string): $CancellablePromise<$models.Status> {
-    return $Call.ByID(4160072770, workspaceRoot, requestPath, environmentFileName);
+export function Authorize(workspaceRoot: string, entryPath: string, environmentFileName: string): $CancellablePromise<$models.Status> {
+    return $Call.ByID(4160072770, workspaceRoot, entryPath, environmentFileName);
 }
 
 /**
- * Clear forgets the cached token of a request.
+ * Clear forgets the cached token of an entry, shared with the requests that
+ * inherit its authentication.
  */
-export function Clear(workspaceRoot: string, requestPath: string, environmentFileName: string): $CancellablePromise<void> {
-    return $Call.ByID(1711597488, workspaceRoot, requestPath, environmentFileName);
+export function Clear(workspaceRoot: string, entryPath: string, environmentFileName: string): $CancellablePromise<void> {
+    return $Call.ByID(1711597488, workspaceRoot, entryPath, environmentFileName);
 }
 
 /**
- * Status reports the cached token of a request without contacting the token
+ * Status reports the cached token of an entry without contacting the token
  * endpoint.
  */
-export function Status(workspaceRoot: string, requestPath: string, environmentFileName: string): $CancellablePromise<$models.Status> {
-    return $Call.ByID(4267321769, workspaceRoot, requestPath, environmentFileName);
+export function Status(workspaceRoot: string, entryPath: string, environmentFileName: string): $CancellablePromise<$models.Status> {
+    return $Call.ByID(4267321769, workspaceRoot, entryPath, environmentFileName);
+}
+
+/**
+ * Token returns the cached tokens of an entry so the user can inspect or copy
+ * them. It does not contact the token endpoint and returns
+ * ErrAuthorizationRequired when no token is cached.
+ */
+export function Token(workspaceRoot: string, entryPath: string, environmentFileName: string): $CancellablePromise<$models.TokenDetails> {
+    return $Call.ByID(2253844436, workspaceRoot, entryPath, environmentFileName);
 }

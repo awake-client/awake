@@ -2,6 +2,7 @@ package app
 
 import (
 	"errors"
+	"path"
 	"strings"
 
 	"github.com/awake-client/awake/src/domain"
@@ -53,11 +54,72 @@ func (requestSource) LoadRequest(workspaceRoot string, relativePath string) (dom
 	return request, nil
 }
 
-// LoadVariableLayers stacks the variables visible to a request, from the
-// weakest to the strongest: the workspace, the variables of its collection,
-// the global environment and then the environment of the same name declared
-// by the collection, each followed by its local overrides and its secrets.
+// ResolveAuthentication returns the authentication used by a request,
+// collection or folder, and the path of the entry that defines it. An entry
+// set to inherit resolves to its closest folder or collection; a request
+// without authentication uses none.
+func (requestSource) ResolveAuthentication(workspaceRoot string, entryPath string) (domain.Authentication, string, error) {
+	repository := collections.NewRepository(workspaceRoot)
+	none := domain.Authentication{Type: domain.AuthenticationNone}
+
+	var own *domain.Authentication
+	if isRequestEntry(entryPath) {
+		request, err := repository.LoadRequest(entryPath)
+		if err != nil {
+			return domain.Authentication{}, "", err
+		}
+		if request.Authentication == nil {
+			return none, entryPath, nil
+		}
+		own = request.Authentication
+	} else {
+		entryPath = path.Clean(entryPath)
+		collection, err := repository.LoadCollection(entryPath)
+		if err != nil && !errors.Is(err, collections.ErrEntryNotFound) {
+			return domain.Authentication{}, "", err
+		}
+		own = collection.Authentication
+	}
+
+	if own != nil && own.Type != domain.AuthenticationInherit {
+		return *own, entryPath, nil
+	}
+
+	var inherited collections.InheritedAuthentication
+	var err error
+	if isRequestEntry(entryPath) {
+		inherited, err = repository.ResolveInheritedAuthentication(entryPath)
+	} else if len(strings.Split(entryPath, "/")) > 2 {
+		inherited, err = repository.ResolveInheritedAuthenticationForScope(entryPath)
+	} else {
+		return none, entryPath, nil
+	}
+	if err != nil {
+		return domain.Authentication{}, "", err
+	}
+	if inherited.Authentication == nil || inherited.SourcePath == "" {
+		return none, entryPath, nil
+	}
+	return *inherited.Authentication, inherited.SourcePath, nil
+}
+
+// isRequestEntry reports whether a path names a request file rather than the
+// directory of a collection or folder.
+func isRequestEntry(entryPath string) bool {
+	return strings.HasSuffix(entryPath, ".yaml")
+}
+
+// LoadVariableLayers stacks the variables visible to a request, or to a
+// collection or folder given by its directory path, from the weakest to the
+// strongest: the workspace, the variables of its collection, the global
+// environment and then the environment of the same name declared by the
+// collection, each followed by its local overrides and its secrets.
 func (source requestSource) LoadVariableLayers(workspaceRoot string, requestPath string, environmentFileName string) ([]variables.Layer, error) {
+	if !isRequestEntry(requestPath) {
+		// The scopes of a directory are those of a request placed in it.
+		requestPath = path.Join(requestPath, "request.yaml")
+	}
+
 	configuration, err := workspace.NewRepository(workspaceRoot).Load()
 	if err != nil {
 		return nil, err

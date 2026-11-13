@@ -10,6 +10,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"github.com/awake-client/awake/src/domain"
 )
@@ -111,6 +112,32 @@ func (manager *manager) status(key string, configuration configuration) Status {
 	return status
 }
 
+// details returns the cached tokens of a key, or ErrAuthorizationRequired when
+// none matches the current configuration.
+func (manager *manager) details(key string, configuration configuration) (TokenDetails, error) {
+	manager.mutex.Lock()
+	cached, found := manager.tokens[key]
+	manager.mutex.Unlock()
+
+	if !found || cached.fingerprint != configuration.fingerprint() {
+		return TokenDetails{}, ErrAuthorizationRequired
+	}
+
+	details := TokenDetails{
+		GrantType:    configuration.GrantType,
+		AccessToken:  cached.token.AccessToken,
+		TokenType:    cached.token.TokenType,
+		RefreshToken: cached.token.RefreshToken,
+		IDToken:      cached.token.IDToken,
+		Scopes:       append([]string{}, cached.token.Scopes...),
+	}
+	if !cached.token.ExpiresAt.IsZero() {
+		details.ExpiresAtMilliseconds = cached.token.ExpiresAt.UnixMilli()
+	}
+
+	return details, nil
+}
+
 func (manager *manager) clear(key string) {
 	manager.mutex.Lock()
 	delete(manager.tokens, key)
@@ -172,6 +199,11 @@ func (manager *manager) refresh(key string, configuration configuration, refresh
 	if token.RefreshToken == "" {
 		token.RefreshToken = refreshToken
 	}
+	if token.IDToken == "" {
+		manager.mutex.Lock()
+		token.IDToken = manager.tokens[key].token.IDToken
+		manager.mutex.Unlock()
+	}
 
 	manager.store(key, configuration, token)
 	return token, nil
@@ -210,7 +242,7 @@ func (manager *manager) requestToken(configuration configuration, form url.Value
 	}
 
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		return Token{}, tokenEndpointError(response.StatusCode, body)
+		return Token{}, tokenEndpointError(configuration.TokenURL, response.StatusCode, body)
 	}
 
 	return parseToken(body, manager.now(), configuration.Scopes)
@@ -220,6 +252,7 @@ type tokenPayload struct {
 	AccessToken      string `json:"access_token"`
 	TokenType        string `json:"token_type"`
 	RefreshToken     string `json:"refresh_token"`
+	IDToken          string `json:"id_token"`
 	ExpiresIn        int64  `json:"expires_in"`
 	Scope            string `json:"scope"`
 	Error            string `json:"error"`
@@ -241,6 +274,7 @@ func parseToken(body []byte, now time.Time, defaultScopes []string) (Token, erro
 	token := Token{
 		AccessToken:  payload.AccessToken,
 		RefreshToken: payload.RefreshToken,
+		IDToken:      payload.IDToken,
 		TokenType:    payload.TokenType,
 		Scopes:       splitScopes(payload.Scope),
 	}
@@ -254,13 +288,51 @@ func parseToken(body []byte, now time.Time, defaultScopes []string) (Token, erro
 	return token, nil
 }
 
-func tokenEndpointError(statusCode int, body []byte) error {
+// tokenEndpointError describes a refused token request with what the user
+// needs to fix it: the endpoint called, the HTTP status and the reason given by
+// the server, either an OAuth 2 error or the start of a plain text body.
+func tokenEndpointError(tokenURL string, statusCode int, body []byte) error {
+	reason := fmt.Sprintf("token endpoint %s responded %d %s", displayURL(tokenURL), statusCode, http.StatusText(statusCode))
+
 	var payload tokenPayload
 	if err := json.Unmarshal(body, &payload); err == nil && payload.Error != "" {
-		return tokenError(payload.Error, payload.ErrorDescription)
+		detail := payload.Error
+		if payload.ErrorDescription != "" {
+			detail += ": " + payload.ErrorDescription
+		}
+		return fmt.Errorf("%w: %s: %s", ErrTokenRequestFailed, reason, detail)
 	}
 
-	return fmt.Errorf("%w: server responded %d", ErrTokenRequestFailed, statusCode)
+	if text := bodyExcerpt(body); text != "" {
+		return fmt.Errorf("%w: %s: %s", ErrTokenRequestFailed, reason, text)
+	}
+	return fmt.Errorf("%w: %s", ErrTokenRequestFailed, reason)
+}
+
+// displayURL drops the credentials and the query of a URL before it is shown.
+func displayURL(rawURL string) string {
+	parsed, err := url.Parse(rawURL)
+	if err != nil {
+		return rawURL
+	}
+	parsed.User = nil
+	parsed.RawQuery = ""
+	parsed.Fragment = ""
+	return parsed.String()
+}
+
+// bodyExcerpt returns the start of a plain text error body on one line, or
+// nothing for an HTML page or a binary payload.
+func bodyExcerpt(body []byte) string {
+	const limit = 200
+	text := strings.Join(strings.Fields(string(body)), " ")
+	if text == "" || strings.HasPrefix(text, "<") || !utf8.ValidString(text) {
+		return ""
+	}
+	if len(text) > limit {
+		text = text[:limit] + "…"
+	}
+	return text
 }
 
 func tokenError(code string, description string) error {

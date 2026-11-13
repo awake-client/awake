@@ -44,13 +44,27 @@ type Status struct {
 	Scopes                []string
 }
 
+// TokenDetails exposes the cached tokens of one request so the user can
+// inspect or copy them. It never contacts the token endpoint.
+type TokenDetails struct {
+	GrantType             domain.OAuth2GrantType
+	AccessToken           string
+	TokenType             string
+	RefreshToken          string
+	IDToken               string
+	ExpiresAtMilliseconds int64
+	Scopes                []string
+}
+
 // Token is an access token and the data needed to refresh it.
 type Token struct {
 	AccessToken  string
 	RefreshToken string
-	TokenType    string
-	Scopes       []string
-	ExpiresAt    time.Time
+	// IDToken is the OpenID Connect identity token, when the server issued one.
+	IDToken   string
+	TokenType string
+	Scopes    []string
+	ExpiresAt time.Time
 }
 
 func (token Token) isExpired(now time.Time) bool {

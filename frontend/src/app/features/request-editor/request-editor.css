@@ -377,19 +377,6 @@
   max-width: 64ch;
 }
 
-.oauth2-actions {
-  display: flex;
-  gap: 8px;
-  padding-top: 4px;
-}
-
-.oauth2-error {
-  margin: 0;
-  font-size: var(--text-base);
-  color: var(--color-danger);
-  max-width: 64ch;
-}
-
 /* Method and protocol picker ------------------------------------------------ */
 
 .kind-picker {

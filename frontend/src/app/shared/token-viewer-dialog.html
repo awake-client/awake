@@ -1,0 +1,137 @@
+<dialog
+  #dialog
+  class="token-viewer"
+  aria-labelledby="token-viewer-title"
+  (cancel)="$event.preventDefault(); viewer.close()"
+  (click)="closeOnBackdrop($event)"
+>
+  @if (viewer.pending(); as request) {
+    <header>
+      <span class="badge" aria-hidden="true"><app-icon name="key" [size]="16" /></span>
+      <div class="title">
+        <h2 id="token-viewer-title">Token viewer</h2>
+        <p>
+          @if (endpointExpiry(); as expiry) {
+            <span class="expiry" [attr.data-state]="expiry.state">
+              <span class="dot" aria-hidden="true"></span>
+              <strong>{{ expiry.label }}</strong>
+              @if (expiry.at) {
+                <span class="muted">{{ expiry.at }}</span>
+              }
+            </span>
+          }
+          @for (detail of request.details ?? []; track $index) {
+            <span>{{ detail }}</span>
+          }
+        </p>
+      </div>
+      <button type="button" class="icon-btn" aria-label="Close" (click)="viewer.close()">
+        <app-icon name="close" [size]="16" />
+      </button>
+    </header>
+
+    @if (tokens().length > 1) {
+      <div class="token-tabs" role="tablist" aria-label="Tokens">
+        @for (token of tokens(); track token.label; let index = $index) {
+          <button
+            type="button"
+            role="tab"
+            [class.selected]="selectedIndex() === index"
+            [attr.aria-selected]="selectedIndex() === index"
+            (click)="select(index)"
+          >
+            {{ token.label }}
+          </button>
+        }
+      </div>
+    }
+
+    <div class="columns">
+      <section class="column">
+        <div class="section-head">
+          <h3>Encoded</h3>
+          <button type="button" class="btn btn-sm btn-ghost" (click)="copy('token')">
+            <app-icon [name]="copied() === 'token' ? 'check' : 'copy'" [size]="13" />
+            {{ copied() === 'token' ? 'Copied' : 'Copy token' }}
+          </button>
+        </div>
+        <div class="encoded">
+          <pre
+            class="encoded-highlight"
+            aria-hidden="true"
+          >@for (segment of text().split('.'); track $index; let index = $index, last = $last) {<span [class]="'part-' + (index < 3 ? index : 'extra')">{{ segment }}</span>@if (!last) {<span class="dot">.</span>}}{{ '\n' }}</pre>
+          <textarea
+            class="encoded-input"
+            spellcheck="false"
+            autocomplete="off"
+            aria-label="Encoded token"
+            placeholder="Paste a JWT"
+            [value]="text()"
+            (input)="edit($event)"
+          ></textarea>
+        </div>
+        @if (decoding(); as result) {
+          @if (!result.ok) {
+            <p class="status error"><app-icon name="alert" [size]="14" /> {{ result.error }}</p>
+          } @else {
+            <p class="status" [attr.data-validity]="validity()">
+              <app-icon [name]="validity() === 'expired' ? 'alert' : 'check'" [size]="14" />
+              @if (validity() === 'pending') {
+                Not yet valid
+              } @else if (jwtExpiry(); as expiry) {
+                <strong>{{ expiry.label }}</strong>
+                <span class="muted">({{ expiry.at }})</span>
+              } @else {
+                No <code>exp</code> claim
+              }
+            </p>
+            <p class="status muted">
+              {{ jwt()?.header?.['alg'] ?? 'Unknown algorithm' }}, signature not verified
+            </p>
+          }
+        }
+      </section>
+
+      <section class="column decoded">
+        @if (jwt()) {
+          <div class="section-head">
+            <h3><span class="swatch part-0"></span>Header</h3>
+            <button type="button" class="btn btn-sm btn-ghost" (click)="copy('header')">
+              <app-icon [name]="copied() === 'header' ? 'check' : 'copy'" [size]="13" />
+              {{ copied() === 'header' ? 'Copied' : 'Copy' }}
+            </button>
+          </div>
+          <pre class="json part-0-border">{{ headerJson() }}</pre>
+
+          <div class="section-head">
+            <h3><span class="swatch part-1"></span>Payload</h3>
+            <button type="button" class="btn btn-sm btn-ghost" (click)="copy('payload')">
+              <app-icon [name]="copied() === 'payload' ? 'check' : 'copy'" [size]="13" />
+              {{ copied() === 'payload' ? 'Copied' : 'Copy' }}
+            </button>
+          </div>
+          <pre class="json part-1-border">{{ payloadJson() }}</pre>
+
+          @if (claims().length > 0) {
+            <h3 class="claims-title">Claims</h3>
+            <dl class="claims">
+              @for (claim of claims(); track claim.name) {
+                <dt>
+                  {{ claim.label }} <code>{{ claim.name }}</code>
+                </dt>
+                <dd>
+                  <span class="mono">{{ claim.value }}</span>
+                  @if (claim.detail) {
+                    <span class="muted">{{ claim.detail }}</span>
+                  }
+                </dd>
+              }
+            </dl>
+          }
+        } @else {
+          <p class="empty">The decoded header and payload appear here.</p>
+        }
+      </section>
+    </div>
+  }
+</dialog>

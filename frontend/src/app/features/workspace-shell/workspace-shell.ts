@@ -28,6 +28,7 @@ import { NewEntryDialog } from '@features/new-entry/new-entry-dialog';
 import { ConfirmationDialog } from '@shared/confirmation-dialog';
 import { Icon, IconName } from '@shared/icon';
 import { PromptDialog } from '@shared/prompt-dialog';
+import { TokenViewerDialog } from '@shared/token-viewer-dialog';
 import { ResizeHandle } from '@shared/resize-handle';
 import { formatVersion } from '@shared/version-label';
 import { collectionScopeOf, owningCollectionOf, visibleEnvironments } from './environment-scope';
@@ -76,6 +77,7 @@ const SIDEBAR_SECTIONS: SidebarSection[] = [
     NewEntryDialog,
     ConfirmationDialog,
     PromptDialog,
+    TokenViewerDialog,
     RequestTabs,
     EnvironmentPicker,
     EnvironmentDialog,

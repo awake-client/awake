@@ -404,36 +404,13 @@
               [inheritedFrom]="authenticationSourceName()"
               [collectionPath]="authenticationSourcePath()"
             >
-              <div oauth2Actions class="oauth2-actions">
-                <button
-                  type="button"
-                  class="btn btn-sm"
-                  [disabled]="oauth2Busy()"
-                  (click)="authorizeOAuth2()"
-                >
-                  {{
-                    oauth2Busy()
-                      ? 'Authorizing…'
-                      : authentication().GrantType !==
-                            OAuth2GrantType.OAuth2GrantAuthorizationCode &&
-                          authentication().GrantType
-                        ? 'Get token'
-                        : 'Authorize in browser'
-                  }}
-                </button>
-                <button
-                  type="button"
-                  class="btn btn-sm btn-ghost"
-                  [disabled]="oauth2Busy()"
-                  (click)="clearOAuth2()"
-                >
-                  Clear token
-                </button>
-                <span class="panel-note">{{ oauth2Expiry() }}</span>
-              </div>
-              @if (oauth2Error(); as message) {
-                <p oauth2Actions class="oauth2-error">{{ message }}</p>
-              }
+              <app-oauth2-actions
+                oauth2Actions
+                [entryPath]="requestPath()"
+                [authentication]="effectiveAuthentication()"
+                [revision]="savedRevision()"
+                [beforeAuthorize]="saveBeforeAuthorize"
+              />
             </app-auth-editor>
           }
 

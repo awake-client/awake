@@ -295,3 +295,52 @@ func TestLoadRequestInheritsTheFolderAuthentication(t *testing.T) {
 		t.Fatalf("expected the collection authentication fallback, got %+v", fallback.Authentication)
 	}
 }
+
+func TestResolveAuthenticationReturnsTheDefiningEntry(t *testing.T) {
+	root := t.TempDir()
+	if _, err := workspace.NewService().Create(root, workspace.CreateOptions{Name: "Owners", Mode: workspace.ModeTeam}); err != nil {
+		t.Fatalf("create workspace: %v", err)
+	}
+	write := func(path string, content string) {
+		t.Helper()
+		full := filepath.Join(root, filepath.FromSlash(path))
+		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(full, []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write("collections/keycloak/collection.yaml", "name: Keycloak\nauthentication:\n  type: oauth2\n  grantType: clientCredentials\n  tokenUrl: https://id.example.com/token\n  clientId: app\n")
+	write("collections/keycloak/users/folder.yaml", "name: Users\nauthentication:\n  type: inherit\n")
+	write("collections/keycloak/users/list.yaml", "name: List\nmethod: GET\nurl: https://example.com\n")
+	write("collections/keycloak/own.yaml", "name: Own\nmethod: GET\nurl: https://example.com\nauthentication:\n  type: bearer\n  token: mine\n")
+	write("collections/open/collection.yaml", "name: Open\n")
+
+	source := requestSource{}
+	cases := []struct {
+		entry    string
+		owner    string
+		authType domain.AuthenticationType
+	}{
+		{"collections/keycloak", "collections/keycloak", domain.AuthenticationOAuth2},
+		{"collections/keycloak/users", "collections/keycloak", domain.AuthenticationOAuth2},
+		{"collections/keycloak/users/list.yaml", "collections/keycloak", domain.AuthenticationOAuth2},
+		{"collections/keycloak/own.yaml", "collections/keycloak/own.yaml", domain.AuthenticationBearer},
+		{"collections/open", "collections/open", domain.AuthenticationNone},
+	}
+	for _, c := range cases {
+		authentication, owner, err := source.ResolveAuthentication(root, c.entry)
+		if err != nil {
+			t.Fatalf("resolve %s: %v", c.entry, err)
+		}
+		if owner != c.owner || authentication.Type != c.authType {
+			t.Errorf("%s: expected %s from %s, got %s from %s", c.entry, c.authType, c.owner, authentication.Type, owner)
+		}
+	}
+
+	layers, err := source.LoadVariableLayers(root, "collections/keycloak", "")
+	if err != nil || len(layers) == 0 {
+		t.Errorf("expected the variables of a collection, got %v, %v", layers, err)
+	}
+}

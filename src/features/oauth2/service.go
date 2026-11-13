@@ -7,12 +7,18 @@ import (
 	"github.com/awake-client/awake/src/shared/variables"
 )
 
-// Source supplies the request and its variable layers to the authorization
-// flow. The application layer implements it so this feature does not read the
-// workspace itself.
+// Source supplies the authentication of an entry and its variable layers to
+// the authorization flow. The application layer implements it so this feature
+// does not read the workspace itself.
 type Source interface {
-	LoadRequest(workspaceRoot string, relativePath string) (domain.Request, error)
-	LoadVariableLayers(workspaceRoot string, requestPath string, environmentFileName string) ([]variables.Layer, error)
+	// ResolveAuthentication returns the authentication used by a request,
+	// collection or folder, and the path of the entry that defines it: the
+	// entry itself, or the folder or collection it inherits from. Tokens are
+	// cached per defining entry, so requests inheriting one share its token.
+	ResolveAuthentication(workspaceRoot string, entryPath string) (domain.Authentication, string, error)
+	// LoadVariableLayers returns the variables visible to a request, or to a
+	// collection or folder when given its directory path.
+	LoadVariableLayers(workspaceRoot string, entryPath string, environmentFileName string) ([]variables.Layer, error)
 }
 
 // Service exposes the OAuth 2 flows to the application layer.
@@ -45,14 +51,15 @@ func NewServiceWithDependencies(source Source, browser Browser, client *http.Cli
 // package function rather than a service method so the token cache stays out
 // of the Wails bindings.
 func NewProvider(service *Service) Provider {
-	return Provider{manager: service.manager}
+	return Provider{manager: service.manager, source: service.source}
 }
 
-// Authorize runs the configured flow. For the authorization code flow it opens
+// Authorize runs the flow configured for an entry: a request, or a collection
+// or folder given by its directory path. For the authorization code flow it opens
 // the browser and waits for the loopback callback. For client credentials it
 // contacts the token endpoint directly.
-func (service *Service) Authorize(workspaceRoot string, requestPath string, environmentFileName string) (Status, error) {
-	configuration, key, err := service.loadConfiguration(workspaceRoot, requestPath, environmentFileName)
+func (service *Service) Authorize(workspaceRoot string, entryPath string, environmentFileName string) (Status, error) {
+	configuration, key, err := service.loadConfiguration(workspaceRoot, entryPath, environmentFileName)
 	if err != nil {
 		return Status{}, err
 	}
@@ -77,10 +84,10 @@ func (service *Service) Authorize(workspaceRoot string, requestPath string, envi
 	return service.manager.status(key, configuration), nil
 }
 
-// Status reports the cached token of a request without contacting the token
+// Status reports the cached token of an entry without contacting the token
 // endpoint.
-func (service *Service) Status(workspaceRoot string, requestPath string, environmentFileName string) (Status, error) {
-	configuration, key, err := service.loadConfiguration(workspaceRoot, requestPath, environmentFileName)
+func (service *Service) Status(workspaceRoot string, entryPath string, environmentFileName string) (Status, error) {
+	configuration, key, err := service.loadConfiguration(workspaceRoot, entryPath, environmentFileName)
 	if err != nil {
 		return Status{}, err
 	}
@@ -88,42 +95,75 @@ func (service *Service) Status(workspaceRoot string, requestPath string, environ
 	return service.manager.status(key, configuration), nil
 }
 
-// Clear forgets the cached token of a request.
-func (service *Service) Clear(workspaceRoot string, requestPath string, environmentFileName string) error {
-	service.manager.clear(tokenKey(workspaceRoot, requestPath, environmentFileName))
+// Token returns the cached tokens of an entry so the user can inspect or copy
+// them. It does not contact the token endpoint and returns
+// ErrAuthorizationRequired when no token is cached.
+func (service *Service) Token(workspaceRoot string, entryPath string, environmentFileName string) (TokenDetails, error) {
+	configuration, key, err := service.loadConfiguration(workspaceRoot, entryPath, environmentFileName)
+	if err != nil {
+		return TokenDetails{}, err
+	}
+
+	return service.manager.details(key, configuration)
+}
+
+// Clear forgets the cached token of an entry, shared with the requests that
+// inherit its authentication.
+func (service *Service) Clear(workspaceRoot string, entryPath string, environmentFileName string) error {
+	_, owner, err := service.source.ResolveAuthentication(workspaceRoot, entryPath)
+	if err != nil {
+		return err
+	}
+	service.manager.clear(tokenKey(workspaceRoot, owner, environmentFileName))
 	return nil
 }
 
-func (service *Service) loadConfiguration(workspaceRoot string, requestPath string, environmentFileName string) (configuration, string, error) {
-	request, err := service.source.LoadRequest(workspaceRoot, requestPath)
+func (service *Service) loadConfiguration(workspaceRoot string, entryPath string, environmentFileName string) (configuration, string, error) {
+	authentication, owner, err := service.source.ResolveAuthentication(workspaceRoot, entryPath)
 	if err != nil {
 		return configuration{}, "", err
 	}
-	if request.Authentication == nil || request.Authentication.Type != domain.AuthenticationOAuth2 {
+	if authentication.Type != domain.AuthenticationOAuth2 {
 		return configuration{}, "", ErrInvalidConfiguration
 	}
 
-	labeledLayers, err := service.source.LoadVariableLayers(workspaceRoot, requestPath, environmentFileName)
+	labeledLayers, err := service.source.LoadVariableLayers(workspaceRoot, entryPath, environmentFileName)
 	if err != nil {
 		return configuration{}, "", err
 	}
 	layers := variables.Maps(labeledLayers)
 
-	resolved, err := resolveConfiguration(*request.Authentication, layers)
+	resolved, err := resolveConfiguration(authentication, layers)
 	if err != nil {
 		return configuration{}, "", err
 	}
 
-	return resolved, tokenKey(workspaceRoot, requestPath, environmentFileName), nil
+	return resolved, tokenKey(workspaceRoot, owner, environmentFileName), nil
 }
 
-func tokenKey(workspaceRoot string, requestPath string, environmentFileName string) string {
-	return workspaceRoot + "\x00" + requestPath + "\x00" + environmentFileName
+// tokenKey identifies a cached token by the entry that defines the
+// authentication, so a collection and the requests inheriting from it share
+// one token.
+func tokenKey(workspaceRoot string, ownerPath string, environmentFileName string) string {
+	return workspaceRoot + "\x00" + ownerPath + "\x00" + environmentFileName
+}
+
+// ownerKey returns the token key of a request, falling back to the request
+// itself when its authentication cannot be resolved.
+func ownerKey(source Source, workspaceRoot string, requestPath string, environmentFileName string) string {
+	owner := requestPath
+	if source != nil {
+		if _, resolved, err := source.ResolveAuthentication(workspaceRoot, requestPath); err == nil && resolved != "" {
+			owner = resolved
+		}
+	}
+	return tokenKey(workspaceRoot, owner, environmentFileName)
 }
 
 // Provider supplies OAuth 2 access tokens to the HTTP client.
 type Provider struct {
 	manager *manager
+	source  Source
 }
 
 // AccessToken returns a cached or freshly obtained token for a request. It
@@ -142,7 +182,7 @@ func (provider Provider) AccessToken(
 	}
 
 	return provider.manager.accessToken(
-		tokenKey(workspaceRoot, requestPath, environmentFileName),
+		ownerKey(provider.source, workspaceRoot, requestPath, environmentFileName),
 		configuration,
 	)
 }
@@ -151,5 +191,5 @@ func (provider Provider) AccessToken(
 // refresh token. The HTTP client calls it when the API answers 401 with a
 // token believed valid, then asks for a fresh one.
 func (provider Provider) ExpireAccessToken(workspaceRoot string, requestPath string, environmentFileName string) {
-	provider.manager.expire(tokenKey(workspaceRoot, requestPath, environmentFileName))
+	provider.manager.expire(ownerKey(provider.source, workspaceRoot, requestPath, environmentFileName))
 }

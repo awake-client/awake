@@ -66,7 +66,8 @@ export function describeAuthentication(authentication: Authentication | null | u
  * Edits an authentication, for a request or a collection. Values accept
  * `{{variables}}`, so credentials can come from environments and secrets.
  * Extra actions, such as authorizing OAuth 2, are projected with the
- * `oauth2Actions` attribute.
+ * `oauth2Actions` attribute; they also show when the inherited
+ * authentication is OAuth 2.
  */
 @Component({
   selector: 'app-auth-editor',
@@ -99,6 +100,19 @@ export class AuthEditor {
   protected usesBrowser(): boolean {
     const grantType = this.value().GrantType;
     return !grantType || grantType === OAuth2GrantType.OAuth2GrantAuthorizationCode;
+  }
+
+  /**
+   * OAuth 2 actions apply to the authentication actually sent: the one of the
+   * request, or the inherited one when the request inherits it.
+   */
+  protected showsOAuth2Actions(): boolean {
+    const authentication = this.value();
+    const effective =
+      authentication.Type === AuthenticationType.AuthenticationInherit
+        ? this.inherited()
+        : authentication;
+    return effective?.Type === AuthenticationType.AuthenticationOAuth2;
   }
 
   protected collectionLink(): string[] {

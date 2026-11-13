@@ -248,11 +248,9 @@
         </label>
       }
     </div>
-    <p class="hint">
-      Reference secrets declared in the environment for the client secret and the password; their
-      values stay in the keychain. Expired tokens are refreshed automatically, and a request
-      rejected with 401 is retried once with a fresh token.
-    </p>
-    <ng-content select="[oauth2Actions]" />
   }
+}
+
+@if (showsOAuth2Actions()) {
+  <ng-content select="[oauth2Actions]" />
 }

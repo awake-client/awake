@@ -233,7 +233,15 @@
             [inheritedFrom]="authenticationSourceName()"
             [collectionPath]="authenticationSourcePath()"
             (authenticationChange)="authentication.set($event)"
-          />
+          >
+            <app-oauth2-actions
+              oauth2Actions
+              [entryPath]="collectionPath()"
+              [authentication]="effectiveAuthentication()"
+              [revision]="savedRevision()"
+              [beforeAuthorize]="saveBeforeAuthorize"
+            />
+          </app-auth-editor>
         }
       }
     </div>

@@ -18,8 +18,6 @@ import {
   Chunk,
   Response as HTTPResponse,
 } from '@bindings/github.com/awake-client/awake/src/features/httpclient/models';
-import * as OAuth2Service from '@bindings/github.com/awake-client/awake/src/features/oauth2/service';
-import { Status as OAuth2Status } from '@bindings/github.com/awake-client/awake/src/features/oauth2/models';
 import {
   Authentication,
   AuthenticationType,
@@ -35,6 +33,7 @@ import {
   ScriptOutcome,
 } from '@bindings/github.com/awake-client/awake/src/domain/models';
 import { EnvironmentStore } from '@core/environment-store';
+import { OAuth2Actions } from '../oauth2/oauth2-actions';
 import {
   COLLECTIONS_CHANGED_EVENT,
   CollectionsChange,
@@ -144,6 +143,7 @@ function valueOf(parameters: PathParameter[] | null, name: string): string | und
     RequestHistory,
     Icon,
     AuthEditor,
+    OAuth2Actions,
     CodeEditor,
     ResizeHandle,
     VariableInput,
@@ -200,6 +200,13 @@ export class RequestEditor {
   protected readonly authenticationSourcePath = signal('');
   protected readonly authenticationSourceName = signal('');
   protected readonly inheritedAuthentication = signal<Authentication | null>(null);
+  /** The authentication sent: the request's own, or the inherited one. */
+  protected readonly effectiveAuthentication = computed(() => {
+    const authentication = this.authentication();
+    return authentication.Type === AuthenticationType.AuthenticationInherit
+      ? this.inheritedAuthentication()
+      : authentication;
+  });
   /** Request path split for the breadcrumb, without the collections root. */
   protected readonly pathSegments = computed(() => {
     const segments = this.requestPath().split('/').filter(Boolean);
@@ -316,9 +323,11 @@ export class RequestEditor {
   /** Request paths the pre-request script can pass to awake.runRequest. */
   protected readonly scriptRequests = signal<readonly string[]>([]);
   protected readonly activeTab = signal<EditorTab>('parameters');
-  protected readonly oauth2Status = signal<OAuth2Status | null>(null);
-  protected readonly oauth2Busy = signal(false);
-  protected readonly oauth2Error = signal<string | null>(null);
+  /** Bumped when the request is loaded or saved, so OAuth 2 status reloads. */
+  protected readonly savedRevision = signal(0);
+  /** Saves pending edits before an OAuth 2 flow reads the request file. */
+  protected readonly saveBeforeAuthorize = async (): Promise<boolean> =>
+    !this.isDirty() || (await this.save());
 
   protected readonly response = signal<HTTPResponse | null>(null);
   protected readonly responseBody = signal('');
@@ -680,7 +689,7 @@ export class RequestEditor {
       this.url.set(request.URL);
       this.snapshot.set(JSON.stringify(this.draft()));
       this.statusMessage.set('Saved');
-      void this.refreshOAuth2Status();
+      this.savedRevision.update((revision) => revision + 1);
       // The tree labels requests with their name from the file, so a rename
       // only shows there once it reloads.
       if (request.Name !== previousName) {
@@ -1120,77 +1129,7 @@ export class RequestEditor {
   }
 
   protected setAuthentication(authentication: Authentication): void {
-    const previous = this.authentication();
     this.authentication.set(authentication);
-    if (authentication.Type !== AuthenticationType.AuthenticationOAuth2) {
-      this.oauth2Status.set(null);
-      this.oauth2Error.set(null);
-    } else if (
-      previous.Type !== authentication.Type ||
-      previous.GrantType !== authentication.GrantType
-    ) {
-      void this.refreshOAuth2Status();
-    }
-  }
-
-  protected async authorizeOAuth2(): Promise<void> {
-    const rootPath = this.workspaceStore.rootPath();
-    const requestPath = this.requestPath();
-    if (!rootPath || !requestPath || this.oauth2Busy()) {
-      return;
-    }
-    if (this.isDirty() && !(await this.save())) {
-      return;
-    }
-
-    this.oauth2Busy.set(true);
-    this.oauth2Error.set(null);
-
-    try {
-      const status = await OAuth2Service.Authorize(
-        rootPath,
-        requestPath,
-        this.environmentStore.selected(),
-      );
-      this.oauth2Status.set(status);
-      this.statusMessage.set('OAuth 2 token obtained.');
-    } catch (error) {
-      this.oauth2Error.set(describeError(error));
-    } finally {
-      this.oauth2Busy.set(false);
-    }
-  }
-
-  protected async clearOAuth2(): Promise<void> {
-    const rootPath = this.workspaceStore.rootPath();
-    const requestPath = this.requestPath();
-    if (!rootPath || !requestPath) {
-      return;
-    }
-
-    this.oauth2Busy.set(true);
-    this.oauth2Error.set(null);
-
-    try {
-      await OAuth2Service.Clear(rootPath, requestPath, this.environmentStore.selected());
-      this.oauth2Status.set(null);
-      this.statusMessage.set('OAuth 2 token cleared.');
-    } catch (error) {
-      this.oauth2Error.set(describeError(error));
-    } finally {
-      this.oauth2Busy.set(false);
-    }
-  }
-
-  protected oauth2Expiry(): string {
-    const status = this.oauth2Status();
-    if (!status?.HasToken) {
-      return 'No token stored.';
-    }
-    if (!status.ExpiresAtMilliseconds) {
-      return 'Token stored without an expiry.';
-    }
-    return `Token stored until ${new Date(status.ExpiresAtMilliseconds).toLocaleString()}.`;
   }
 
   /** Starts a local override of a tab from a copy of its shared version. */
@@ -1480,7 +1419,7 @@ export class RequestEditor {
       // which would otherwise append the query twice.
       this.snapshot.set(JSON.stringify({ ...this.draft(), URL: request.URL }));
     }
-    void this.refreshOAuth2Status();
+    this.savedRevision.update((revision) => revision + 1);
   }
 
   /** Shows the local version of a tab whenever it has one. */
@@ -1500,28 +1439,6 @@ export class RequestEditor {
     this.overrideSnapshot.set(JSON.stringify(this.overrideDraft()));
   }
 
-  private async refreshOAuth2Status(): Promise<void> {
-    const rootPath = this.workspaceStore.rootPath();
-    const requestPath = this.requestPath();
-    const authentication = this.authentication();
-    if (
-      !rootPath ||
-      !requestPath ||
-      authentication.Type !== AuthenticationType.AuthenticationOAuth2 ||
-      !authentication.GrantType
-    ) {
-      this.oauth2Status.set(null);
-      return;
-    }
-
-    try {
-      this.oauth2Status.set(
-        await OAuth2Service.Status(rootPath, requestPath, this.environmentStore.selected()),
-      );
-    } catch {
-      this.oauth2Status.set(null);
-    }
-  }
   private async closeResponse(): Promise<void> {
     const response = this.response();
     this.releaseImage();

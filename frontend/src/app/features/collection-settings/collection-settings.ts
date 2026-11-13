@@ -14,6 +14,7 @@ import { Shortcuts } from '@core/shortcuts';
 import { VariableStore } from '@core/variable-store';
 import { WorkspaceStore } from '@core/workspace-store';
 import { AuthEditor } from '@shared/auth-editor';
+import { OAuth2Actions } from '../oauth2/oauth2-actions';
 import { ColorPicker } from '@shared/color-picker';
 import { Icon } from '@shared/icon';
 import { VariableInput } from '@shared/variable-input';
@@ -32,7 +33,7 @@ interface VariableRow {
  */
 @Component({
   selector: 'app-collection-settings',
-  imports: [AuthEditor, ColorPicker, Icon, RouterLink, VariableInput],
+  imports: [AuthEditor, ColorPicker, Icon, OAuth2Actions, RouterLink, VariableInput],
   host: {
     '(document:keydown)': 'handleShortcut($event)',
   },
@@ -99,6 +100,23 @@ export class CollectionSettings {
   });
 
   protected readonly isDirty = computed(() => JSON.stringify(this.draft()) !== this.snapshot());
+
+  /** The authentication in effect: its own, or the one a folder inherits. */
+  protected readonly effectiveAuthentication = computed(() => {
+    const authentication = this.authentication();
+    return authentication.Type === AuthenticationType.AuthenticationInherit
+      ? this.inheritedAuthentication()
+      : authentication;
+  });
+  /** Bumped when the settings are loaded or saved, so OAuth 2 status reloads. */
+  protected readonly savedRevision = signal(0);
+  /** Saves pending edits before an OAuth 2 flow reads the settings file. */
+  protected readonly saveBeforeAuthorize = async (): Promise<boolean> => {
+    if (this.isDirty()) {
+      await this.save();
+    }
+    return !this.isDirty();
+  };
 
   constructor() {
     inject(DestroyRef).onDestroy(() => this.variableStore.useCollection(null));
@@ -182,6 +200,7 @@ export class CollectionSettings {
     try {
       await CollectionsService.UpdateCollection(rootPath, this.collectionPath(), draft);
       this.snapshot.set(JSON.stringify(this.draft()));
+      this.savedRevision.update((revision) => revision + 1);
       this.statusMessage.set('Saved');
       notifyCollectionsChanged();
     } catch (error) {
@@ -237,6 +256,7 @@ export class CollectionSettings {
         this.resetInheritedAuthentication();
       }
       this.snapshot.set(JSON.stringify(this.draft()));
+      this.savedRevision.update((revision) => revision + 1);
     } catch (error) {
       this.errorMessage.set(error instanceof Error ? error.message : String(error));
     } finally {

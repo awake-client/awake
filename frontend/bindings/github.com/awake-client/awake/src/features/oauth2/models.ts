@@ -14,3 +14,17 @@ export interface Status {
     "ExpiresAtMilliseconds": number;
     "Scopes": string[] | null;
 }
+
+/**
+ * TokenDetails exposes the cached tokens of one request so the user can
+ * inspect or copy them. It never contacts the token endpoint.
+ */
+export interface TokenDetails {
+    "GrantType": domain$0.OAuth2GrantType;
+    "AccessToken": string;
+    "TokenType": string;
+    "RefreshToken": string;
+    "IDToken": string;
+    "ExpiresAtMilliseconds": number;
+    "Scopes": string[] | null;
+}

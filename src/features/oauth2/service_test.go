@@ -19,8 +19,11 @@ type fakeSource struct {
 	layers  []map[string]string
 }
 
-func (source fakeSource) LoadRequest(_ string, _ string) (domain.Request, error) {
-	return source.request, nil
+func (source fakeSource) ResolveAuthentication(_ string, entryPath string) (domain.Authentication, string, error) {
+	if source.request.Authentication == nil {
+		return domain.Authentication{Type: domain.AuthenticationNone}, entryPath, nil
+	}
+	return *source.request.Authentication, entryPath, nil
 }
 
 func (source fakeSource) LoadVariableLayers(_ string, _ string, _ string) ([]variables.Layer, error) {
@@ -372,5 +375,103 @@ func TestPasswordGrantRequiresAUserName(t *testing.T) {
 	}, nil)
 	if err == nil {
 		t.Fatal("expected a missing user name to be rejected")
+	}
+}
+
+func TestTokenReturnsTheCachedTokens(t *testing.T) {
+	tokenServer := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
+		writer.Header().Set("Content-Type", "application/json")
+		_, _ = writer.Write([]byte(`{"access_token":"access","id_token":"identity","refresh_token":"refresh","token_type":"Bearer","expires_in":3600}`))
+	}))
+	defer tokenServer.Close()
+
+	service := NewServiceWithDependencies(
+		fakeSource{request: clientCredentialsRequest(tokenServer.URL)},
+		fakeBrowser{},
+		tokenServer.Client(),
+	)
+
+	if _, err := service.Token("/workspace", "collection/request.yaml", "development"); !errors.Is(err, ErrAuthorizationRequired) {
+		t.Fatalf("expected ErrAuthorizationRequired before authorizing, got %v", err)
+	}
+
+	if _, err := service.Authorize("/workspace", "collection/request.yaml", "development"); err != nil {
+		t.Fatalf("authorize: %v", err)
+	}
+
+	details, err := service.Token("/workspace", "collection/request.yaml", "development")
+	if err != nil {
+		t.Fatalf("token: %v", err)
+	}
+	if details.AccessToken != "access" || details.IDToken != "identity" || details.RefreshToken != "refresh" {
+		t.Errorf("unexpected tokens: %+v", details)
+	}
+	if details.TokenType != "Bearer" || details.ExpiresAtMilliseconds == 0 {
+		t.Errorf("unexpected token metadata: %+v", details)
+	}
+	if details.GrantType != domain.OAuth2GrantClientCredentials {
+		t.Errorf("unexpected grant type: %q", details.GrantType)
+	}
+}
+
+// ownerSource resolves every request to the collection that defines the
+// authentication, as requests inheriting it do.
+type ownerSource struct {
+	fakeSource
+}
+
+func (source ownerSource) ResolveAuthentication(_ string, _ string) (domain.Authentication, string, error) {
+	return *source.request.Authentication, "collections/keycloak", nil
+}
+
+func TestRequestsInheritingAnAuthenticationShareItsToken(t *testing.T) {
+	var requests int
+	tokenServer := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
+		requests++
+		writer.Header().Set("Content-Type", "application/json")
+		_, _ = writer.Write([]byte(`{"access_token":"shared","expires_in":3600}`))
+	}))
+	defer tokenServer.Close()
+
+	request := clientCredentialsRequest(tokenServer.URL)
+	service := NewServiceWithDependencies(ownerSource{fakeSource{request: request}}, fakeBrowser{}, tokenServer.Client())
+
+	if _, err := service.Authorize("/workspace", "collections/keycloak", ""); err != nil {
+		t.Fatalf("authorize the collection: %v", err)
+	}
+
+	token, err := NewProvider(service).AccessToken("/workspace", "collections/keycloak/users/list.yaml", "", *request.Authentication, nil)
+	if err != nil || token != "shared" {
+		t.Fatalf("expected the collection token, got %q, %v", token, err)
+	}
+	if requests != 1 {
+		t.Errorf("expected the request to reuse the collection token, got %d token requests", requests)
+	}
+
+	status, err := service.Status("/workspace", "collections/keycloak/users/list.yaml", "")
+	if err != nil || !status.HasToken {
+		t.Errorf("expected the request to report the shared token, got %+v, %v", status, err)
+	}
+}
+
+func TestTokenEndpointErrorNamesTheEndpointAndTheStatus(t *testing.T) {
+	err := tokenEndpointError(
+		"https://user:secret@id.example.com/realms/master/protocol/openid-connect/auth?debug=1",
+		http.StatusMethodNotAllowed,
+		[]byte(`{"error":"Unable to find target resource method"}`),
+	)
+	expected := "oauth2: token request failed: token endpoint https://id.example.com/realms/master/protocol/openid-connect/auth responded 405 Method Not Allowed: Unable to find target resource method"
+	if !errors.Is(err, ErrTokenRequestFailed) || err.Error() != expected {
+		t.Errorf("unexpected error:\n%v\nexpected:\n%s", err, expected)
+	}
+
+	err = tokenEndpointError("https://id.example.com/token", http.StatusNotFound, []byte("<html><body>Not found</body></html>"))
+	if err.Error() != "oauth2: token request failed: token endpoint https://id.example.com/token responded 404 Not Found" {
+		t.Errorf("an HTML body must not be quoted: %v", err)
+	}
+
+	err = tokenEndpointError("https://id.example.com/token", http.StatusBadGateway, []byte("upstream\n  unavailable"))
+	if !strings.HasSuffix(err.Error(), "responded 502 Bad Gateway: upstream unavailable") {
+		t.Errorf("a plain text body must be quoted on one line: %v", err)
 	}
 }
