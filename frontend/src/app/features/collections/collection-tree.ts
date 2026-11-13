@@ -174,15 +174,22 @@ export class CollectionTree {
       return;
     }
 
-    this.selected.set(row.entry.Path);
-    // A collection opens its settings and unfolds; a folder just toggles.
+    // A collection opens its settings and unfolds; clicked again while its
+    // settings are on screen, it folds. A folder just toggles.
     if (row.depth === 0) {
+      const settingsShown = this.openSettingsPath() === row.entry.Path;
+      this.selected.set(row.entry.Path);
+      if (row.expanded && settingsShown) {
+        await this.toggle(row);
+        return;
+      }
       void this.router.navigate(['/workspace/collection', ...row.entry.Path.split('/')]);
       if (!row.expanded) {
         await this.toggle(row);
       }
       return;
     }
+    this.selected.set(row.entry.Path);
     await this.toggle(row);
   }
 
@@ -669,6 +676,13 @@ export class CollectionTree {
     return url.startsWith(prefix) ? decodeURIComponent(url.slice(prefix.length)) : null;
   }
 
+  /** Path of the collection or folder whose settings are on screen, if any. */
+  private openSettingsPath(): string | null {
+    const prefix = '/workspace/collection/';
+    const url = this.router.url.split(/[?#]/)[0];
+    return url.startsWith(prefix) ? decodeURIComponent(url.slice(prefix.length)) : null;
+  }
+
   /**
    * Highlights the page on screen and unfolds the folder of an open request,
    * so a request opened from the search palette, the history or a tab is also
@@ -676,10 +690,9 @@ export class CollectionTree {
    */
   private async syncSelectionWithRoute(): Promise<void> {
     const openRequest = this.openRequestPath();
-    const settingsPrefix = '/workspace/collection/';
-    const url = this.router.url.split(/[?#]/)[0];
-    if (url.startsWith(settingsPrefix)) {
-      this.selected.set(decodeURIComponent(url.slice(settingsPrefix.length)));
+    const openSettings = this.openSettingsPath();
+    if (openSettings) {
+      this.selected.set(openSettings);
     } else if (openRequest) {
       this.selected.set(openRequest);
       await this.revealDirectory(openRequest.slice(0, openRequest.lastIndexOf('/')));
