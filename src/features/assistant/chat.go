@@ -41,6 +41,12 @@ var (
 //go:embed AGENT.md
 var agentInstructions string
 
+// AgentInstructions documents the workspace conventions for coding agents,
+// as written to AGENT.md at the root of a workspace.
+func AgentInstructions() string {
+	return agentInstructions
+}
+
 // AgentStatus tells whether a command line agent can be used.
 type AgentStatus struct {
 	Name      string

@@ -131,10 +131,16 @@ export class CollectionTree {
       )
       .subscribe(() => void this.syncSelectionWithRoute());
 
+    // Agents and editors change the files from other processes, such as
+    // the MCP server: reload when the window comes back to the front.
+    const reloadOnFocus = () => this.refresh();
+
     window.addEventListener(COLLECTIONS_CHANGED_EVENT, collectionsChanged);
     window.addEventListener('awake:open-collection', openCollection);
+    window.addEventListener('focus', reloadOnFocus);
     document.addEventListener('click', closeMenu);
     this.destroyRef.onDestroy(() => {
+      window.removeEventListener('focus', reloadOnFocus);
       window.removeEventListener(COLLECTIONS_CHANGED_EVENT, collectionsChanged);
       window.removeEventListener('awake:open-collection', openCollection);
       document.removeEventListener('click', closeMenu);

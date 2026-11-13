@@ -8,6 +8,7 @@ import (
 	"github.com/awake-client/awake/src/features/history"
 	"github.com/awake-client/awake/src/features/httpclient"
 	"github.com/awake-client/awake/src/features/interop"
+	"github.com/awake-client/awake/src/features/mcp"
 	"github.com/awake-client/awake/src/features/oauth2"
 	"github.com/awake-client/awake/src/features/platform"
 	"github.com/awake-client/awake/src/features/scripts"
@@ -31,6 +32,7 @@ type services struct {
 	Updates      *updates.Service
 	Workspace    *workspace.Service
 	Assistant    *assistant.Service
+	MCPSettings  *mcp.SettingsService
 }
 
 func newServices() (*services, error) {
@@ -63,5 +65,6 @@ func newServices() (*services, error) {
 		Updates:      updates.NewService(),
 		Workspace:    workspace.NewService(),
 		Assistant:    assistant.NewService(),
+		MCPSettings:  mcp.NewSettingsService(),
 	}, nil
 }

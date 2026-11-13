@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `awake mcp` serves a workspace to coding agents such as Claude Code over
+  the Model Context Protocol, locally over stdio: they list, read, send,
+  create and update requests, without ever seeing secret values. The
+  Assistant page shows the command registering it and a switch turning it off
+  for a workspace on this computer.
+
 ## [0.8.0] - 2026-11-10
 
 ### Added

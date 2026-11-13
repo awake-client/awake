@@ -44,6 +44,7 @@ func Run(frontendAssets embed.FS) error {
 			application.NewService(featureServices.Updates),
 			application.NewService(featureServices.Workspace),
 			application.NewService(featureServices.Assistant),
+			application.NewService(featureServices.MCPSettings),
 		},
 		Assets: application.AssetOptions{
 			Handler: application.AssetFileServerFS(frontendAssets),

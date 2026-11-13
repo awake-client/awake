@@ -9,6 +9,7 @@ import { notifyCollectionsChanged } from '@core/collection-events';
 import { WorkspaceStore } from '@core/workspace-store';
 import { Icon, IconName } from '@shared/icon';
 import { AssistantChatStore } from './assistant-chat-store';
+import { McpSetup } from './mcp-setup';
 
 const SUGGESTIONS = [
   'Rename the unclear requests in this workspace.',
@@ -27,7 +28,7 @@ const AGENT_ICONS: Record<string, IconName> = {
  */
 @Component({
   selector: 'app-assistant-panel',
-  imports: [FormsModule, Icon],
+  imports: [FormsModule, Icon, McpSetup],
   templateUrl: './assistant-panel.html',
   styleUrl: './assistant-panel.css',
 })

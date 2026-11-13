@@ -11,6 +11,14 @@
 import { Call as $Call, CancellablePromise as $CancellablePromise } from "@wailsio/runtime";
 
 /**
+ * MCPCommand returns the command registering this Awake executable as the MCP
+ * server of a workspace in Claude Code, ready to paste in a terminal.
+ */
+export function MCPCommand(workspaceRoot: string, readOnly: boolean): $CancellablePromise<string> {
+    return $Call.ByID(2585642234, workspaceRoot, readOnly);
+}
+
+/**
  * Name returns the operating system identifier used by Go: darwin, linux or
  * windows.
  */

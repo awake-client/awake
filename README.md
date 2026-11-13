@@ -19,7 +19,8 @@ through git instead of a cloud account.
 - **Environments** — shared variables with local overrides; secret values stay
   in the operating system keychain and never in the repository.
 - **Coding agents** — chat with Claude Code or OpenCode to rename requests,
-  extract base URLs or change anything else in the workspace.
+  extract base URLs or change anything else in the workspace, or let agents
+  list, send and write requests through the local [MCP server](docs/mcp.md).
 - **Import and export** — Bruno, OpenCollection, OpenAPI and Postman.
 - **Built to stay fast** — virtualized tree, SQLite index, search, command
   palette, request history, light and dark themes.
@@ -64,6 +65,7 @@ wails3 task package # create the platform package
 ## Documentation
 
 - [File format](docs/file-format.md)
+- [MCP server](docs/mcp.md)
 - [Architecture and conventions](docs/conventions.md)
 - [Changelog](CHANGELOG.md)
 
