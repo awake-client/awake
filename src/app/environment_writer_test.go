@@ -32,6 +32,26 @@ func TestApplyEnvironmentChangesWritesPrivateEnvironment(t *testing.T) {
 	}
 }
 
+func TestApplyEnvironmentChangesWritesPrivateEnvironmentWithoutVariables(t *testing.T) {
+	workspaceRoot := t.TempDir()
+	privatePath := filepath.Join(workspaceRoot, "environments", "scratch.local.yaml")
+	writeFile(t, privatePath, "name: Scratch\nsecretVariables:\n  - apiToken\n")
+
+	writer := environmentWriter{}
+	changes := []domain.EnvironmentChange{{Name: "lastId", Value: "550"}}
+	if err := writer.ApplyEnvironmentChanges(workspaceRoot, "collections/billing/invoices.yaml", "scratch", changes); err != nil {
+		t.Fatalf("apply environment changes: %v", err)
+	}
+
+	local, err := os.ReadFile(privatePath)
+	if err != nil {
+		t.Fatalf("read private environment: %v", err)
+	}
+	if !strings.Contains(string(local), "lastId") {
+		t.Errorf("expected the private environment to hold the new variable, got:\n%s", local)
+	}
+}
+
 func TestResolveEnvironmentNameMatchesFileOrDisplayName(t *testing.T) {
 	workspaceRoot := t.TempDir()
 	writeFile(t, filepath.Join(workspaceRoot, "environments", "production.yaml"), "name: Production\n")

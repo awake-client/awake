@@ -52,6 +52,10 @@ func (writer environmentWriter) ApplyEnvironmentChanges(
 	}
 	if resolved.Private {
 		environment := resolved.Environment()
+		// A private environment without variables has no map to write into.
+		if environment.Variables == nil {
+			environment.Variables = map[string]string{}
+		}
 		for _, change := range plain {
 			if change.Removed {
 				delete(environment.Variables, change.Name)

@@ -67,8 +67,10 @@ func Run(frontendAssets embed.FS) error {
 		Mac: application.MacWindow{
 			// The web title bar declares its own drag region through the
 			// --wails-draggable CSS property, so its buttons stay clickable.
+			// The unified toolbar insets the traffic lights further from the
+			// window edges, instead of pressing them into the corner.
 			Backdrop: application.MacBackdropTranslucent,
-			TitleBar: application.MacTitleBarHiddenInset,
+			TitleBar: application.MacTitleBarHiddenInsetUnified,
 		},
 		URL: "/",
 	}

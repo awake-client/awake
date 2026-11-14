@@ -389,6 +389,7 @@ export class EnvironmentEditor {
       await SecretsService.SetSecret(rootPath, this.scope(), this.fileName(), name, value);
       this.updateSecretValue(name, '');
       await this.loadSecretStates();
+      notifyEnvironmentsChanged();
       this.message.set(`Secret ${name} stored.`);
     } catch (error) {
       this.errorMessage.set(describeError(error));
@@ -407,6 +408,7 @@ export class EnvironmentEditor {
     try {
       await SecretsService.DeleteSecret(rootPath, this.scope(), this.fileName(), name);
       await this.loadSecretStates();
+      notifyEnvironmentsChanged();
       this.message.set(`Secret ${name} cleared.`);
     } catch (error) {
       this.errorMessage.set(describeError(error));

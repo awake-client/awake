@@ -21,18 +21,19 @@
   flex: 0 0 auto;
 }
 
-/* Leave room for the macOS traffic lights drawn over the inset title bar, and
-   nudge the content down so it centers with them. */
+/* The unified toolbar is 52 pixels tall and centers the macOS traffic lights
+   in it, inset from the corner: the bar takes the same height so its content
+   lines up with them, and leaves room for them on the left. */
 :host-context(html[data-platform='darwin']) .titlebar {
-  padding-left: 96px;
-  padding-top: 6px;
+  height: 52px;
+  padding-left: 104px;
 }
 
 /* macOS hides the traffic lights in fullscreen, so nothing needs their inset:
    the workspace selector moves to the left edge and the bar re-centres. */
 :host-context(html[data-platform='darwin'][data-fullscreen='true']) .titlebar {
+  height: var(--titlebar-height);
   padding-left: 16px;
-  padding-top: 0;
 }
 
 /* Windows uses a frameless window whose caption buttons are drawn in the web
