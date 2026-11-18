@@ -1,5 +1,16 @@
-import { ScrollingModule } from '@angular/cdk/scrolling';
-import { Component, DestroyRef, effect, inject, input, output, signal } from '@angular/core';
+import { CdkVirtualScrollViewport, ScrollingModule } from '@angular/cdk/scrolling';
+import {
+  Component,
+  DestroyRef,
+  Injector,
+  afterNextRender,
+  effect,
+  inject,
+  input,
+  output,
+  signal,
+  viewChild,
+} from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { NavigationEnd, Router } from '@angular/router';
 import { Clipboard } from '@wailsio/runtime';
@@ -68,6 +79,7 @@ export class CollectionTree {
   private readonly childrenCache = new Map<string, Entry[]>();
   private readonly expandedPaths = new Set<string>();
   private readonly destroyRef = inject(DestroyRef);
+  private readonly injector = inject(Injector);
   private readonly router = inject(Router);
   private readonly confirmation = inject(Confirmation);
   private readonly hiddenCollections = inject(HiddenCollectionsStore);
@@ -95,6 +107,7 @@ export class CollectionTree {
   /** Folder that would receive the row being dragged. */
   protected readonly dropTarget = signal<string | null>(null);
   protected readonly dragged = signal<TreeRow | null>(null);
+  private readonly viewport = viewChild(CdkVirtualScrollViewport);
   private expandTimer: number | undefined;
 
   constructor() {
@@ -216,6 +229,9 @@ export class CollectionTree {
    * so a refresh never collapses what the user was looking at.
    */
   protected async reload(workspaceRoot: string): Promise<void> {
+    // Rebuilding the rows collapses the tree before unfolding it again, which
+    // would clamp the viewport to the top. Keep the offset to put it back.
+    const scrollOffset = this.viewport()?.measureScrollOffset('top') ?? 0;
     this.isLoading.set(true);
     this.errorMessage.set(null);
     this.hiddenCollections.useWorkspace(workspaceRoot);
@@ -275,7 +291,20 @@ export class CollectionTree {
       this.errorMessage.set(describeError(error));
     } finally {
       this.isLoading.set(false);
+      this.restoreScrollOffset(scrollOffset);
     }
+  }
+
+  /**
+   * Puts the tree back where it was once the rebuilt rows are on screen. The
+   * tree reloads when the window regains focus to pick up outside changes;
+   * without this, every alt-tab would scroll the collections to the top.
+   */
+  private restoreScrollOffset(offset: number): void {
+    if (offset <= 0) {
+      return;
+    }
+    afterNextRender(() => this.viewport()?.scrollToOffset(offset), { injector: this.injector });
   }
 
   protected refresh(): void {
