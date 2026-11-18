@@ -3,6 +3,7 @@ import { CollectionColors } from '@core/collection-colors';
 import { Confirmation } from '@core/confirmation';
 import { RequestTab, TabsStore } from '@core/tabs-store';
 import { Shortcuts } from '@core/shortcuts';
+import { Icon } from '@shared/icon';
 
 /** What a tab menu entry closes, relative to the tab clicked. */
 type CloseTarget = 'this' | 'others' | 'left' | 'right' | 'saved' | 'all';
@@ -16,7 +17,7 @@ interface TabMenu {
 
 /** Size of the tab menu, to keep it inside the window. */
 const MENU_WIDTH = 200;
-const MENU_HEIGHT = 230;
+const MENU_HEIGHT = 262;
 const MENU_MARGIN = 8;
 
 /** Short labels keep tabs narrow. */
@@ -35,6 +36,7 @@ const METHOD_LABELS: Record<string, string> = { DELETE: 'DEL', OPTIONS: 'OPT' };
     '(window:blur)': 'closeMenu()',
     '(window:resize)': 'closeMenu()',
   },
+  imports: [Icon],
   template: `
     <div #strip class="tab-strip" role="tablist" aria-label="Open requests">
       @for (tab of tabs.tabs(); track tab.path; let index = $index) {
@@ -45,12 +47,13 @@ const METHOD_LABELS: Record<string, string> = { DELETE: 'DEL', OPTIONS: 'OPT' };
           draggable="true"
           [class.active]="tab.path === tabs.active()"
           [class.preview]="tab.preview"
+          [class.pinned]="tab.pinned"
           [class.drop-before]="dropIndex() === index"
           [attr.data-color]="collectionColors.colorOf(tab.path) || null"
           [attr.aria-selected]="tab.path === tabs.active()"
-          [title]="tab.path"
+          [title]="tab.pinned ? tab.path + ' (pinned)' : tab.path"
           (click)="tabs.open(tab.path)"
-          (dblclick)="tabs.pin(tab.path)"
+          (dblclick)="tabs.togglePin(tab.path)"
           (auxclick)="$event.button === 1 && close(tab, $event)"
           (contextmenu)="openMenu($event, tab, index)"
           (keydown.enter)="tabs.open(tab.path)"
@@ -59,6 +62,9 @@ const METHOD_LABELS: Record<string, string> = { DELETE: 'DEL', OPTIONS: 'OPT' };
           (drop)="drop($event, index)"
           (dragend)="endDrag()"
         >
+          @if (tab.pinned) {
+            <app-icon class="tab-pin" name="pin" [size]="11" />
+          }
           <span class="tab-method" [attr.data-method]="tab.protocol === 'http' ? tab.method : null">
             {{ label(tab) }}
           </span>
@@ -92,6 +98,10 @@ const METHOD_LABELS: Record<string, string> = { DELETE: 'DEL', OPTIONS: 'OPT' };
         [style.left.px]="open.left"
         (click)="$event.stopPropagation()"
       >
+        <button type="button" role="menuitem" class="menu-item" (click)="togglePinFromMenu()">
+          {{ open.tab.pinned ? 'Unpin tab' : 'Pin tab' }}
+        </button>
+        <hr class="menu-separator" />
         <button type="button" role="menuitem" class="menu-item" (click)="closeFromMenu('this')">
           Close
           <kbd>{{ shortcuts.key('W') }}</kbd>
@@ -209,7 +219,16 @@ export class RequestTabs {
   }
 
   protected hasSavedTabs(): boolean {
-    return this.tabs.tabs().some((tab) => !tab.dirty);
+    return this.tabs.tabs().some((tab) => !tab.pinned && !tab.dirty);
+  }
+
+  /** Pins or unpins the tab whose menu is open. */
+  protected togglePinFromMenu(): void {
+    const menu = this.menu();
+    this.closeMenu();
+    if (menu) {
+      this.tabs.togglePin(menu.tab.path);
+    }
   }
 
   /** Closes the tabs a menu entry targets, relative to the tab clicked. */

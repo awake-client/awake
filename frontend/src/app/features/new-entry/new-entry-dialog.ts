@@ -358,7 +358,7 @@ export class NewEntryDialog {
       notifyCollectionsChanged({ created, kind: this.kind() });
       if (this.kind() === 'request') {
         await this.router.navigate(['/workspace/request', ...created.split('/')]);
-        this.tabsStore.pin(created);
+        this.tabsStore.keep(created);
       }
     } catch (error) {
       this.errorMessage.set(describeError(error));

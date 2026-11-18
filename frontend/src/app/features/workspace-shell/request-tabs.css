@@ -75,6 +75,15 @@
   font-style: italic;
 }
 
+.tab-pin {
+  flex: 0 0 auto;
+  color: var(--color-accent);
+}
+
+.tab.pinned .tab-name {
+  font-weight: 600;
+}
+
 /* Insertion marker while a tab is dragged. */
 .tab.drop-before::before,
 .tab-tail.drop-before::before {

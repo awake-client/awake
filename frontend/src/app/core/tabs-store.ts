@@ -15,8 +15,10 @@ export interface RequestTab {
   name: string;
   method: string;
   protocol: string;
-  /** A preview tab is replaced by the next request opened; editing pins it. */
+  /** A preview tab is replaced by the next request opened; editing keeps it. */
   preview: boolean;
+  /** A pinned tab stays at the start of the strip and survives bulk closes. */
+  pinned: boolean;
   dirty: boolean;
 }
 
@@ -33,7 +35,7 @@ export interface StashedEditorState {
 }
 
 interface StoredTabs {
-  tabs: Pick<RequestTab, 'path' | 'name' | 'method' | 'protocol'>[];
+  tabs: Pick<RequestTab, 'path' | 'name' | 'method' | 'protocol' | 'pinned'>[];
 }
 
 /**
@@ -91,8 +93,27 @@ export class TabsStore {
     this.update(path, { dirty, preview: dirty ? false : tab.preview });
   }
 
-  pin(path: string): void {
+  /** Keeps a preview tab open: the next request no longer replaces it. */
+  keep(path: string): void {
     this.update(path, { preview: false });
+  }
+
+  /** Pins or unpins a tab, keeping pinned tabs before the others. */
+  togglePin(path: string): void {
+    const tabs = this.tabs();
+    const index = tabs.findIndex((tab) => tab.path === path);
+    if (index < 0) {
+      return;
+    }
+
+    const pinned = !tabs[index].pinned;
+    const rest = tabs.filter((_tab, position) => position !== index);
+    const pinnedCount = rest.filter((tab) => tab.pinned).length;
+    // Pinning joins the end of the pinned group; unpinning joins the start of
+    // the others, so the tabs keep their relative order.
+    rest.splice(pinnedCount, 0, { ...tabs[index], pinned, preview: false });
+    this.tabs.set(rest);
+    this.persist();
   }
 
   stash(path: string, state: StashedEditorState): void {
@@ -151,15 +172,19 @@ export class TabsStore {
    * nearest remaining tab is shown instead, or the overview when none is left.
    */
   closeMany(paths: string[]): void {
+    // Pinned tabs are only closed one at a time, by their own close button.
     const closing = new Set(paths);
     const tabs = this.tabs();
-    if (!tabs.some((tab) => closing.has(tab.path))) {
+    if (!tabs.some((tab) => !tab.pinned && closing.has(tab.path))) {
       return;
     }
 
+    const closingPaths = new Set(
+      tabs.filter((tab) => !tab.pinned && closing.has(tab.path)).map((tab) => tab.path),
+    );
     const activeIndex = tabs.findIndex((tab) => tab.path === this.active());
-    const remaining = tabs.filter((tab) => !closing.has(tab.path));
-    for (const path of closing) {
+    const remaining = tabs.filter((tab) => !closingPaths.has(tab.path));
+    for (const path of closingPaths) {
       const state = this.stashes.get(path);
       this.stashes.delete(path);
       this.release(state);
@@ -168,12 +193,12 @@ export class TabsStore {
     this.persist();
 
     const active = this.active();
-    if (active === null || !closing.has(active)) {
+    if (active === null || !closingPaths.has(active)) {
       return;
     }
     const next =
-      tabs.slice(activeIndex + 1).find((tab) => !closing.has(tab.path)) ??
-      [...tabs.slice(0, activeIndex)].reverse().find((tab) => !closing.has(tab.path));
+      tabs.slice(activeIndex + 1).find((tab) => !closingPaths.has(tab.path)) ??
+      [...tabs.slice(0, activeIndex)].reverse().find((tab) => !closingPaths.has(tab.path));
     if (next) {
       this.open(next.path);
     } else {
@@ -199,7 +224,12 @@ export class TabsStore {
       return;
     }
     const [tab] = tabs.splice(index, 1);
-    tabs.splice(Math.max(0, Math.min(targetIndex, tabs.length)), 0, tab);
+    // Dropping keeps the pinned group first and the others after it.
+    const pinnedCount = tabs.filter((candidate) => candidate.pinned).length;
+    const position = tab.pinned
+      ? Math.max(0, Math.min(targetIndex, pinnedCount))
+      : Math.max(pinnedCount, Math.min(targetIndex, tabs.length));
+    tabs.splice(position, 0, tab);
     this.tabs.set(tabs);
     this.persist();
   }
@@ -224,6 +254,7 @@ export class TabsStore {
       method: 'GET',
       protocol: 'http',
       preview: true,
+      pinned: false,
       dirty: false,
     };
     const previewIndex = tabs.findIndex((candidate) => candidate.preview && !candidate.dirty);
@@ -295,7 +326,14 @@ export class TabsStore {
     this.workspaceRoot = workspaceRoot;
 
     const stored = readStorage()[workspaceRoot];
-    this.tabs.set((stored?.tabs ?? []).map((tab) => ({ ...tab, preview: false, dirty: false })));
+    this.tabs.set(
+      (stored?.tabs ?? []).map((tab) => ({
+        ...tab,
+        preview: false,
+        pinned: tab.pinned ?? false,
+        dirty: false,
+      })),
+    );
     this.followRoute();
   }
 
@@ -307,7 +345,13 @@ export class TabsStore {
     storage[this.workspaceRoot] = {
       tabs: this.tabs()
         .filter((tab) => !tab.preview || tab.path === this.active())
-        .map(({ path, name, method, protocol }) => ({ path, name, method, protocol })),
+        .map(({ path, name, method, protocol, pinned }) => ({
+          path,
+          name,
+          method,
+          protocol,
+          pinned,
+        })),
     };
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(storage));

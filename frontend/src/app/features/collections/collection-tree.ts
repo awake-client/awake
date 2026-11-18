@@ -709,7 +709,7 @@ export class CollectionTree {
       return;
     }
     if (this.isRequest(row)) {
-      this.tabsStore.pin(row.entry.Path);
+      this.tabsStore.keep(row.entry.Path);
       return;
     }
     this.selected.set(row.entry.Path);
