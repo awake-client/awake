@@ -152,7 +152,6 @@ function valueOf(parameters: PathParameter[] | null, name: string): string | und
   templateUrl: './request-editor.html',
   styleUrls: ['./request-editor.css', './request-layout.css', './request-response.css'],
   host: {
-    '(document:keydown)': 'handleShortcut($event)',
     '(document:click)': 'closeMenus()',
   },
 })
@@ -557,6 +556,13 @@ export class RequestEditor {
   });
 
   constructor() {
+    // Listen in the capture phase: the code editor handles keydown on its own
+    // element first, and would insert a line before the shortcut reaches the
+    // document. Capturing lets Ctrl+Enter send without touching the body.
+    const onKeydown = (event: KeyboardEvent) => this.handleShortcut(event);
+    document.addEventListener('keydown', onKeydown, true);
+    inject(DestroyRef).onDestroy(() => document.removeEventListener('keydown', onKeydown, true));
+
     this.route.url.pipe(takeUntilDestroyed()).subscribe((segments) => {
       const path = segments.map((segment) => segment.path).join('/');
       if (path) {
@@ -998,6 +1004,7 @@ export class RequestEditor {
 
     if (event.key.toLowerCase() === 's') {
       event.preventDefault();
+      event.stopPropagation();
       if (this.isDirty() && !this.isSaving()) {
         void this.save();
       }
@@ -1006,6 +1013,7 @@ export class RequestEditor {
 
     if (event.key === 'Enter') {
       event.preventDefault();
+      event.stopPropagation();
       void this.send();
     }
   }
