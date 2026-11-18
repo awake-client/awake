@@ -58,8 +58,16 @@
       [disabled]="hiddenCount() === 0 && !showHidden()"
       [class.open]="showHidden()"
       [attr.aria-pressed]="showHidden()"
-      [attr.aria-label]="showHidden() ? 'Hide the hidden collections' : 'Show the hidden collections'"
-      [title]="showHidden() ? 'Hide the hidden collections' : 'Show the hidden collections'"
+      [attr.aria-label]="
+        showHidden()
+          ? 'Hide the hidden collections and folders'
+          : 'Show the hidden collections and folders'
+      "
+      [title]="
+        showHidden()
+          ? 'Hide the hidden collections and folders'
+          : 'Show the hidden collections and folders'
+      "
       (click)="toggleShowHidden()"
     >
       <app-icon [name]="showHidden() ? 'eye' : 'eye-off'" [size]="14" />
@@ -218,7 +226,7 @@
         <app-icon name="globe" [size]="14" />
         New environment
       </button>
-      @if (isDimmed(menu.row)) {
+      @if (isHiddenRow(menu.row)) {
         <button type="button" role="menuitem" class="menu-item" (click)="unhideFromRowMenu()">
           <app-icon name="eye" [size]="14" />
           Unhide collection
@@ -235,6 +243,17 @@
         <app-icon name="settings" [size]="14" />
         Folder settings
       </button>
+      @if (isHiddenRow(menu.row)) {
+        <button type="button" role="menuitem" class="menu-item" (click)="unhideFromRowMenu()">
+          <app-icon name="eye" [size]="14" />
+          Unhide folder
+        </button>
+      } @else {
+        <button type="button" role="menuitem" class="menu-item" (click)="hideFromRowMenu()">
+          <app-icon name="eye-off" [size]="14" />
+          Hide folder
+        </button>
+      }
       <hr class="menu-separator" />
     }
     @if (isRequest(menu.row)) {

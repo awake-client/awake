@@ -101,7 +101,7 @@ export class CollectionTree {
   protected readonly selected = signal<string | null>(null);
   protected readonly isMenuOpen = signal(false);
   protected readonly rowMenu = signal<RowMenu | null>(null);
-  /** Number of collections the user hid, shown dimmed on demand. */
+  /** Number of collections and folders the user hid, shown dimmed on demand. */
   protected readonly hiddenCount = signal(0);
   protected readonly showHidden = this.hiddenCollections.showHidden;
   /** Folder that would receive the row being dragged. */
@@ -178,9 +178,19 @@ export class CollectionTree {
     return row.entry.Kind === Kind.KindRequest;
   }
 
-  /** Reports whether a root entry is a collection the user hid. */
+  /** Reports whether a collection or folder was hidden by the user. */
   protected isHidden(entry: Entry): boolean {
-    return entry.Kind === Kind.KindCollection && this.hiddenCollections.isHidden(entry.Path);
+    return entry.Kind !== Kind.KindRequest && this.hiddenCollections.isHidden(entry.Path);
+  }
+
+  /** Reports whether the row itself is hidden, not merely inside a hidden one. */
+  protected isHiddenRow(row: TreeRow): boolean {
+    return !row.section && this.hiddenCollections.isHidden(row.entry.Path);
+  }
+
+  /** Entries the tree shows, leaving out hidden ones unless dimmed on demand. */
+  private visibleEntries(entries: Entry[]): Entry[] {
+    return this.showHidden() ? entries : entries.filter((entry) => !this.isHidden(entry));
   }
 
   protected async activate(row: TreeRow, event?: MouseEvent): Promise<void> {
@@ -249,33 +259,16 @@ export class CollectionTree {
       this.childrenCache.clear();
       this.expandedPaths.clear();
       const rows: TreeRow[] = [];
-      const showHidden = this.showHidden();
-      let hiddenCount = 0;
-      for (const entry of entries ?? []) {
-        if (this.isHidden(entry)) {
-          hiddenCount++;
-          if (!showHidden) {
-            continue;
-          }
-        }
+      for (const entry of this.visibleEntries(entries ?? [])) {
         rows.push(...this.toRows([entry], 0));
       }
 
-      const visiblePrivateEntries: Entry[] = [];
-      for (const entry of privateEntries ?? []) {
-        if (this.isHidden(entry)) {
-          hiddenCount++;
-          if (!showHidden) {
-            continue;
-          }
-        }
-        visiblePrivateEntries.push(entry);
-      }
+      const visiblePrivateEntries = this.visibleEntries(privateEntries ?? []);
       if (visiblePrivateEntries.length > 0) {
         rows.push(privateSectionRow(), ...this.toRows(visiblePrivateEntries, 0));
       }
       this.rows.set(rows);
-      this.hiddenCount.set(hiddenCount);
+      this.hiddenCount.set(this.hiddenCollections.hiddenPaths().length);
 
       for (const path of previouslyExpanded) {
         const row = this.rows().find((candidate) => candidate.entry.Path === path);
@@ -314,25 +307,29 @@ export class CollectionTree {
     }
   }
 
-  /** Shows the hidden collections dimmed in the tree, or hides them again. */
+  /** Shows the hidden collections and folders dimmed, or hides them again. */
   protected toggleShowHidden(): void {
     this.hiddenCollections.toggleShowHidden();
     if (!this.showHidden()) {
       const openRequest = this.openRequestPath();
-      if (openRequest && this.hiddenCollections.isInHidden(openRequest)) {
+      const openSettings = this.openSettingsPath();
+      if (
+        (openRequest && this.hiddenCollections.isInHidden(openRequest)) ||
+        (openSettings && this.hiddenCollections.isInHidden(openSettings))
+      ) {
         void this.router.navigate(['/workspace']);
       }
     }
     this.refresh();
   }
 
-  /** Reports whether a row belongs to a hidden collection shown dimmed. */
+  /** Reports whether a row belongs to a hidden collection or folder. */
   protected isDimmed(row: TreeRow): boolean {
     return !row.section && this.hiddenCollections.isInHidden(row.entry.Path);
   }
 
-  /** Makes a hidden collection a regular one again. */
-  protected async unhideCollection(row: TreeRow): Promise<void> {
+  /** Makes a hidden collection or folder a regular one again. */
+  protected async unhideEntry(row: TreeRow): Promise<void> {
     this.hiddenCollections.unhide(row.entry.Path);
     const workspaceRoot = this.workspaceRoot();
     if (workspaceRoot) {
@@ -340,22 +337,23 @@ export class CollectionTree {
     }
   }
 
-  /** Hides a collection from the tree, keeping its files on disk. */
-  protected async hideCollection(row: TreeRow): Promise<void> {
+  /** Hides a collection or folder from the tree, keeping its files on disk. */
+  protected async hideEntry(row: TreeRow): Promise<void> {
     const workspaceRoot = this.workspaceRoot();
-    if (!workspaceRoot || row.section) {
+    if (!workspaceRoot || row.section || this.isRequest(row)) {
       return;
     }
 
     this.hiddenCollections.hide(row.entry.Path);
     if (this.showHidden()) {
-      // The collection stays on screen, dimmed.
+      // The entry stays on screen, dimmed.
       await this.reload(workspaceRoot);
       return;
     }
     const contains = (path: string | null) =>
       !!path && (path === row.entry.Path || path.startsWith(`${row.entry.Path}/`));
-    if (contains(this.openRequestPath())) {
+    // Leave a request or settings page that is about to disappear.
+    if (contains(this.openRequestPath()) || contains(this.openSettingsPath())) {
       await this.router.navigate(['/workspace']);
     }
     if (contains(this.selected())) {
@@ -435,12 +433,12 @@ export class CollectionTree {
     }
   }
 
-  /** Hides a collection from the tree, keeping its files on disk. */
+  /** Hides a collection or folder from the tree, keeping its files on disk. */
   protected hideFromRowMenu(): void {
     const menu = this.rowMenu();
     this.rowMenu.set(null);
     if (menu) {
-      void this.hideCollection(menu.row);
+      void this.hideEntry(menu.row);
     }
   }
 
@@ -448,7 +446,7 @@ export class CollectionTree {
     const menu = this.rowMenu();
     this.rowMenu.set(null);
     if (menu) {
-      void this.unhideCollection(menu.row);
+      void this.unhideEntry(menu.row);
     }
   }
 
@@ -802,7 +800,9 @@ export class CollectionTree {
     let children = this.childrenCache.get(row.entry.Path);
     if (!children) {
       try {
-        children = (await CollectionsService.List(workspaceRoot, row.entry.Path)) ?? [];
+        children = this.visibleEntries(
+          (await CollectionsService.List(workspaceRoot, row.entry.Path)) ?? [],
+        );
       } catch (error) {
         this.errorMessage.set(describeError(error));
         return;

@@ -36,6 +36,15 @@ describe('HiddenCollectionsStore', () => {
     expect(store.hiddenPaths()).toEqual([]);
   });
 
+  it('hides a folder and the entries inside it', () => {
+    const store = new HiddenCollectionsStore();
+    store.useWorkspace(WORKSPACE);
+
+    store.hide('collections/billing/invoices');
+    expect(store.isHidden('collections/billing/invoices')).toBe(true);
+    expect(store.isInHidden('collections/billing/invoices/list.yaml')).toBe(true);
+  });
+
   it('recognizes the entries inside a hidden collection', () => {
     const store = new HiddenCollectionsStore();
     store.useWorkspace(WORKSPACE);

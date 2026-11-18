@@ -3,25 +3,25 @@ import { Injectable, signal } from '@angular/core';
 const STORAGE_KEY = 'awake.hiddenCollections';
 
 /**
- * Collections of the open workspace the user chose to hide from the tree.
- * The memory stays on this computer: it is a personal preference, not a
- * setting shared through git.
+ * Collections and folders of the open workspace the user chose to hide from
+ * the tree. The memory stays on this computer: it is a personal preference,
+ * not a setting shared through git.
  */
 @Injectable({ providedIn: 'root' })
 export class HiddenCollectionsStore {
   private readonly current = signal<string[]>([]);
   private workspaceRoot = '';
 
-  /** Paths of the collections hidden in the open workspace. */
+  /** Paths of the collections and folders hidden in the open workspace. */
   readonly hiddenPaths = this.current.asReadonly();
 
   /**
-   * Whether the tree shows the hidden collections anyway, dimmed. It lasts
+   * Whether the tree shows the hidden collections and folders anyway, dimmed. It lasts
    * for the session only, so they are hidden again at the next start.
    */
   readonly showHidden = signal(false);
 
-  /** Scopes the hidden collections to a workspace. */
+  /** Scopes the hidden collections and folders to a workspace. */
   useWorkspace(workspaceRoot: string): void {
     if (workspaceRoot === this.workspaceRoot) {
       return;
@@ -61,7 +61,7 @@ export class HiddenCollectionsStore {
     return this.current().some((hidden) => path === hidden || path.startsWith(`${hidden}/`));
   }
 
-  /** Shows or hides again the hidden collections in the tree. */
+  /** Shows or hides again the hidden collections and folders in the tree. */
   toggleShowHidden(): void {
     this.showHidden.update((shown) => !shown);
   }
@@ -80,7 +80,7 @@ export class HiddenCollectionsStore {
   }
 }
 
-/** Hidden collections per workspace, keyed by workspace root. */
+/** Hidden collections and folders per workspace, keyed by workspace root. */
 type Memory = Record<string, string[]>;
 
 function readMemory(): Memory {
