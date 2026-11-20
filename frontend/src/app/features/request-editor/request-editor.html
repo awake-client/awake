@@ -267,11 +267,7 @@
             </div>
             @if (parametersSource() === 'local' && !localParameters()) {
               <div class="override-empty">
-                <p class="panel-note">
-                  No local override. Override the parameters on this machine only: they are kept in
-                  <code>{{ overrideFileName() }}</code
-                  >, which git ignores, and sent instead of the shared ones.
-                </p>
+                <p class="panel-note">No local override</p>
                 <button type="button" class="btn btn-sm" (click)="overrideLocally('parameters')">
                   Override locally
                 </button>
@@ -459,11 +455,7 @@
             </div>
             @if (bodySource() === 'local' && !localBody()) {
               <div class="override-empty">
-                <p class="panel-note">
-                  No local override. Override the body on this machine only: they are kept in
-                  <code>{{ overrideFileName() }}</code
-                  >, which git ignores, and sent instead of the shared ones.
-                </p>
+                <p class="panel-note">No local override</p>
                 <button type="button" class="btn btn-sm" (click)="overrideLocally('body')">
                   Override locally
                 </button>
