@@ -282,6 +282,7 @@
 
 .response-header-row {
   display: flex;
+  align-items: flex-start;
   gap: 12px;
   padding: 3px 0;
   border-bottom: 1px solid var(--color-border);
@@ -299,6 +300,46 @@
   flex: 1;
   min-width: 0;
   overflow-wrap: anywhere;
+  user-select: text;
+  cursor: text;
+}
+
+/* Shown on the hovered row, and kept visible while it confirms the copy. */
+.response-header-copy {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 22px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  opacity: 0;
+}
+
+.response-header-row:hover .response-header-copy,
+.response-header-copy:focus-visible,
+.response-header-copy.copied {
+  opacity: 1;
+}
+
+.response-header-copy:hover {
+  background: var(--color-hover);
+  color: var(--color-text);
+}
+
+.response-header-copy.copied {
+  color: var(--color-success);
+}
+
+@media (hover: none) {
+  .response-header-copy {
+    opacity: 1;
+  }
 }
 
 /* A narrow response pane, typically beside the request. */

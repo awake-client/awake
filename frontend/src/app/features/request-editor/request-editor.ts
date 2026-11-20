@@ -81,6 +81,9 @@ const LARGE_PAYLOAD_BYTES = 1 << 20;
 /** Width the response pane keeps when it sits beside the request. */
 const RESPONSE_MIN_WIDTH = 560;
 
+/** How long a copy button shows its confirmation, in milliseconds. */
+const COPIED_FEEDBACK_DURATION = 1500;
+
 /** Width the request pane keeps when the response sits beside it. */
 const REQUEST_MIN_WIDTH = 360;
 
@@ -219,6 +222,9 @@ export class RequestEditor {
   protected readonly isSaving = signal(false);
   protected readonly errorMessage = signal<string | null>(null);
   protected readonly statusMessage = signal<string | null>(null);
+  /** Name of the response header whose value was just copied. */
+  protected readonly copiedHeader = signal<string | null>(null);
+  private copiedHeaderTimer: ReturnType<typeof setTimeout> | undefined;
 
   protected readonly name = signal('');
   protected readonly method = signal<string>('GET');
@@ -632,6 +638,7 @@ export class RequestEditor {
   }
 
   ngOnDestroy(): void {
+    clearTimeout(this.copiedHeaderTimer);
     void this.streamPanel()?.release();
     this.stashCurrent();
     this.releaseImage();
@@ -987,6 +994,21 @@ export class RequestEditor {
       return 'client-error';
     }
     return 'success';
+  }
+
+  protected async copyHeaderValue(name: string, value: string): Promise<void> {
+    try {
+      await navigator.clipboard.writeText(value);
+    } catch (error) {
+      this.errorMessage.set(describeError(error));
+      return;
+    }
+    this.copiedHeader.set(name);
+    clearTimeout(this.copiedHeaderTimer);
+    this.copiedHeaderTimer = setTimeout(
+      () => this.copiedHeader.set(null),
+      COPIED_FEEDBACK_DURATION,
+    );
   }
 
   protected headerEntries(response: HTTPResponse): { name: string; value: string }[] {

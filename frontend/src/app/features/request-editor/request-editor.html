@@ -807,6 +807,19 @@
               <div class="response-header-row">
                 <span class="response-header-name">{{ header.name }}</span>
                 <span class="response-header-value">{{ header.value }}</span>
+                <button
+                  type="button"
+                  class="response-header-copy"
+                  [class.copied]="copiedHeader() === header.name"
+                  [attr.aria-label]="'Copy the value of ' + header.name"
+                  [title]="copiedHeader() === header.name ? 'Copied' : 'Copy value'"
+                  (click)="copyHeaderValue(header.name, header.value)"
+                >
+                  <app-icon
+                    [name]="copiedHeader() === header.name ? 'check' : 'copy'"
+                    [size]="13"
+                  />
+                </button>
               </div>
             } @empty {
               <p class="empty-panel">No response headers.</p>
