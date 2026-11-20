@@ -9,11 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- `awake mcp` serves a workspace to coding agents such as Claude Code over
-  the Model Context Protocol, locally over stdio: they list, read, send,
-  create and update requests, without ever seeing secret values. The
-  Assistant page shows the command registering it and a switch turning it off
-  for a workspace on this computer.
+- Search the response body with ⌘F on macOS, Ctrl+F on Windows and Linux. The
+  search bar counts the matches and steps through them with Enter and
+  Shift+Enter; the shortcut also searches a request body or script while one
+  of them has the focus.
+- Each response header has a button copying its value, and the values can be
+  selected with the mouse.
+- Awake warns when a local override drifts from the shared request it
+  replaces. A JSON body is checked against the structure of the shared one:
+  keys missing, added or holding another kind of value are listed with their
+  path, and a variable written as a bare value matches anything. Query
+  parameters and form fields are compared by name. The Local switch shows the
+  warning, and the list sits above the override.
+- A spinner fills the response pane while a request is on its way.
 - Request scripts can store variables in the collection of a request with
   `awake.collection.setVariable` and remove them with
   `awake.collection.unset`. Unlike `awake.setVariable`, the value is saved in
@@ -21,14 +29,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `awake.collection.local.setVariable` keeps the value on this machine in the
   git ignored `collection.local.yaml`, which wins over the shared collection
   variables when resolving `{{name}}`.
-
-### Changed
-
 - macOS releases also ship as a disk image, `awake-darwin-<arch>.dmg`, to drag
   Awake to Applications. The zip archives stay for the installer script and
   in-app updates.
-- Release notes on GitHub are the changelog section of the version instead of
-  a generated list of commits.
+
+### Changed
+
 - Updates are checked from within the application instead of a separate
   window. Awake looks for one quietly a few seconds after it starts and shows
   a hint in the sidebar when one is out; the update dialog lists what changed
@@ -36,15 +42,63 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   confirmed. It then follows the download and asks before restarting, warning
   about requests with unsaved changes.
 - When Awake cannot replace itself, such as an installation in Program Files
-  or `/usr/local/bin` that the account cannot write to, the dialog says so and
-  links to the release page instead of failing during the installation.
+  or `/usr/local/bin` that the account cannot write to, the update dialog says
+  so and links to the release page instead of failing during the installation.
+- The WebSocket and server-sent events panel is redesigned: its toolbar stays
+  on one line at every width and shows the connection state with a dot,
+  events are listed as plain rows with an icon for their direction, and the
+  empty states sit in the middle of the panel.
+- The environment picker no longer offers "No environment".
+- An empty local override of the parameters or the body just reads "No local
+  override"; the Local switch explains where overrides are kept.
+- The handle resizing the sidebar and the response pane is a thin line with a
+  grip, shown after a short hover, instead of a bright bar.
+- Release notes on GitHub are the changelog section of the version instead of
+  a generated list of commits.
 
 ### Fixed
 
+- Copying a request as `curl` no longer fails with "The request is not allowed
+  by the user agent"; every copy button uses the clipboard of the system.
+- Switching a request body between its shared and local versions no longer
+  leaves the cursor floating above the first line on macOS.
 - Creating a git repository and talking to a coding agent no longer flash an
   empty console window over the application on Windows.
 - Updating from within the application works on Linux: the release archive
   also carries the icon and desktop entry, which the updater refused.
+
+## [0.9.1] - 2026-11-18
+
+### Added
+
+- Folders can be hidden from the tree, like collections.
+- Tabs can be pinned from their menu.
+
+### Fixed
+
+- Ctrl+Enter sends the request without inserting a line in the body.
+- The collection tree keeps its scroll position when it reloads.
+- Secrets refresh after a change, writes to private environments land in
+  their local file, and the macOS window controls sit in their place.
+
+## [0.9.0] - 2026-11-13
+
+### Added
+
+- `awake mcp` serves a workspace to coding agents such as Claude Code over
+  the Model Context Protocol, locally over stdio: they list, read, send,
+  create and update requests, without ever seeing secret values. The
+  Assistant page shows the command registering it and a switch turning it off
+  for a workspace on this computer.
+- Collections get, inspect and share OAuth 2 tokens, with a viewer that
+  decodes JWTs.
+- Environment controlled authentication picks `authType` and `grantType` from
+  a selector.
+- The environment dialog saves with Ctrl+S.
+- Tabs whose settings are in use, such as a body or scripts, are marked with a
+  dot.
+- Double clicking a folder or a collection opens its settings, and clicking a
+  collection again folds it.
 
 ## [0.8.0] - 2026-11-10
 
@@ -192,7 +246,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   showing "No environment". Scripts writing environment variables find the
   collection environment from a request in one of its folders.
 
-[Unreleased]: https://github.com/awake-client/awake/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/awake-client/awake/compare/v0.9.1...HEAD
+[0.9.1]: https://github.com/awake-client/awake/compare/v0.9.0...v0.9.1
+[0.9.0]: https://github.com/awake-client/awake/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/awake-client/awake/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/awake-client/awake/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/awake-client/awake/compare/v0.5.1...v0.6.0
