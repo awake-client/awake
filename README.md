@@ -44,7 +44,11 @@ equivalent). macOS builds are ad-hoc signed, so the installer clears the
 quarantine flag to let Gatekeeper run them.
 
 Windows and manual downloads are available from
-[Releases](https://github.com/awake-client/awake/releases). On Windows, download
+[Releases](https://github.com/awake-client/awake/releases). On macOS, open
+`awake-darwin-arm64.dmg` (Apple silicon) or `awake-darwin-amd64.dmg` (Intel)
+and drag Awake to Applications. The build is ad-hoc signed, not notarized: if
+macOS refuses to open it the first time, click Open Anyway in System Settings >
+Privacy & Security. On Windows, download
 `awake-windows-amd64-installer.exe` for a per-user install (no administrator
 rights required), or `awake-windows-amd64.zip` for a portable copy. Every `v*`
 tag publishes macOS (`arm64`, `amd64`), Linux (`amd64`, `arm64`) and Windows

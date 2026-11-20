@@ -61,6 +61,23 @@ func TestMatchReleaseAssetFindsThePlatformArchive(t *testing.T) {
 	}
 }
 
+func TestMatchReleaseAssetSkipsDiskImages(t *testing.T) {
+	// GitHub lists assets by name, so the disk image comes before the zip.
+	assets := releaseAssets(
+		"SHA256SUMS",
+		"awake-darwin-arm64.dmg",
+		"awake-darwin-arm64.zip",
+		"awake-linux-amd64.tar.gz",
+	)
+
+	if got := assetName(t, "darwin", "arm64", assets); got != "awake-darwin-arm64.zip" {
+		t.Errorf("got %q, want the zip", got)
+	}
+	if got := assetName(t, "darwin", "arm64", releaseAssets("awake-darwin-arm64.dmg")); got != "" {
+		t.Errorf("got %q, want no asset when only a disk image exists", got)
+	}
+}
+
 func TestMatchReleaseAssetAcceptsDarwinNames(t *testing.T) {
 	assets := releaseAssets("awake-darwin-arm64.zip", "awake-darwin-amd64.zip")
 

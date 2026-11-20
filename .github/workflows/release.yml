@@ -49,6 +49,7 @@ jobs:
             tags: production,purego
             binary: awake
             archive: awake-darwin-arm64.zip
+            disk_image: awake-darwin-arm64.dmg
           - name: macOS amd64
             os: macos-latest
             goos: darwin
@@ -56,6 +57,7 @@ jobs:
             tags: production,purego
             binary: awake
             archive: awake-darwin-amd64.zip
+            disk_image: awake-darwin-amd64.dmg
           - name: Linux amd64
             os: ubuntu-latest
             goos: linux
@@ -181,7 +183,21 @@ jobs:
             -c "Set :CFBundleVersion ${version}" \
             "$app/Contents/Info.plist"
           /usr/bin/codesign --force --deep --sign - "$app"
+          # The zip is what the in-app updater and install.sh download.
           ditto -c -k --keepParent "$app" "dist/${{ matrix.archive }}"
+
+      - name: Package macOS disk image
+        if: matrix.goos == 'darwin'
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Drag and drop install: Awake.app next to a link to /Applications.
+          go run github.com/wailsapp/wails/v3/cmd/wails3@v3.1.0 tool package \
+            --format dmg --name Awake --out dist \
+            --background build/darwin/dmg-background.png \
+            --volume-icon build/darwin/icons.icns \
+            --file-icon build/darwin/dmg-file-icon.icns
+          mv dist/Awake.dmg "dist/${{ matrix.disk_image }}"
 
       - name: Package Linux archive
         if: matrix.goos == 'linux'
@@ -260,6 +276,14 @@ jobs:
           path: dist/${{ matrix.archive }}
           if-no-files-found: error
 
+      - name: Upload macOS disk image
+        if: matrix.goos == 'darwin'
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ matrix.name }} disk image
+          path: dist/${{ matrix.disk_image }}
+          if-no-files-found: error
+
       - name: Upload Windows installer
         if: matrix.goos == 'windows'
         uses: actions/upload-artifact@v7
@@ -273,6 +297,27 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v7
+
+      - name: Read the release notes from the changelog
+        shell: bash
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          version="${TAG#v}"
+          # The section of the version, without its heading, up to the next one.
+          awk -v version="$version" '
+            index($0, "## [" version "]") == 1 { inside = 1; next }
+            /^## \[/ && inside { exit }
+            /^\[[^]]+\]: / { next }
+            inside { print }
+          ' CHANGELOG.md | sed -e '/./,$!d' > "$RUNNER_TEMP/notes.md"
+          if [ ! -s "$RUNNER_TEMP/notes.md" ]; then
+            echo "::error::CHANGELOG.md has no section for $version: prepare releases with 'wails3 task release VERSION=$version'"
+            exit 1
+          fi
+
       - uses: actions/download-artifact@v8
         with:
           path: dist
@@ -294,10 +339,12 @@ jobs:
         run: |
           set -euo pipefail
           version="${TAG#v}"
+          notes="$RUNNER_TEMP/notes.md"
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" dist/* --clobber
+            gh release edit "$TAG" --notes-file "$notes"
           else
             gh release create "$TAG" dist/* \
               --title "Awake ${version}" \
-              --generate-notes
+              --notes-file "$notes"
           fi

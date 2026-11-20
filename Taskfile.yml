@@ -48,6 +48,15 @@ tasks:
     cmds:
       - npm test -- --watch=false
 
+  release:
+    summary: Prepares a release from the Unreleased changelog section, tags it and asks before pushing
+    desc: 'Usage: wails3 task release VERSION=0.10.0 (add DRY_RUN=true to preview the changelog section)'
+    interactive: true
+    requires:
+      vars: [VERSION]
+    cmds:
+      - sh build/release.sh {{.VERSION}}{{if eq .DRY_RUN "true"}} --dry-run{{end}}
+
   lint:
     summary: Runs the Go linters
     cmds:

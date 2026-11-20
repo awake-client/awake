@@ -24,6 +24,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- macOS releases also ship as a disk image, `awake-darwin-<arch>.dmg`, to drag
+  Awake to Applications. The zip archives stay for the installer script and
+  in-app updates.
+- Release notes on GitHub are the changelog section of the version instead of
+  a generated list of commits.
 - Updates are checked from within the application instead of a separate
   window. Awake looks for one quietly a few seconds after it starts and shows
   a hint in the sidebar when one is out; the update dialog lists what changed

@@ -174,21 +174,43 @@ func (source GitHubChangelog) Changelog(ctx context.Context, tag string) (string
 	return string(content), nil
 }
 
+// manualInstallSuffixes are assets for people, not for the updater: a disk
+// image is mounted and dragged to /Applications, which the updater cannot do.
+var manualInstallSuffixes = []string{".dmg"}
+
 // matchReleaseAsset picks the asset of the running platform. The default
 // matcher is tried first, then the aliases of the platform, so a release
-// keeps working whichever name it uses.
+// keeps working whichever name it uses. Assets meant for a manual install
+// are never picked.
 func matchReleaseAsset(request updater.CheckRequest, assets []github.ReleaseAsset) int {
-	if index := github.DefaultAssetMatcher(request, assets); index >= 0 {
-		return index
+	var installable []github.ReleaseAsset
+	var positions []int
+	for position, asset := range assets {
+		if !isManualInstall(asset.Name) {
+			installable = append(installable, asset)
+			positions = append(positions, position)
+		}
 	}
-	for _, alias := range platformAliases[request.Platform] {
+
+	platforms := append([]string{request.Platform}, platformAliases[request.Platform]...)
+	for _, platform := range platforms {
 		aliased := request
-		aliased.Platform = alias
-		if index := github.DefaultAssetMatcher(aliased, assets); index >= 0 {
-			return index
+		aliased.Platform = platform
+		if index := github.DefaultAssetMatcher(aliased, installable); index >= 0 {
+			return positions[index]
 		}
 	}
 	return -1
+}
+
+func isManualInstall(name string) bool {
+	lower := strings.ToLower(name)
+	for _, suffix := range manualInstallSuffixes {
+		if strings.HasSuffix(lower, suffix) {
+			return true
+		}
+	}
+	return false
 }
 
 var apiStatus = regexp.MustCompile(`^github: api (\d{3}):`)

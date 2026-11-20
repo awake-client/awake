@@ -77,6 +77,25 @@ build outputs are not.
 - Add or update tests, and make sure CI is green.
 - Update the documentation and [CHANGELOG.md](CHANGELOG.md) when relevant.
 
+## Releases
+
+Describe each user-facing change under `## [Unreleased]` in
+[CHANGELOG.md](CHANGELOG.md) as it lands. To publish a version, from an
+up-to-date `main` with a clean working tree:
+
+```sh
+wails3 task release VERSION=0.10.0 DRY_RUN=true   # preview the section
+wails3 task release VERSION=0.10.0
+```
+
+The task renames the Unreleased section to `## [0.10.0] - <date>`, opens an
+empty one above it, updates the comparison links, commits
+`chore(release): 0.10.0`, tags `v0.10.0` and asks before pushing both. The tag
+starts the release workflow, which builds every platform and publishes the
+release with that changelog section as its notes; it fails if the section is
+missing. The changelog is committed before the tag because the application
+reads it at the tag to show what an update brings.
+
 ## Reporting bugs
 
 Open an [issue](https://github.com/awake-client/awake/issues) with the Awake
