@@ -13,6 +13,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/awake-client/awake/src/shared/process"
 )
 
 const (
@@ -190,6 +192,7 @@ func runCommand(ctx context.Context, binary string, directory string, input stri
 	command := exec.CommandContext(ctx, binary, arguments...)
 	command.Dir = directory
 	command.Stdin = strings.NewReader(input)
+	process.HideConsoleWindow(command)
 	var stdout, stderr bytes.Buffer
 	command.Stdout = &stdout
 	command.Stderr = &stderr

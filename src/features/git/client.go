@@ -11,6 +11,8 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+
+	"github.com/awake-client/awake/src/shared/process"
 )
 
 // Client runs git commands inside a single working directory.
@@ -163,6 +165,7 @@ func (client *Client) run(ctx context.Context, arguments ...string) ([]byte, err
 		"LC_ALL=C",
 		"GIT_TERMINAL_PROMPT=0",
 	)
+	process.HideConsoleWindow(command)
 
 	var output bytes.Buffer
 	command.Stdout = &output

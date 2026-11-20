@@ -14,6 +14,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   create and update requests, without ever seeing secret values. The
   Assistant page shows the command registering it and a switch turning it off
   for a workspace on this computer.
+### Fixed
+
+- Creating a git repository and talking to a coding agent no longer flash an
+  empty console window over the application on Windows.
 
 ## [0.8.0] - 2026-11-10
 
