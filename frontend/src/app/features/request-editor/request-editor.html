@@ -712,6 +712,13 @@
         }
       </header>
 
+      @if (isSending()) {
+        <div class="response-loader" role="status" aria-live="polite">
+          <span class="loader-spinner" aria-hidden="true"></span>
+          <span class="loader-label">Waiting for the response…</span>
+        </div>
+      }
+
       @if (responseError(); as message) {
         <p class="editor-message error">{{ message }}</p>
       }
