@@ -174,7 +174,7 @@ export class EnvironmentPicker {
   protected readonly query = signal('');
   protected readonly sort = signal<EnvironmentSort>('ascending');
 
-  /** "No environment" first, then the matching environments. */
+  /** The environments matching the search, pinned ones first. */
   protected readonly options = computed<EnvironmentChoice[]>(() =>
     environmentOptions(this.environments(), this.pinned(), this.query(), this.sort()),
   );

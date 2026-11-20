@@ -11,23 +11,11 @@ export interface EnvironmentChoice {
   Scopes: string[];
 }
 
-/** Clearing the environment, always offered first. */
-export const NO_ENVIRONMENT: EnvironmentChoice = {
-  FileName: '',
-  Name: 'No environment',
-  HasLocalOverrides: false,
-  Private: false,
-  CollectionOnly: false,
-  Color: '',
-  Scopes: [],
-};
-
 export type EnvironmentSort = 'ascending' | 'descending';
 
 /**
- * Options of the picker: "No environment" when it matches the search, then the
- * matching environments. Pinned ones come first, and each group is sorted by
- * display name.
+ * Options of the picker: the environments matching the search. Pinned ones
+ * come first, and each group is sorted by display name.
  */
 export function environmentOptions(
   environments: readonly EnvironmentChoice[],
@@ -51,8 +39,7 @@ export function environmentOptions(
     return sort === 'descending' ? -byName : byName;
   });
 
-  const options = matchesQuery(NO_ENVIRONMENT, term) ? [NO_ENVIRONMENT] : [];
-  return [...options, ...matches];
+  return matches;
 }
 
 /** A search term matches the display name, the file name or a scope. */
