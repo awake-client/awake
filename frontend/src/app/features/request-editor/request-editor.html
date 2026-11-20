@@ -242,7 +242,18 @@
                   (click)="parametersSource.set('local')"
                 >
                   Local
-                  @if (localParameters()) {
+                  @if (parametersDrift().length > 0) {
+                    <span
+                      class="drift-mark"
+                      [attr.aria-label]="
+                        'overridden, ' +
+                        parametersDrift().length +
+                        ' differences with the shared version'
+                      "
+                    >
+                      <app-icon name="alert" [size]="12" />
+                    </span>
+                  } @else if (localParameters()) {
                     <span class="override-dot" aria-label="overridden"></span>
                   }
                 </button>
@@ -251,6 +262,12 @@
                 <span class="override-note"
                   >Overridden on this machine: the local version is sent.</span
                 >
+                @if (parametersDrift().length > 0) {
+                  <button type="button" class="drift-link" (click)="parametersSource.set('local')">
+                    <app-icon name="alert" [size]="12" />
+                    Out of sync
+                  </button>
+                }
               }
               @if (parametersSource() === 'local' && localParameters()) {
                 <span class="override-note"
@@ -265,6 +282,13 @@
                 </button>
               }
             </div>
+            @if (parametersSource() === 'local' && parametersDrift().length > 0) {
+              <app-drift-notice
+                [issues]="parametersDrift()"
+                subject="parameters"
+                (compare)="parametersSource.set('shared')"
+              />
+            }
             @if (parametersSource() === 'local' && !localParameters()) {
               <div class="override-empty">
                 <p class="panel-note">No local override</p>
@@ -434,7 +458,16 @@
                   (click)="bodySource.set('local')"
                 >
                   Local
-                  @if (localBody()) {
+                  @if (bodyDrift().length > 0) {
+                    <span
+                      class="drift-mark"
+                      [attr.aria-label]="
+                        'overridden, ' + bodyDrift().length + ' differences with the shared version'
+                      "
+                    >
+                      <app-icon name="alert" [size]="12" />
+                    </span>
+                  } @else if (localBody()) {
                     <span class="override-dot" aria-label="overridden"></span>
                   }
                 </button>
@@ -443,6 +476,12 @@
                 <span class="override-note"
                   >Overridden on this machine: the local version is sent.</span
                 >
+                @if (bodyDrift().length > 0) {
+                  <button type="button" class="drift-link" (click)="bodySource.set('local')">
+                    <app-icon name="alert" [size]="12" />
+                    Out of sync
+                  </button>
+                }
               }
               @if (bodySource() === 'local' && localBody()) {
                 <span class="override-note"
@@ -453,6 +492,13 @@
                 </button>
               }
             </div>
+            @if (bodySource() === 'local' && bodyDrift().length > 0) {
+              <app-drift-notice
+                [issues]="bodyDrift()"
+                subject="body"
+                (compare)="bodySource.set('shared')"
+              />
+            }
             @if (bodySource() === 'local' && !localBody()) {
               <div class="override-empty">
                 <p class="panel-note">No local override</p>

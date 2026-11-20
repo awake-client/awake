@@ -58,6 +58,8 @@ import { VariableStore } from '@core/variable-store';
 import { WorkspaceStore } from '@core/workspace-store';
 import { AuthEditor, describeAuthentication } from '@shared/auth-editor';
 import { CodeEditor, CodeLanguage, prettyJson } from '@shared/code-editor';
+import { DriftNotice } from './drift-notice';
+import { bodyDrift, parameterDrift } from './override-drift';
 import { looksLikeMarkup, prettyMarkup } from '@shared/markup-format';
 import { ResizeHandle } from '@shared/resize-handle';
 import { applyEnvironmentAuthentication } from '@shared/environment-authentication';
@@ -152,6 +154,7 @@ function valueOf(parameters: PathParameter[] | null, name: string): string | und
     CodeEditor,
     ResizeHandle,
     VariableInput,
+    DriftNotice,
   ],
   templateUrl: './request-editor.html',
   styleUrls: ['./request-editor.css', './request-layout.css', './request-response.css'],
@@ -317,6 +320,18 @@ export class RequestEditor {
       inUse.documentation = 'Documented';
     }
     return inUse;
+  });
+  /**
+   * How each local override differs from the shared version it replaces,
+   * which shows when the shared request changed after the override was made.
+   */
+  protected readonly parametersDrift = computed(() => {
+    const local = this.localParameters();
+    return local ? parameterDrift(this.parameters(), local) : [];
+  });
+  protected readonly bodyDrift = computed(() => {
+    const local = this.localBody();
+    return local ? bodyDrift(this.body(), local) : [];
   });
   protected readonly shownBody = computed(() =>
     this.bodySource() === 'local' ? (this.localBody() ?? emptyBody()) : this.body(),
