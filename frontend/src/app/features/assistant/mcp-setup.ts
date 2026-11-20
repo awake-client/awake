@@ -3,6 +3,7 @@ import * as MCPSettingsService from '@bindings/github.com/awake-client/awake/src
 import * as PlatformService from '@bindings/github.com/awake-client/awake/src/features/platform/service';
 import { WorkspaceStore } from '@core/workspace-store';
 import { Icon } from '@shared/icon';
+import { copyText } from '@core/clipboard';
 
 /**
  * Shows how to give an external coding agent, such as Claude Code, access to
@@ -298,7 +299,7 @@ export class McpSetup {
   }
 
   protected async copy(text: string): Promise<void> {
-    await navigator.clipboard.writeText(text);
+    await copyText(text);
     this.copied.set(true);
     clearTimeout(this.copiedTimer);
     this.copiedTimer = setTimeout(() => this.copied.set(false), 1500);

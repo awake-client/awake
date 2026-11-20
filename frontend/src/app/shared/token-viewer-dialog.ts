@@ -3,6 +3,7 @@ import { TokenViewer, ViewedToken } from '@core/token-viewer';
 import { describeExpiry } from './expiry';
 import { Icon } from './icon';
 import { decodeJwt, describeClaims, jwtValidity } from './jwt';
+import { copyText } from '@core/clipboard';
 
 type CopyTarget = 'token' | 'header' | 'payload';
 
@@ -107,7 +108,7 @@ export class TokenViewerDialog {
       return;
     }
 
-    await navigator.clipboard.writeText(value);
+    await copyText(value);
     this.copied.set(target);
     clearTimeout(this.copiedTimer);
     this.copiedTimer = setTimeout(() => this.copied.set(null), 1500);

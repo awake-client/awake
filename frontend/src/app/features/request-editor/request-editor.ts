@@ -65,6 +65,7 @@ import { Icon } from '@shared/icon';
 import { VariableInput } from '@shared/variable-input';
 import { RequestHistory } from './request-history/request-history';
 import { StreamPanel } from './stream-panel/stream-panel';
+import { copyText } from '@core/clipboard';
 
 /** Sections of the request editor. */
 type EditorTab =
@@ -1001,7 +1002,7 @@ export class RequestEditor {
 
   protected async copyHeaderValue(name: string, value: string): Promise<void> {
     try {
-      await navigator.clipboard.writeText(value);
+      await copyText(value);
     } catch (error) {
       this.errorMessage.set(describeError(error));
       return;
@@ -1361,7 +1362,7 @@ export class RequestEditor {
         this.requestPath(),
         this.environmentStore.selected(),
       );
-      await navigator.clipboard.writeText(command);
+      await copyText(command);
       this.errorMessage.set(null);
       this.statusMessage.set('cURL copied');
     } catch (error) {

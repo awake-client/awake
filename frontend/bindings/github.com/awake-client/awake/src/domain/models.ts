@@ -100,6 +100,24 @@ export interface Collection {
 }
 
 /**
+ * CollectionChange is a variable a script stores in, or removes from, the
+ * collection of the running request. A shared change goes to the tracked
+ * collection.yaml; a local one to the git ignored collection.local.yaml kept
+ * on this machine.
+ */
+export interface CollectionChange {
+    "Name": string;
+    "Value": string;
+    "Removed": boolean;
+
+    /**
+     * Local is true for a variable stored in the local overrides of the
+     * collection, which stay on this machine.
+     */
+    "Local": boolean;
+}
+
+/**
  * EnvironmentChange is a variable a script stores in, or removes from, the
  * selected environment so later requests see it.
  */
@@ -117,24 +135,6 @@ export interface EnvironmentChange {
     "Name": string;
     "Value": string;
     "Removed": boolean;
-}
-
-/**
- * CollectionChange is a variable a script stores in, or removes from, the
- * collection of the running request. A shared change goes to the tracked
- * collection.yaml; a local one to the git ignored collection.local.yaml kept
- * on this machine.
- */
-export interface CollectionChange {
-    "Name": string;
-    "Value": string;
-    "Removed": boolean;
-
-    /**
-     * Local is true for a variable stored in the local overrides of the
-     * collection, which stay on this machine.
-     */
-    "Local": boolean;
 }
 
 /**
