@@ -692,18 +692,6 @@
             }
           </div>
 
-          @if (canSearchResponse()) {
-            <button
-              type="button"
-              class="response-close"
-              aria-label="Search the response"
-              [title]="'Search the response (' + shortcuts.key('F') + ')'"
-              (click)="openResponseSearch()"
-            >
-              <app-icon name="search" [size]="14" />
-            </button>
-          }
-
           <button
             type="button"
             class="response-close"

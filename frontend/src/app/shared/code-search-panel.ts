@@ -124,6 +124,11 @@ export function createSearchPanel(view: EditorView): Panel {
   return {
     dom,
     top: true,
+    // openSearchPanel only focuses a bar that is already open.
+    mount() {
+      field.focus();
+      field.select();
+    },
     update(update: ViewUpdate) {
       if (update.docChanged || update.selectionSet || queryChanged(update)) {
         refresh(update.state);

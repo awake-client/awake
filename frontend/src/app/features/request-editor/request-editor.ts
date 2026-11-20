@@ -171,8 +171,6 @@ export class RequestEditor {
   protected readonly defaultResponseRatio = RESPONSE_RATIO.default;
   private readonly streamPanel = viewChild<StreamPanel>(StreamPanel);
   private readonly responseEditor = viewChild<CodeEditor>('responseEditor');
-  /** True while the response body shows as text, which can be searched. */
-  protected readonly canSearchResponse = computed(() => this.responseEditor() !== undefined);
 
   protected readonly AuthenticationType = AuthenticationType;
   protected readonly OAuth2GrantType = OAuth2GrantType;
@@ -1056,10 +1054,6 @@ export class RequestEditor {
     if (event.key.toLowerCase() === 'f' && !event.shiftKey && !event.altKey) {
       this.searchResponse(event);
     }
-  }
-
-  protected openResponseSearch(): void {
-    this.responseEditor()?.openSearch();
   }
 
   /**
