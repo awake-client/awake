@@ -56,8 +56,10 @@ fi
 [ "$(git rev-parse --abbrev-ref HEAD)" = "$BRANCH" ] || die "release from $BRANCH"
 [ -z "$(git status --porcelain)" ] || die "commit or stash your changes first"
 git fetch -q "$REMOTE" "$BRANCH"
-[ "$(git rev-parse HEAD)" = "$(git rev-parse "$REMOTE/$BRANCH")" ] ||
-  die "$BRANCH differs from $REMOTE/$BRANCH: pull or push first"
+# Local commits ahead of the remote are fine: they are pushed with the tag.
+# Missing remote commits are not, the push would be refused.
+git merge-base --is-ancestor "$REMOTE/$BRANCH" HEAD ||
+  die "$BRANCH is behind or has diverged from $REMOTE/$BRANCH: pull first"
 
 PREVIOUS=$(git describe --tags --abbrev=0 --match 'v[0-9]*' 2>/dev/null || true)
 REPOSITORY=$(sed -n 's|^\[Unreleased\]: \(https://[^ ]*\)/compare/.*|\1|p' "$CHANGELOG")
