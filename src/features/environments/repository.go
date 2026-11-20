@@ -378,97 +378,16 @@ func encodeEnvironment(existing []byte, environment Environment) ([]byte, error)
 		return yamlcodec.EncodeValue(environment)
 	}
 
-	setScalar(mapping, "name", environment.Name)
+	yamlcodec.SetScalar(mapping, "name", environment.Name)
 	if environment.Color == "" {
-		removeMappingValue(mapping, "color")
+		yamlcodec.RemoveMappingValue(mapping, "color")
 	} else {
-		setScalar(mapping, "color", environment.Color)
+		yamlcodec.SetScalar(mapping, "color", environment.Color)
 	}
-	setStringMap(mapping, "variables", environment.Variables)
-	setStringSequence(mapping, "secretVariables", environment.SecretVariables)
+	yamlcodec.SetStringMap(mapping, "variables", environment.Variables)
+	yamlcodec.SetStringSequence(mapping, "secretVariables", environment.SecretVariables)
 
 	return document.Encode()
-}
-
-func setScalar(mapping *yaml.Node, key string, value string) {
-	for index := 0; index+1 < len(mapping.Content); index += 2 {
-		if mapping.Content[index].Value == key {
-			mapping.Content[index+1].Kind = yaml.ScalarNode
-			mapping.Content[index+1].Tag = "!!str"
-			mapping.Content[index+1].Value = value
-			mapping.Content[index+1].Content = nil
-			return
-		}
-	}
-
-	mapping.Content = append(mapping.Content,
-		&yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: key},
-		&yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: value},
-	)
-}
-
-func setStringMap(mapping *yaml.Node, key string, values map[string]string) {
-	if len(values) == 0 {
-		removeMappingValue(mapping, key)
-		return
-	}
-
-	keys := make([]string, 0, len(values))
-	for name := range values {
-		keys = append(keys, name)
-	}
-	sort.Strings(keys)
-
-	node := &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map"}
-	for _, name := range keys {
-		node.Content = append(node.Content,
-			&yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: name},
-			&yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: values[name]},
-		)
-	}
-
-	setMappingValue(mapping, key, node)
-}
-
-func setStringSequence(mapping *yaml.Node, key string, values []string) {
-	if len(values) == 0 {
-		removeMappingValue(mapping, key)
-		return
-	}
-
-	node := &yaml.Node{Kind: yaml.SequenceNode, Tag: "!!seq"}
-	for _, value := range values {
-		node.Content = append(node.Content, &yaml.Node{
-			Kind:  yaml.ScalarNode,
-			Tag:   "!!str",
-			Value: value,
-		})
-	}
-
-	setMappingValue(mapping, key, node)
-}
-
-func setMappingValue(mapping *yaml.Node, key string, value *yaml.Node) {
-	for index := 0; index+1 < len(mapping.Content); index += 2 {
-		if mapping.Content[index].Value == key {
-			mapping.Content[index+1] = value
-			return
-		}
-	}
-
-	mapping.Content = append(mapping.Content,
-		&yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: key},
-		value,
-	)
-}
-
-func removeMappingValue(mapping *yaml.Node, key string) {
-	for index := 0; index+1 < len(mapping.Content); index += 2 {
-		if mapping.Content[index].Value == key {
-			mapping.Content = append(mapping.Content[:index], mapping.Content[index+2:]...)
-			return
-		}
-	}
 }
 
 // Delete removes an environment and its local file, whether it is shared or
@@ -580,7 +499,7 @@ func encodeLocalOverrides(path string, values map[string]string) ([]byte, error)
 	if len(existing) > 0 {
 		document, err := yamlcodec.Parse(existing)
 		if err == nil && len(document.Root().Content) > 0 && document.Root().Content[0].Kind == yaml.MappingNode {
-			setStringMap(document.Root().Content[0], "variables", values)
+			yamlcodec.SetStringMap(document.Root().Content[0], "variables", values)
 			return document.Encode()
 		}
 	}

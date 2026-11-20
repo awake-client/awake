@@ -12,6 +12,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"sort"
 
 	"go.yaml.in/yaml/v3"
 )
@@ -120,6 +121,95 @@ func (document *Document) Decode(target any) error {
 		return fmt.Errorf("decode yaml document: %w", err)
 	}
 	return nil
+}
+
+// SetScalar sets or adds a string value under key in a mapping, keeping the
+// other keys and their comments.
+func SetScalar(mapping *yaml.Node, key string, value string) {
+	for index := 0; index+1 < len(mapping.Content); index += 2 {
+		if mapping.Content[index].Value == key {
+			mapping.Content[index+1].Kind = yaml.ScalarNode
+			mapping.Content[index+1].Tag = "!!str"
+			mapping.Content[index+1].Value = value
+			mapping.Content[index+1].Content = nil
+			return
+		}
+	}
+
+	mapping.Content = append(mapping.Content,
+		&yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: key},
+		&yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: value},
+	)
+}
+
+// SetStringMap sets or adds a string map under key in a mapping, sorted by
+// key. An empty map removes the key.
+func SetStringMap(mapping *yaml.Node, key string, values map[string]string) {
+	if len(values) == 0 {
+		RemoveMappingValue(mapping, key)
+		return
+	}
+
+	keys := make([]string, 0, len(values))
+	for name := range values {
+		keys = append(keys, name)
+	}
+	sort.Strings(keys)
+
+	node := &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map"}
+	for _, name := range keys {
+		node.Content = append(node.Content,
+			&yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: name},
+			&yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: values[name]},
+		)
+	}
+
+	SetMappingValue(mapping, key, node)
+}
+
+// SetStringSequence sets or adds a string sequence under key in a mapping. An
+// empty sequence removes the key.
+func SetStringSequence(mapping *yaml.Node, key string, values []string) {
+	if len(values) == 0 {
+		RemoveMappingValue(mapping, key)
+		return
+	}
+
+	node := &yaml.Node{Kind: yaml.SequenceNode, Tag: "!!seq"}
+	for _, value := range values {
+		node.Content = append(node.Content, &yaml.Node{
+			Kind:  yaml.ScalarNode,
+			Tag:   "!!str",
+			Value: value,
+		})
+	}
+
+	SetMappingValue(mapping, key, node)
+}
+
+// SetMappingValue sets or adds a node under key in a mapping.
+func SetMappingValue(mapping *yaml.Node, key string, value *yaml.Node) {
+	for index := 0; index+1 < len(mapping.Content); index += 2 {
+		if mapping.Content[index].Value == key {
+			mapping.Content[index+1] = value
+			return
+		}
+	}
+
+	mapping.Content = append(mapping.Content,
+		&yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: key},
+		value,
+	)
+}
+
+// RemoveMappingValue removes the value under key from a mapping.
+func RemoveMappingValue(mapping *yaml.Node, key string) {
+	for index := 0; index+1 < len(mapping.Content); index += 2 {
+		if mapping.Content[index].Value == key {
+			mapping.Content = append(mapping.Content[:index], mapping.Content[index+2:]...)
+			return
+		}
+	}
 }
 
 // Root returns the document node. Its first content node is the mapping that
