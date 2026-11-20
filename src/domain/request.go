@@ -340,6 +340,19 @@ type EnvironmentChange struct {
 	Removed         bool
 }
 
+// CollectionChange is a variable a script stores in, or removes from, the
+// collection of the running request. A shared change goes to the tracked
+// collection.yaml; a local one to the git ignored collection.local.yaml kept
+// on this machine.
+type CollectionChange struct {
+	Name    string
+	Value   string
+	Removed bool
+	// Local is true for a variable stored in the local overrides of the
+	// collection, which stay on this machine.
+	Local bool
+}
+
 // EnvironmentResolver gives scripts access to environments other than the
 // selected one.
 type EnvironmentResolver interface {

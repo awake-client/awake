@@ -842,3 +842,133 @@ func TestLoadCollectionFallsBackToTheFolderName(t *testing.T) {
 		t.Errorf("a missing folder must stay not found, got %v", err)
 	}
 }
+
+func TestCollectionOfRequestReturnsCollectionScope(t *testing.T) {
+	repository := NewRepository(t.TempDir())
+
+	for requestPath, expected := range map[string]string{
+		"collections/billing/list.yaml":                "collections/billing",
+		"collections/billing/users/invoices/list.yaml": "collections/billing",
+		"local/scratch/ping.yaml":                      "local/scratch",
+	} {
+		scope, err := repository.CollectionOfRequest(requestPath)
+		if err != nil {
+			t.Fatalf("collection of %s: %v", requestPath, err)
+		}
+		if scope != expected {
+			t.Errorf("collection of %s: expected %s, got %s", requestPath, expected, scope)
+		}
+	}
+
+	for _, invalid := range []string{
+		"awake.yaml",
+		"collections/billing",
+		"collections/billing/collection.yaml",
+		"collections/list.yaml",
+		"../../outside.yaml",
+	} {
+		if _, err := repository.CollectionOfRequest(invalid); !errors.Is(err, ErrInvalidPath) {
+			t.Errorf("collection of %s: expected ErrInvalidPath, got %v", invalid, err)
+		}
+	}
+}
+
+func TestApplyVariableChangesStoresAndRemovesVariables(t *testing.T) {
+	workspaceRoot := t.TempDir()
+	writeTestFile(t, workspaceRoot, "collections/platform/collection.yaml", `# Platform team defaults
+name: Platform API
+variables:
+  baseUrl: https://api.example.com
+  pageSize: "20" # kept
+authentication:
+  type: none
+`)
+
+	repository := NewRepository(workspaceRoot)
+
+	if err := repository.ApplyVariableChanges("collections/platform", []domain.CollectionChange{
+		{Name: "pageSize", Value: "50"},
+		{Name: "cookies", Value: "a=1; b=2"},
+		{Name: "stale", Removed: true},
+	}); err != nil {
+		t.Fatalf("apply changes: %v", err)
+	}
+
+	loaded, err := repository.LoadCollection("collections/platform")
+	if err != nil {
+		t.Fatalf("reload collection: %v", err)
+	}
+	expected := map[string]string{"baseUrl": "https://api.example.com", "pageSize": "50", "cookies": "a=1; b=2"}
+	if !reflect.DeepEqual(loaded.Variables, expected) {
+		t.Errorf("unexpected variables: %v", loaded.Variables)
+	}
+	if loaded.Authentication == nil || loaded.Authentication.Type != domain.AuthenticationNone {
+		t.Errorf("expected unchanged authentication, got %+v", loaded.Authentication)
+	}
+
+	content, err := os.ReadFile(filepath.Join(workspaceRoot, "collections/platform/collection.yaml"))
+	if err != nil {
+		t.Fatalf("read collection: %v", err)
+	}
+	text := string(content)
+	if !strings.Contains(text, "# Platform team defaults") || !strings.Contains(text, "baseUrl") {
+		t.Errorf("expected the comments to survive:\n%s", text)
+	}
+}
+
+func TestApplyVariableChangesStoresLocalOverrides(t *testing.T) {
+	workspaceRoot := t.TempDir()
+	writeTestFile(t, workspaceRoot, "collections/platform/collection.yaml", "name: Platform\nvariables:\n  baseUrl: shared\n")
+
+	repository := NewRepository(workspaceRoot)
+
+	if err := repository.ApplyVariableChanges("collections/platform", []domain.CollectionChange{
+		{Name: "baseUrl", Value: "mine", Local: true},
+		{Name: "token", Value: "secret", Local: true},
+	}); err != nil {
+		t.Fatalf("apply local changes: %v", err)
+	}
+
+	local, err := repository.LocalVariables("collections/platform")
+	if err != nil {
+		t.Fatalf("read local variables: %v", err)
+	}
+	expected := map[string]string{"baseUrl": "mine", "token": "secret"}
+	if !reflect.DeepEqual(local, expected) {
+		t.Errorf("unexpected local variables: %v", local)
+	}
+
+	// The shared file keeps its value: the override stays on this machine.
+	shared, err := repository.LoadCollection("collections/platform")
+	if err != nil {
+		t.Fatalf("reload collection: %v", err)
+	}
+	if shared.Variables["baseUrl"] != "shared" {
+		t.Errorf("expected the shared value to stay, got %v", shared.Variables)
+	}
+
+	// Removing the last local variable drops the git ignored file.
+	if err := repository.ApplyVariableChanges("collections/platform", []domain.CollectionChange{
+		{Name: "baseUrl", Removed: true, Local: true},
+		{Name: "token", Removed: true, Local: true},
+	}); err != nil {
+		t.Fatalf("remove local changes: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(workspaceRoot, "collections/platform", "collection.local.yaml")); !errors.Is(err, os.ErrNotExist) {
+		t.Errorf("expected the local file to be removed, got %v", err)
+	}
+}
+
+func TestApplyVariableChangesRejectsInvalidNamesAndMissingCollection(t *testing.T) {
+	workspaceRoot := t.TempDir()
+	writeTestFile(t, workspaceRoot, "collections/platform/collection.yaml", "name: Platform\n")
+	repository := NewRepository(workspaceRoot)
+
+	if err := repository.ApplyVariableChanges("collections/platform", []domain.CollectionChange{{Name: "not valid", Value: "x"}}); err == nil {
+		t.Error("expected an error for an invalid variable name")
+	}
+
+	if err := repository.ApplyVariableChanges("collections/empty", []domain.CollectionChange{{Name: "cookies", Value: "a=1"}}); err == nil || !strings.Contains(err.Error(), "no settings yet") {
+		t.Errorf("expected a missing settings error, got %v", err)
+	}
+}

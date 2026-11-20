@@ -7,6 +7,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 
@@ -23,6 +24,10 @@ const (
 	// workspace ignores it in git.
 	privateDirectoryName = "local"
 	collectionFileName   = "collection.yaml"
+	// localCollectionFileName is the git ignored file holding the local
+	// variables of a collection, kept on this machine only. The workspace
+	// ignore list covers every *.local.yaml file.
+	localCollectionFileName = "collection.local.yaml"
 	// localOverrideSuffix ends the git ignored file holding the parts of a
 	// request replaced on this machine only.
 	localOverrideSuffix = ".local.yaml"
@@ -395,6 +400,238 @@ func (repository *Repository) LoadCollection(relativePath string) (domain.Collec
 
 	return collection, nil
 }
+
+// CollectionOfRequest returns the collection directory a request belongs to,
+// such as collections/billing or local/scratch.
+func (repository *Repository) CollectionOfRequest(requestPath string) (string, error) {
+	cleaned := path.Clean(requestPath)
+	if !isRequestPath(cleaned) {
+		return "", ErrInvalidPath
+	}
+
+	segments := strings.Split(cleaned, "/")
+	if len(segments) < 3 || !isRoot(segments[0]) {
+		return "", ErrInvalidPath
+	}
+	collection := segments[0] + "/" + segments[1]
+	if !isCollectionPath(collection) {
+		return "", ErrInvalidPath
+	}
+	return collection, nil
+}
+
+// LocalVariables returns the variables of the local overrides of a collection,
+// from its git ignored collection.local.yaml. An absent file means no local
+// variables.
+func (repository *Repository) LocalVariables(relativePath string) (map[string]string, error) {
+	cleaned := path.Clean(relativePath)
+	if !isCollectionPath(cleaned) {
+		return nil, ErrInvalidPath
+	}
+
+	directory, err := repository.resolve(cleaned)
+	if err != nil {
+		return nil, err
+	}
+
+	content, err := os.ReadFile(filepath.Join(directory, localCollectionFileName))
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return map[string]string{}, nil
+		}
+		return nil, fmt.Errorf("read local collection %s: %w", cleaned, err)
+	}
+
+	var local collectionLocalVariables
+	if err := yaml.Unmarshal(content, &local); err != nil {
+		return nil, fmt.Errorf("parse local collection %s: %w", cleaned, err)
+	}
+	return local.Variables, nil
+}
+
+// ApplyVariableChanges stores or removes variables in the variables of a
+// collection, keeping the comments and the other keys of collection.yaml. A
+// shared change goes to collection.yaml; a local one to the git ignored
+// collection.local.yaml, created when needed. The collection must already
+// have a metadata file to write into.
+func (repository *Repository) ApplyVariableChanges(relativePath string, changes []domain.CollectionChange) error {
+	if len(changes) == 0 {
+		return nil
+	}
+
+	cleaned := path.Clean(relativePath)
+	if !isCollectionPath(cleaned) {
+		return ErrInvalidPath
+	}
+
+	directory, err := repository.resolve(cleaned)
+	if err != nil {
+		return err
+	}
+
+	for _, change := range changes {
+		if !isVariableName(change.Name) {
+			return fmt.Errorf("collections: %q is not a valid variable name", change.Name)
+		}
+	}
+
+	shared, local := splitCollectionChanges(changes)
+	if len(shared) > 0 {
+		if err := repository.applySharedVariables(directory, cleaned, shared); err != nil {
+			return err
+		}
+	}
+	if len(local) > 0 {
+		if err := repository.applyLocalVariables(directory, cleaned, local); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// applySharedVariables rewrites only the variables key of collection.yaml, so
+// its comments and other keys survive.
+func (repository *Repository) applySharedVariables(directory string, collectionPath string, changes []domain.CollectionChange) error {
+	filePath := filepath.Join(directory, collectionFileName)
+	existing, err := os.ReadFile(filePath)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return fmt.Errorf("collections: %s has no settings yet; save the collection first", collectionPath)
+		}
+		return fmt.Errorf("read collection %s: %w", collectionPath, err)
+	}
+
+	values, err := collectionVariables(existing, changes)
+	if err != nil {
+		return err
+	}
+
+	content, err := encodeCollectionVariables(existing, values)
+	if err != nil {
+		return err
+	}
+	return files.WriteAtomically(filePath, content)
+}
+
+// applyLocalVariables stores or removes variables in the git ignored
+// collection.local.yaml of a collection, creating the file when needed and
+// removing it when nothing is left to override.
+func (repository *Repository) applyLocalVariables(directory string, collectionPath string, changes []domain.CollectionChange) error {
+	localPath := filepath.Join(directory, localCollectionFileName)
+
+	existing, err := os.ReadFile(localPath)
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("read local collection %s: %w", collectionPath, err)
+	}
+
+	values := map[string]string{}
+	if len(existing) > 0 {
+		var local collectionLocalVariables
+		if err := yaml.Unmarshal(existing, &local); err != nil {
+			return fmt.Errorf("parse local collection %s: %w", collectionPath, err)
+		}
+		for name, value := range local.Variables {
+			values[name] = value
+		}
+	}
+	for _, change := range changes {
+		if change.Removed {
+			delete(values, change.Name)
+		} else {
+			values[change.Name] = change.Value
+		}
+	}
+
+	content, err := encodeCollectionLocalVariables(existing, values)
+	if err != nil {
+		return err
+	}
+	if len(values) == 0 {
+		if err := os.Remove(localPath); err != nil && !errors.Is(err, os.ErrNotExist) {
+			return fmt.Errorf("delete local collection %s: %w", collectionPath, err)
+		}
+		return nil
+	}
+	return files.WriteAtomically(localPath, content)
+}
+
+// collectionVariables applies changes to the variables of a collection file.
+func collectionVariables(content []byte, changes []domain.CollectionChange) (map[string]string, error) {
+	var collection domain.Collection
+	if err := yaml.Unmarshal(content, &collection); err != nil {
+		return nil, fmt.Errorf("%w: %v", domain.ErrInvalidCollection, err)
+	}
+
+	values := make(map[string]string, len(collection.Variables)+len(changes))
+	for name, value := range collection.Variables {
+		values[name] = value
+	}
+	for _, change := range changes {
+		if change.Removed {
+			delete(values, change.Name)
+		} else {
+			values[change.Name] = change.Value
+		}
+	}
+	return values, nil
+}
+
+// splitCollectionChanges separates the changes for the tracked file from the
+// ones for the local overrides.
+func splitCollectionChanges(changes []domain.CollectionChange) (shared []domain.CollectionChange, local []domain.CollectionChange) {
+	for _, change := range changes {
+		if change.Local {
+			local = append(local, change)
+		} else {
+			shared = append(shared, change)
+		}
+	}
+	return shared, local
+}
+
+// collectionLocalVariables is the content of collection.local.yaml.
+type collectionLocalVariables struct {
+	Variables map[string]string `yaml:"variables,omitempty"`
+}
+
+// encodeCollectionVariables rewrites only the variables of an existing
+// collection file, so its comments and other keys survive.
+func encodeCollectionVariables(existing []byte, values map[string]string) ([]byte, error) {
+	document, err := yamlcodec.Parse(existing)
+	if err != nil || len(document.Root().Content) == 0 {
+		return yamlcodec.EncodeValue(domain.Collection{Variables: values})
+	}
+
+	mapping := document.Root().Content[0]
+	if mapping.Kind != yaml.MappingNode {
+		return yamlcodec.EncodeValue(domain.Collection{Variables: values})
+	}
+
+	yamlcodec.SetStringMap(mapping, "variables", values)
+	return document.Encode()
+}
+
+// encodeCollectionLocalVariables rewrites only the variables of an existing
+// local collection file, so its comments and other keys survive.
+func encodeCollectionLocalVariables(existing []byte, values map[string]string) ([]byte, error) {
+	if len(existing) > 0 {
+		document, err := yamlcodec.Parse(existing)
+		if err == nil && len(document.Root().Content) > 0 && document.Root().Content[0].Kind == yaml.MappingNode {
+			yamlcodec.SetStringMap(document.Root().Content[0], "variables", values)
+			return document.Encode()
+		}
+	}
+	return yamlcodec.EncodeValue(collectionLocalVariables{Variables: values})
+}
+
+// isVariableName reports whether name is a valid variable identifier, the
+// same pattern the {{name}} placeholders accept.
+func isVariableName(name string) bool {
+	return variableNamePattern.MatchString(name)
+}
+
+// variableNamePattern matches a value that may stand in a {{name}} placeholder.
+var variableNamePattern = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 
 // ResolveInheritedAuthentication returns the authentication of the closest
 // ancestor of a request that defines one: its folder, then the folders above
