@@ -20,6 +20,7 @@ import {
   indentOnInput,
   syntaxHighlighting,
 } from '@codemirror/language';
+import { openSearchPanel, search, searchKeymap } from '@codemirror/search';
 import { Compartment, EditorState, Extension } from '@codemirror/state';
 import {
   EditorView,
@@ -31,6 +32,7 @@ import {
 } from '@codemirror/view';
 import { tags } from '@lezer/highlight';
 
+import { createSearchPanel } from './code-search-panel';
 import { ScriptKind, scriptLanguage } from './script-language';
 
 /** Languages the editor highlights. */
@@ -151,6 +153,65 @@ const theme = EditorView.theme({
     textUnderlineOffset: '3px',
   },
   '.cm-gutter-lint': { width: '14px' },
+  '.cm-panels': {
+    backgroundColor: 'var(--color-surface)',
+    color: 'var(--color-text)',
+  },
+  '.cm-panels.cm-panels-top': { borderBottom: '1px solid var(--color-border)' },
+  '.awake-search': {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '2px',
+    padding: '4px 6px 4px 10px',
+    fontFamily: 'var(--font-sans)',
+    fontSize: 'var(--text-sm)',
+  },
+  '.awake-search-field': {
+    flex: '1 1 auto',
+    minWidth: '0',
+    padding: '3px 0',
+    border: 'none',
+    background: 'transparent',
+    color: 'var(--color-text)',
+    font: 'inherit',
+    outline: 'none',
+  },
+  '.awake-search-field::placeholder': { color: 'var(--color-text-subtle)' },
+  '.awake-search-count': {
+    flex: '0 0 auto',
+    padding: '0 6px',
+    color: 'var(--color-text-muted)',
+    fontSize: 'var(--text-xs)',
+    fontVariantNumeric: 'tabular-nums',
+    whiteSpace: 'nowrap',
+  },
+  '.awake-search-count.empty': { color: 'var(--color-danger)' },
+  '.awake-search-button': {
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '24px',
+    height: '24px',
+    padding: '0',
+    border: 'none',
+    borderRadius: 'var(--radius-sm)',
+    background: 'transparent',
+    color: 'var(--color-text-muted)',
+    cursor: 'pointer',
+  },
+  '.awake-search-button:hover:not(:disabled)': {
+    backgroundColor: 'var(--color-hover)',
+    color: 'var(--color-text)',
+  },
+  '.awake-search-button:disabled': { opacity: '0.4', cursor: 'default' },
+  '.cm-searchMatch': {
+    backgroundColor: 'color-mix(in srgb, var(--color-warning) 28%, transparent)',
+    borderRadius: '2px',
+  },
+  '.cm-searchMatch.cm-searchMatch-selected': {
+    backgroundColor: 'color-mix(in srgb, var(--color-accent) 45%, transparent)',
+    outline: '1px solid var(--color-accent)',
+  },
   '.cm-foldPlaceholder': {
     backgroundColor: 'var(--color-active)',
     border: 'none',
@@ -222,7 +283,14 @@ export class CodeEditor {
             EditorView.lineWrapping,
             syntaxHighlighting(highlightStyle),
             theme,
-            keymap.of([...defaultKeymap, ...historyKeymap, ...foldKeymap, indentWithTab]),
+            search({ top: true, createPanel: createSearchPanel }),
+            keymap.of([
+              ...searchKeymap,
+              ...defaultKeymap,
+              ...historyKeymap,
+              ...foldKeymap,
+              indentWithTab,
+            ]),
             this.language.of(
               languageExtension(this.lang(), this.scriptKind(), this.scriptRequests()),
             ),
@@ -257,6 +325,18 @@ export class CodeEditor {
 
     inject(DestroyRef).onDestroy(() => this.view?.destroy());
   }
+
+  /** Opens the search bar, or focuses it again when it is already open. */
+  openSearch(): void {
+    if (this.view) {
+      openSearchPanel(this.view);
+    }
+  }
+
+  /** Reports whether the keyboard focus is in this editor or its search bar. */
+  hasFocus(): boolean {
+    return this.host.nativeElement.contains(document.activeElement);
+  }
 }
 
 function languageExtension(
@@ -277,7 +357,13 @@ function languageExtension(
 }
 
 function editableExtension(readOnly: boolean): Extension {
-  return [EditorState.readOnly.of(readOnly), EditorView.editable.of(!readOnly)];
+  return [
+    EditorState.readOnly.of(readOnly),
+    EditorView.editable.of(!readOnly),
+    // A read-only view still takes the focus, so its keyboard shortcuts, such
+    // as the search, work after a click in the response.
+    readOnly ? EditorView.contentAttributes.of({ tabindex: '0' }) : [],
+  ];
 }
 
 /** Indents JSON for display, leaving anything else untouched. */

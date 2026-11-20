@@ -169,6 +169,9 @@ export class RequestEditor {
   protected readonly shortcuts = inject(Shortcuts);
   protected readonly defaultResponseRatio = RESPONSE_RATIO.default;
   private readonly streamPanel = viewChild<StreamPanel>(StreamPanel);
+  private readonly responseEditor = viewChild<CodeEditor>('responseEditor');
+  /** True while the response body shows as text, which can be searched. */
+  protected readonly canSearchResponse = computed(() => this.responseEditor() !== undefined);
 
   protected readonly AuthenticationType = AuthenticationType;
   protected readonly OAuth2GrantType = OAuth2GrantType;
@@ -1046,7 +1049,34 @@ export class RequestEditor {
       event.preventDefault();
       event.stopPropagation();
       void this.send();
+      return;
     }
+
+    if (event.key.toLowerCase() === 'f' && !event.shiftKey && !event.altKey) {
+      this.searchResponse(event);
+    }
+  }
+
+  protected openResponseSearch(): void {
+    this.responseEditor()?.openSearch();
+  }
+
+  /**
+   * Opens the search of the response body. A request body or script editor
+   * with the focus keeps the shortcut and searches its own content.
+   */
+  private searchResponse(event: KeyboardEvent): void {
+    const responseEditor = this.responseEditor();
+    if (!responseEditor) {
+      return;
+    }
+    const focused = document.activeElement;
+    if (!responseEditor.hasFocus() && focused instanceof Element && focused.closest('.cm-editor')) {
+      return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+    responseEditor.openSearch();
   }
 
   protected addParameter(): void {
