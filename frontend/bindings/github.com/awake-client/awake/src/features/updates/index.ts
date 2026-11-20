@@ -5,3 +5,10 @@ import * as Service from "./service.js";
 export {
     Service
 };
+
+export type {
+    ChangelogSection,
+    ChangelogVersion,
+    Release,
+    Status
+} from "./models.js";

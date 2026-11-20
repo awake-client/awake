@@ -135,8 +135,9 @@ button:disabled {
   background: transparent;
 }
 
-.update-error {
-  color: var(--color-danger);
+.link-button.update-hint {
+  color: var(--color-accent);
+  font-weight: 600;
 }
 
 select {

@@ -1,0 +1,201 @@
+<dialog
+  #dialog
+  class="update"
+  aria-labelledby="update-title"
+  (cancel)="$event.preventDefault(); updates.closeDialog()"
+  (click)="closeOnBackdrop($event)"
+>
+  @let phase = updates.phase();
+  <header class="body">
+    <span
+      class="badge"
+      [class.success]="phase === 'up-to-date' || phase === 'ready'"
+      [class.danger]="phase === 'check-failed' || phase === 'install-failed'"
+      aria-hidden="true"
+    >
+      <app-icon [name]="icon()" [size]="16" [class.spinning]="phase === 'checking'" />
+    </span>
+    <div class="text">
+      @switch (phase) {
+        @case ('checking') {
+          <h2 id="update-title">Checking for updates…</h2>
+          <p>You are running Awake {{ currentLabel() }}.</p>
+        }
+        @case ('up-to-date') {
+          <h2 id="update-title">Awake is up to date</h2>
+          <p>{{ currentLabel() }} is the latest version.</p>
+        }
+        @case ('check-failed') {
+          <h2 id="update-title">Could not check for updates</h2>
+          <p class="error">{{ updates.error() }}</p>
+        }
+        @case ('available') {
+          <h2 id="update-title">Awake {{ releaseLabel() }} is available</h2>
+          <p>
+            You are running {{ currentLabel() }}.
+            @if (publishedOn()) {
+              Released {{ publishedOn() }}.
+            }
+            @if (downloadSize() && !updates.installBlocker()) {
+              {{ downloadSize() }} to download.
+            }
+          </p>
+        }
+        @case ('downloading') {
+          <h2 id="update-title">Downloading Awake {{ releaseLabel() }}…</h2>
+          <p>You can keep working; Awake asks before restarting.</p>
+        }
+        @case ('installing') {
+          <h2 id="update-title">Installing Awake {{ releaseLabel() }}…</h2>
+          <p>Checking and unpacking the new version.</p>
+        }
+        @case ('ready') {
+          <h2 id="update-title">Awake {{ releaseLabel() }} is ready</h2>
+          <p>Restart Awake to start using the new version.</p>
+        }
+        @case ('restarting') {
+          <h2 id="update-title">Restarting…</h2>
+          <p>Awake reopens on {{ releaseLabel() }} in a moment.</p>
+        }
+        @case ('install-failed') {
+          <h2 id="update-title">The update could not be installed</h2>
+          <p class="error">{{ updates.error() }}</p>
+        }
+      }
+    </div>
+  </header>
+
+  @if (phase === 'downloading' || phase === 'installing') {
+    <div class="progress">
+      <div
+        class="track"
+        role="progressbar"
+        aria-label="Update progress"
+        [attr.aria-valuenow]="phase === 'downloading' ? percent() : null"
+        aria-valuemin="0"
+        aria-valuemax="100"
+      >
+        <div
+          class="bar"
+          [class.indeterminate]="phase === 'installing' || percent() === null"
+          [style.width.%]="phase === 'downloading' ? percent() : null"
+        ></div>
+      </div>
+      @if (phase === 'downloading' && progressLabel()) {
+        <span class="progress-label">{{ progressLabel() }}</span>
+      }
+    </div>
+  }
+
+  @if (phase === 'available' && updates.installBlocker(); as blocker) {
+    <p class="notice">
+      <app-icon name="alert" [size]="14" />
+      <span>
+        {{ blocker }}. Download the new version from the release page and install it yourself.
+      </span>
+    </p>
+  }
+
+  @if (phase === 'ready' && unsavedCount() > 0) {
+    <p class="notice">
+      <app-icon name="alert" [size]="14" />
+      <span>
+        {{ unsavedCount() }} {{ unsavedCount() === 1 ? 'request has' : 'requests have' }}
+        unsaved changes. Save them before restarting.
+      </span>
+    </p>
+  }
+
+  @if (showsChanges()) {
+    <section class="changes" aria-label="What's new">
+      @for (version of changes(); track version.version) {
+        <article class="version">
+          <h3>
+            {{ version.version }}
+            @if (version.date) {
+              <span class="date">{{ version.date }}</span>
+            }
+          </h3>
+          @for (section of version.sections ?? []; track $index) {
+            @if (section.title) {
+              <h4>{{ section.title }}</h4>
+            }
+            <ul>
+              @for (item of section.items ?? []; track $index) {
+                <li>
+                  @for (segment of segments(item); track $index) {
+                    @switch (segment.kind) {
+                      @case ('code') {
+                        <code>{{ segment.text }}</code>
+                      }
+                      @case ('strong') {
+                        <strong>{{ segment.text }}</strong>
+                      }
+                      @case ('link') {
+                        <a
+                          [href]="segment.kind === 'link' ? segment.href : ''"
+                          (click)="openLink($event, segment.kind === 'link' ? segment.href : '')"
+                          >{{ segment.text }}</a
+                        >
+                      }
+                      @default {
+                        {{ segment.text }}
+                      }
+                    }
+                  }
+                </li>
+              }
+            </ul>
+          }
+        </article>
+      }
+    </section>
+  }
+
+  <footer>
+    @if (updates.release()?.url && (phase === 'available' || phase === 'install-failed')) {
+      <button type="button" class="btn btn-ghost release-link" (click)="updates.openReleasePage()">
+        Release page
+      </button>
+    }
+    <span class="spacer"></span>
+    @switch (phase) {
+      @case ('available') {
+        <button type="button" class="btn btn-ghost" (click)="updates.closeDialog()">Later</button>
+        @if (!updates.installBlocker()) {
+          <button type="button" class="btn btn-primary" autofocus (click)="updates.install()">
+            Install {{ releaseLabel() }}
+          </button>
+        }
+      }
+      @case ('downloading') {
+        <button type="button" class="btn btn-ghost" (click)="updates.closeDialog()">Hide</button>
+      }
+      @case ('installing') {
+        <button type="button" class="btn btn-ghost" (click)="updates.closeDialog()">Hide</button>
+      }
+      @case ('ready') {
+        <button type="button" class="btn btn-ghost" (click)="updates.closeDialog()">Later</button>
+        <button type="button" class="btn btn-primary" autofocus (click)="updates.restart()">
+          Restart now
+        </button>
+      }
+      @case ('restarting') {
+        <button type="button" class="btn btn-primary" disabled>Restarting…</button>
+      }
+      @case ('check-failed') {
+        <button type="button" class="btn btn-ghost" (click)="updates.closeDialog()">Close</button>
+        <button type="button" class="btn btn-primary" (click)="updates.check()">Try again</button>
+      }
+      @case ('install-failed') {
+        <button type="button" class="btn btn-ghost" (click)="updates.closeDialog()">Close</button>
+        <button type="button" class="btn btn-primary" (click)="updates.install()">Try again</button>
+      }
+      @default {
+        <button type="button" class="btn btn-primary" (click)="updates.closeDialog()">
+          {{ phase === 'checking' ? 'Cancel' : 'Close' }}
+        </button>
+      }
+    }
+  </footer>
+</dialog>

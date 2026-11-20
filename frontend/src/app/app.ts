@@ -2,10 +2,12 @@ import { Component, inject } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 import { suppressDefaultContextMenu } from '@core/context-menu';
 import { ThemeStore } from '@core/theme-store';
+import { UpdateStore } from '@core/update-store';
+import { UpdateDialog } from '@features/updates/update-dialog';
 import { WindowControls } from '@shared/window-controls';
 
 @Component({
-  imports: [RouterOutlet, WindowControls],
+  imports: [RouterOutlet, UpdateDialog, WindowControls],
   selector: 'app-root',
   styleUrl: './app.css',
   templateUrl: './app.html',
@@ -16,5 +18,6 @@ export class App {
 
   constructor() {
     suppressDefaultContextMenu();
+    inject(UpdateStore).scheduleStartupCheck();
   }
 }

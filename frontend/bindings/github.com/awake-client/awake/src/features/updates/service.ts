@@ -10,12 +10,17 @@
 // @ts-ignore: Unused imports
 import { Call as $Call, CancellablePromise as $CancellablePromise } from "@wailsio/runtime";
 
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
+import * as $models from "./models.js";
+
 /**
- * CheckForUpdates opens the update window and runs the update flow in the
- * background. Progress and errors appear in that window.
+ * Check asks GitHub for a newer release and returns it with its changes. It
+ * installs nothing: Install does, once the user has confirmed. While an update
+ * is being installed, it reports that update instead of checking again.
  */
-export function CheckForUpdates(): $CancellablePromise<void> {
-    return $Call.ByID(3456239477);
+export function Check(): $CancellablePromise<$models.Status> {
+    return $Call.ByID(3376485726);
 }
 
 /**
@@ -26,6 +31,15 @@ export function CurrentVersion(): $CancellablePromise<string> {
 }
 
 /**
+ * Install downloads, verifies and stages the update found by Check. It
+ * returns once the download has started; progress, completion and failures
+ * arrive as the updater events. The new version runs after Restart.
+ */
+export function Install(): $CancellablePromise<void> {
+    return $Call.ByID(876780661);
+}
+
+/**
  * Ready reports whether an update is installed and waits for a restart.
  */
 export function Ready(): $CancellablePromise<boolean> {
@@ -33,8 +47,22 @@ export function Ready(): $CancellablePromise<boolean> {
 }
 
 /**
+ * Restart quits the application and starts the installed update.
+ */
+export function Restart(): $CancellablePromise<void> {
+    return $Call.ByID(57229777);
+}
+
+/**
  * State reports the updater lifecycle phase.
  */
 export function State(): $CancellablePromise<string> {
     return $Call.ByID(4198909939);
+}
+
+/**
+ * Status returns the current update state without contacting GitHub.
+ */
+export function Status(): $CancellablePromise<$models.Status> {
+    return $Call.ByID(2093691120);
 }

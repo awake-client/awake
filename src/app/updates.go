@@ -12,7 +12,8 @@ import (
 const updateRepository = "awake-client/awake"
 
 // configureUpdates connects the update service to the Wails updater and the
-// GitHub releases of the project.
+// GitHub releases of the project. The updater runs without its own window:
+// the application asks before installing and shows the progress itself.
 func configureUpdates(instance *application.App, service *updates.Service) error {
 	provider, err := updates.NewGitHubProvider(updateRepository)
 	if err != nil {
@@ -22,11 +23,11 @@ func configureUpdates(instance *application.App, service *updates.Service) error
 	if err := instance.Updater.Init(updater.Config{
 		CurrentVersion: updates.Version,
 		Providers:      []updater.Provider{provider},
-		Window:         &updater.BuiltinWindow{},
+		Window:         updater.WindowNone,
 	}); err != nil {
 		return fmt.Errorf("configure updater: %w", err)
 	}
 
-	updates.Use(service, instance.Updater)
+	updates.Use(service, instance.Updater, updates.GitHubChangelog{Repository: updateRepository})
 	return nil
 }

@@ -94,16 +94,24 @@
         <span class="sidebar-version">{{ versionLabel() }}</span>
       }
       <span class="footer-spacer"></span>
-      @if (updateError(); as message) {
-        <span class="update-error" [title]="message">Update unavailable</span>
+      @if (updates.hint(); as hint) {
+        <button
+          type="button"
+          class="update-hint"
+          [class.failed]="updates.phase() === 'install-failed'"
+          (click)="updates.openDialog()"
+        >
+          {{ hint }}
+        </button>
       }
       <app-theme-picker />
       <button
         type="button"
         class="icon-btn"
+        [class.has-update]="updates.hint() !== null"
         [title]="'Check for updates (' + versionLabel() + ')'"
         aria-label="Check for updates"
-        (click)="checkForUpdates()"
+        (click)="showUpdates()"
       >
         <app-icon name="arrow-up-circle" [size]="14" />
       </button>

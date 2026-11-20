@@ -13,7 +13,6 @@ import { NavigationEnd, Router, RouterLink, RouterOutlet } from '@angular/router
 import { filter } from 'rxjs';
 import { ScopedSummary } from '@bindings/github.com/awake-client/awake/src/features/environments/models';
 import * as EnvironmentsService from '@bindings/github.com/awake-client/awake/src/features/environments/service';
-import * as UpdatesService from '@bindings/github.com/awake-client/awake/src/features/updates/service';
 import { EnvironmentEditing } from '@core/environment-editing';
 import { EnvironmentStore } from '@core/environment-store';
 import { EnvironmentDialog } from '../environments/environment-dialog';
@@ -21,6 +20,7 @@ import { GitSync } from '@core/git-sync';
 import { LayoutStore, SIDEBAR_WIDTH } from '@core/layout-store';
 import { Shortcuts } from '@core/shortcuts';
 import { TabsStore } from '@core/tabs-store';
+import { UpdateStore } from '@core/update-store';
 import { WorkspaceStore } from '@core/workspace-store';
 import { CollectionTree } from '@features/collections/collection-tree';
 import { CommandPalette } from '@features/command-palette/command-palette';
@@ -125,9 +125,8 @@ export class WorkspaceShell {
   protected readonly environmentScope = computed(() => owningCollectionOf(this.activeScope()));
   protected readonly selectedEnvironment = this.environmentStore.selected;
   protected readonly pinnedEnvironments = this.environmentStore.pinned;
-  protected readonly version = signal('');
-  protected readonly versionLabel = computed(() => formatVersion(this.version()));
-  protected readonly updateError = signal<string | null>(null);
+  protected readonly updates = inject(UpdateStore);
+  protected readonly versionLabel = computed(() => formatVersion(this.updates.currentVersion()));
   /** Color of the active environment, shown along the top of the work area. */
   protected readonly environmentColor = computed(
     () =>
@@ -203,10 +202,6 @@ export class WorkspaceShell {
     this.destroyRef.onDestroy(() =>
       window.removeEventListener('awake:environments-changed', reloadEnvironments),
     );
-
-    void UpdatesService.CurrentVersion()
-      .then((version) => this.version.set(version))
-      .catch(() => this.version.set(''));
   }
 
   /** Resizes the sidebar without letting it squeeze the request pane. */
@@ -274,12 +269,12 @@ export class WorkspaceShell {
     void this.router.navigate(['/']);
   }
 
-  protected async checkForUpdates(): Promise<void> {
-    this.updateError.set(null);
-    try {
-      await UpdatesService.CheckForUpdates();
-    } catch (error) {
-      this.updateError.set(describeError(error));
+  /** Opens the update in progress, or checks for one. */
+  protected showUpdates(): void {
+    if (this.updates.hint()) {
+      this.updates.openDialog();
+    } else {
+      void this.updates.check();
     }
   }
 
@@ -320,11 +315,4 @@ export class WorkspaceShell {
     }
     return options.length === 1 ? options[0].FileName : '';
   }
-}
-
-function describeError(error: unknown): string {
-  if (error instanceof Error) {
-    return error.message;
-  }
-  return String(error);
 }

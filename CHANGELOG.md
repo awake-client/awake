@@ -22,10 +22,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   git ignored `collection.local.yaml`, which wins over the shared collection
   variables when resolving `{{name}}`.
 
+### Changed
+
+- Updates are checked from within the application instead of a separate
+  window. Awake looks for one quietly a few seconds after it starts and shows
+  a hint in the sidebar when one is out; the update dialog lists what changed
+  in every version since the running one and installs nothing until it is
+  confirmed. It then follows the download and asks before restarting, warning
+  about requests with unsaved changes.
+- When Awake cannot replace itself, such as an installation in Program Files
+  or `/usr/local/bin` that the account cannot write to, the dialog says so and
+  links to the release page instead of failing during the installation.
+
 ### Fixed
 
 - Creating a git repository and talking to a coding agent no longer flash an
   empty console window over the application on Windows.
+- Updating from within the application works on Linux: the release archive
+  also carries the icon and desktop entry, which the updater refused.
 
 ## [0.8.0] - 2026-11-10
 

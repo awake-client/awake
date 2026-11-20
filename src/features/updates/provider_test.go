@@ -1,7 +1,14 @@
 package updates
 
 import (
+	"archive/tar"
+	"bytes"
+	"compress/gzip"
+	"context"
 	"errors"
+	"io"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
@@ -88,5 +95,94 @@ func TestReadableProviderErrorKeepsOtherErrors(t *testing.T) {
 
 	if got := readableProviderError(original); got != original {
 		t.Errorf("got %v, want the original error", got)
+	}
+}
+
+func gzippedTarball(t *testing.T, files map[string]string) []byte {
+	t.Helper()
+	var buffer bytes.Buffer
+	compressed := gzip.NewWriter(&buffer)
+	archive := tar.NewWriter(compressed)
+	for name, content := range files {
+		header := &tar.Header{Name: name, Mode: 0o755, Size: int64(len(content)), Typeflag: tar.TypeReg}
+		if err := archive.WriteHeader(header); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := archive.Write([]byte(content)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := archive.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := compressed.Close(); err != nil {
+		t.Fatal(err)
+	}
+	return buffer.Bytes()
+}
+
+func TestKeepArchiveEntryKeepsOnlyTheBinary(t *testing.T) {
+	source := gzippedTarball(t, map[string]string{
+		"awake":         "binary",
+		"awake.png":     "icon",
+		"awake.desktop": "entry",
+	})
+
+	var repacked bytes.Buffer
+	if err := keepArchiveEntry(bytes.NewReader(source), &repacked, releaseBinaryName); err != nil {
+		t.Fatalf("repack: %v", err)
+	}
+
+	decompressed, err := gzip.NewReader(&repacked)
+	if err != nil {
+		t.Fatal(err)
+	}
+	entries := tar.NewReader(decompressed)
+	header, err := entries.Next()
+	if err != nil {
+		t.Fatal(err)
+	}
+	content, _ := io.ReadAll(entries)
+	if header.Name != "awake" || string(content) != "binary" || header.Mode != 0o755 {
+		t.Errorf("unexpected entry %q (%o): %q", header.Name, header.Mode, content)
+	}
+	if _, err := entries.Next(); !errors.Is(err, io.EOF) {
+		t.Errorf("expected a single entry, got %v", err)
+	}
+}
+
+func TestKeepArchiveEntryRequiresTheBinary(t *testing.T) {
+	source := gzippedTarball(t, map[string]string{"awake.png": "icon"})
+
+	if err := keepArchiveEntry(bytes.NewReader(source), io.Discard, releaseBinaryName); err == nil {
+		t.Error("expected an error for an archive without the binary")
+	}
+}
+
+func TestGitHubChangelogReadsTheTag(t *testing.T) {
+	var requested string
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		requested = request.URL.Path
+		_, _ = writer.Write([]byte("# Changelog"))
+	}))
+	defer server.Close()
+
+	source := GitHubChangelog{Repository: "owner/name", BaseURL: server.URL}
+	content, err := source.Changelog(context.Background(), "v1.2.3")
+	if err != nil {
+		t.Fatalf("changelog: %v", err)
+	}
+	if requested != "/owner/name/v1.2.3/CHANGELOG.md" || content != "# Changelog" {
+		t.Errorf("requested %q, got %q", requested, content)
+	}
+}
+
+func TestGitHubChangelogReportsMissingFiles(t *testing.T) {
+	server := httptest.NewServer(http.NotFoundHandler())
+	defer server.Close()
+
+	source := GitHubChangelog{Repository: "owner/name", BaseURL: server.URL}
+	if _, err := source.Changelog(context.Background(), "v1.2.3"); err == nil {
+		t.Error("expected an error for a missing changelog")
 	}
 }

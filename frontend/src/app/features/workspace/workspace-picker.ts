@@ -2,13 +2,13 @@ import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import * as WorkspaceService from '@bindings/github.com/awake-client/awake/src/features/workspace/service';
-import * as UpdatesService from '@bindings/github.com/awake-client/awake/src/features/updates/service';
 import {
   Configuration,
   CreateOptions,
   Mode,
 } from '@bindings/github.com/awake-client/awake/src/features/workspace/models';
 import { chooseDirectory } from '@core/dialogs';
+import { UpdateStore } from '@core/update-store';
 import { RecentWorkspace, WorkspaceStore } from '@core/workspace-store';
 import { Icon } from '@shared/icon';
 import { formatVersion } from '@shared/version-label';
@@ -29,18 +29,13 @@ export class WorkspacePicker {
   protected readonly mode = signal<Mode>(Mode.ModeTeam);
   protected readonly errorMessage = signal<string | null>(null);
   protected readonly isBusy = signal(false);
-  protected readonly version = signal('');
-  protected readonly versionLabel = computed(() => formatVersion(this.version()));
-  protected readonly updateError = signal<string | null>(null);
+  protected readonly updates = inject(UpdateStore);
+  protected readonly versionLabel = computed(() => formatVersion(this.updates.currentVersion()));
   /** Workspaces opened on this computer, most recent first. */
   protected readonly recent = this.workspaceStore.recent;
   protected readonly busyPath = signal<string | null>(null);
 
   async ngOnInit(): Promise<void> {
-    void UpdatesService.CurrentVersion()
-      .then((version) => this.version.set(version))
-      .catch(() => this.version.set(''));
-
     const stored = this.workspaceStore.workspace();
     if (!stored) {
       return;
@@ -112,12 +107,12 @@ export class WorkspacePicker {
     this.mode.set((event.target as HTMLSelectElement).value as Mode);
   }
 
-  protected async checkForUpdates(): Promise<void> {
-    this.updateError.set(null);
-    try {
-      await UpdatesService.CheckForUpdates();
-    } catch (error) {
-      this.updateError.set(describeError(error));
+  /** Opens the update in progress, or checks for one. */
+  protected showUpdates(): void {
+    if (this.updates.hint()) {
+      this.updates.openDialog();
+    } else {
+      void this.updates.check();
     }
   }
 
