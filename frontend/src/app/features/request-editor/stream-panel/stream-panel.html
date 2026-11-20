@@ -3,14 +3,18 @@
     <span class="protocol-pill">{{ protocolLabel() }}</span>
 
     @if (isConnecting()) {
-      <span class="stream-meta">Connecting…</span>
+      <span class="connection" data-state="connecting">
+        <span class="connection-dot" aria-hidden="true"></span>
+        Connecting…
+      </span>
     } @else if (stream(); as current) {
-      <span class="connection-pill" [attr.data-live]="!current.Closed">
+      <span class="connection" [attr.data-state]="current.Closed ? 'closed' : 'live'">
+        <span class="connection-dot" aria-hidden="true"></span>
         {{ current.Closed ? 'Disconnected' : 'Connected' }}
       </span>
-      <span class="stream-meta">{{ current.Status }}</span>
-    } @else {
-      <span class="stream-meta">Not connected</span>
+      @if (current.Status) {
+        <span class="stream-meta">{{ current.Status }}</span>
+      }
     }
 
     <span class="spacer"></span>
@@ -36,11 +40,17 @@
       </div>
 
       @if (isLive()) {
-        <button type="button" class="stream-button" (click)="disconnect()">Disconnect</button>
+        <button type="button" class="btn btn-sm" (click)="disconnect()">Disconnect</button>
       }
 
-      <button type="button" class="stream-close" aria-label="Close stream" (click)="release()">
-        ×
+      <button
+        type="button"
+        class="stream-close"
+        aria-label="Close stream"
+        title="Close stream"
+        (click)="release()"
+      >
+        <app-icon name="close" [size]="14" />
       </button>
     }
   </header>
@@ -53,22 +63,29 @@
     @if (activeTab() === 'events') {
       <div class="event-log" #eventLog>
         @for (event of events(); track event.Index) {
-          <div
-            class="event-row"
+          <article
+            class="event"
             [attr.data-direction]="event.Direction"
             [attr.data-kind]="event.Kind"
           >
-            <div class="event-header">
-              <span class="event-direction">{{ directionLabel(event) }}</span>
-              <span class="event-label">{{ eventLabel(event) }}</span>
-              <span class="event-time">{{ formatTime(event.TimestampMilliseconds) }}</span>
+            <span class="event-icon" [title]="directionLabel(event)">
+              <app-icon [name]="directionIcon(event)" [size]="12" />
+            </span>
+            <div class="event-body">
+              <div class="event-header">
+                <span class="event-label">{{ eventLabel(event) }}</span>
+                <time class="event-time">{{ formatTime(event.TimestampMilliseconds) }}</time>
+              </div>
+              @if (event.Data) {
+                <pre class="event-data">{{ displayData(event) }}</pre>
+              }
             </div>
-            @if (event.Data) {
-              <pre class="event-data">{{ displayData(event) }}</pre>
-            }
-          </div>
+          </article>
         } @empty {
-          <p class="empty-stream">Waiting for events…</p>
+          <div class="empty-stream">
+            <span class="empty-spinner" aria-hidden="true"></span>
+            <p>Waiting for events…</p>
+          </div>
         }
       </div>
     } @else {
@@ -79,7 +96,9 @@
             <span class="stream-header-value">{{ header.value }}</span>
           </div>
         } @empty {
-          <p class="empty-stream">No response headers.</p>
+          <div class="empty-stream">
+            <p>No response headers.</p>
+          </div>
         }
       </div>
     }
@@ -92,21 +111,28 @@
           [ngModel]="message()"
           (ngModelChange)="message.set($event)"
           (keydown)="handleComposerKeydown($event)"
-          placeholder="Send a WebSocket message"
+          placeholder="Message to send"
           autocomplete="off"
           spellcheck="false"
         />
         <button
           type="button"
-          class="stream-button primary"
+          class="btn btn-primary btn-sm"
           [disabled]="message().trim() === ''"
           (click)="sendMessage()"
         >
+          <app-icon name="send" [size]="13" />
           Send
         </button>
       </div>
     }
-  } @else {
-    <p class="empty-stream">Press Connect to open the {{ protocolLabel() }} session.</p>
+  } @else if (!isConnecting()) {
+    <div class="empty-stream">
+      <span class="empty-icon" aria-hidden="true">
+        <app-icon name="switch" [size]="18" />
+      </span>
+      <p class="empty-title">Not connected</p>
+      <p>Press Connect to open the {{ protocolLabel() }} session.</p>
+    </div>
   }
 </section>

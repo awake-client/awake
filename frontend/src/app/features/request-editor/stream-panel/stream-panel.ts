@@ -16,6 +16,7 @@ import {
 } from '@bindings/github.com/awake-client/awake/src/features/httpclient/models';
 import { Protocol } from '@bindings/github.com/awake-client/awake/src/domain/models';
 import { WorkspaceStore } from '@core/workspace-store';
+import { Icon, IconName } from '@shared/icon';
 
 const POLL_INTERVAL_MILLISECONDS = 250;
 
@@ -25,7 +26,7 @@ const POLL_INTERVAL_MILLISECONDS = 250;
  */
 @Component({
   selector: 'app-stream-panel',
-  imports: [FormsModule],
+  imports: [FormsModule, Icon],
   templateUrl: './stream-panel.html',
   styleUrl: './stream-panel.css',
 })
@@ -185,14 +186,28 @@ export class StreamPanel {
     return event.Data;
   }
 
+  protected directionIcon(event: StreamEvent): IconName {
+    if (event.Kind === 'error') {
+      return 'alert';
+    }
+    switch (event.Direction) {
+      case 'in':
+        return 'arrow-down';
+      case 'out':
+        return 'arrow-up';
+      default:
+        return 'dot';
+    }
+  }
+
   protected directionLabel(event: StreamEvent): string {
     switch (event.Direction) {
       case 'in':
-        return '↓';
+        return 'Received';
       case 'out':
-        return '↑';
+        return 'Sent';
       default:
-        return '•';
+        return 'Connection';
     }
   }
 
