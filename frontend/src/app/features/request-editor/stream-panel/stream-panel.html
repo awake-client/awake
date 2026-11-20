@@ -1,7 +1,5 @@
 <section class="stream-panel">
   <header class="stream-toolbar">
-    <span class="protocol-pill">{{ protocolLabel() }}</span>
-
     @if (isConnecting()) {
       <span class="connection" data-state="connecting">
         <span class="connection-dot" aria-hidden="true"></span>
@@ -13,8 +11,13 @@
         {{ current.Closed ? 'Disconnected' : 'Connected' }}
       </span>
       @if (current.Status) {
-        <span class="stream-meta">{{ current.Status }}</span>
+        <span class="stream-meta" [title]="current.Status">{{ current.Status }}</span>
       }
+    } @else {
+      <span class="connection" data-state="closed">
+        <span class="connection-dot" aria-hidden="true"></span>
+        Not connected
+      </span>
     }
 
     <span class="spacer"></span>
@@ -40,7 +43,16 @@
       </div>
 
       @if (isLive()) {
-        <button type="button" class="btn btn-sm" (click)="disconnect()">Disconnect</button>
+        <button
+          type="button"
+          class="disconnect"
+          title="Disconnect"
+          aria-label="Disconnect"
+          (click)="disconnect()"
+        >
+          <app-icon name="unplug" [size]="13" />
+          <span class="disconnect-label">Disconnect</span>
+        </button>
       }
 
       <button
@@ -129,9 +141,8 @@
   } @else if (!isConnecting()) {
     <div class="empty-stream">
       <span class="empty-icon" aria-hidden="true">
-        <app-icon name="switch" [size]="18" />
+        <app-icon name="plug" [size]="18" />
       </span>
-      <p class="empty-title">Not connected</p>
       <p>Press Connect to open the {{ protocolLabel() }} session.</p>
     </div>
   }
