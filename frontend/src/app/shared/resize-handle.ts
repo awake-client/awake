@@ -1,7 +1,7 @@
 import { Component, input, output } from '@angular/core';
 
 /**
- * A thin bar the user drags to resize two panes. It reports the pointer
+ * A bar the user drags to resize two panes, drawn as a hairline with a grip. It reports the pointer
  * position while dragging; the parent turns it into a size. A double click
  * asks for the default size.
  */
@@ -16,7 +16,7 @@ import { Component, input, output } from '@angular/core';
     '(pointerdown)': 'start($event)',
     '(dblclick)': 'reset.emit()',
   },
-  template: '<span class="grip"></span>',
+  template: '<span class="line"></span><span class="grip"></span>',
   styles: `
     :host {
       position: relative;
@@ -36,27 +36,71 @@ import { Component, input, output } from '@angular/core';
       margin: -4px 0;
       cursor: row-resize;
     }
+    /* A hairline and a small grip, shown after a short hover so the cursor
+       can cross the bar without it flashing. */
+    .line,
     .grip {
       position: absolute;
-      border-radius: 2px;
-      background: transparent;
-      transition: background-color 120ms ease;
+      opacity: 0;
+      transition:
+        opacity 140ms ease,
+        background-color 140ms ease;
+      pointer-events: none;
     }
-    :host(.vertical) .grip {
+    .line {
+      background: var(--color-border-strong);
+    }
+    .grip {
+      border-radius: 999px;
+      background: var(--color-text-subtle);
+    }
+    :host(.vertical) .line {
       top: 0;
       bottom: 0;
-      left: 3px;
-      width: 3px;
+      left: 4px;
+      width: 1px;
     }
-    :host(.horizontal) .grip {
+    :host(.horizontal) .line {
       left: 0;
       right: 0;
-      top: 3px;
-      height: 3px;
+      top: 4px;
+      height: 1px;
     }
-    :host(:hover) .grip,
+    :host(.vertical) .grip {
+      top: 50%;
+      left: 2px;
+      width: 5px;
+      height: 32px;
+      transform: translateY(-50%);
+    }
+    :host(.horizontal) .grip {
+      left: 50%;
+      top: 2px;
+      width: 32px;
+      height: 5px;
+      transform: translateX(-50%);
+    }
+    :host(:hover) .line,
+    :host(:hover) .grip {
+      opacity: 1;
+      transition-delay: 150ms;
+    }
+    :host(.dragging) .line,
+    :host(.dragging) .grip {
+      opacity: 1;
+      transition-delay: 0ms;
+    }
+    :host(.dragging) .line {
+      background: color-mix(in srgb, var(--color-accent) 55%, transparent);
+    }
     :host(.dragging) .grip {
       background: var(--color-accent);
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .line,
+      .grip {
+        transition: none;
+      }
     }
   `,
 })
