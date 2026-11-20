@@ -246,6 +246,46 @@ func TestSetVariableOverridesAnExistingValue(t *testing.T) {
 	}
 }
 
+func TestCollectionNamespaceStoresChanges(t *testing.T) {
+	request := domain.Request{Method: domain.MethodGet, URL: "https://example.com"}
+	variables := map[string]string{"cookies": "old"}
+
+	outcome := NewRunner().AfterResponse(`
+		awake.collection.setVariable("cookies", "a=1; b=2");
+		awake.collection.setVariable("count", 3);
+		awake.collection.local.setVariable("token", "local-token");
+		awake.test("reads its own write", awake.getVariable("count") === "3");
+		awake.collection.unset("stale");
+		awake.collection.local.unset("stale");
+	`, request, domain.ScriptResponse{StatusCode: 200}, variables, nil)
+
+	if outcome.Error != "" {
+		t.Fatalf("unexpected script error: %s", outcome.Error)
+	}
+	if !outcome.Tests[0].Passed {
+		t.Errorf("expected the test to pass: %+v", outcome.Tests[0])
+	}
+	if variables["count"] != "3" {
+		t.Errorf("expected the local variables to follow, got %v", variables)
+	}
+
+	expected := []domain.CollectionChange{
+		{Name: "cookies", Value: "a=1; b=2"},
+		{Name: "count", Value: "3"},
+		{Name: "token", Value: "local-token", Local: true},
+		{Name: "stale", Removed: true},
+		{Name: "stale", Removed: true, Local: true},
+	}
+	if len(outcome.CollectionChanges) != len(expected) {
+		t.Fatalf("unexpected changes: %+v", outcome.CollectionChanges)
+	}
+	for index, change := range expected {
+		if outcome.CollectionChanges[index] != change {
+			t.Errorf("change %d: expected %+v, got %+v", index, change, outcome.CollectionChanges[index])
+		}
+	}
+}
+
 func TestResponseJSONParsesTheBody(t *testing.T) {
 	request := domain.Request{Method: domain.MethodGet, URL: "https://example.com"}
 	response := domain.ScriptResponse{StatusCode: 200, Body: `{"token":"abc"}`}

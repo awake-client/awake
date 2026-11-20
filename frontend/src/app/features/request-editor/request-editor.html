@@ -863,6 +863,28 @@
                     }
                   </ul>
                 }
+                @if (entry.outcome.CollectionError) {
+                  <p class="editor-message error">
+                    Collection not updated: {{ entry.outcome.CollectionError }}
+                  </p>
+                } @else if (entry.outcome.CollectionChanges?.length) {
+                  <ul class="script-environment">
+                    @for (change of entry.outcome.CollectionChanges; track $index) {
+                      <li>
+                        <span class="script-test-state">{{
+                          change.Removed ? 'UNSET' : 'SAVED'
+                        }}</span>
+                        <code>{{ change.Name }}</code>
+                        <span class="script-environment-target">
+                          in {{ change.Local ? 'collection.local.yaml' : 'collection.yaml' }}
+                        </span>
+                        @if (change.Local) {
+                          <span class="script-test-error">this machine only</span>
+                        }
+                      </li>
+                    }
+                  </ul>
+                }
               </article>
             }
           </div>

@@ -748,6 +748,95 @@ func (writer *fakeEnvironmentWriter) ApplyEnvironmentChanges(_ string, _ string,
 	return nil
 }
 
+type collectionScriptRunner struct {
+	fakeScriptRunner
+}
+
+func (runner *collectionScriptRunner) AfterResponse(
+	_ string,
+	_ domain.Request,
+	_ domain.ScriptResponse,
+	_ map[string]string,
+	_ domain.EnvironmentResolver,
+) domain.ScriptOutcome {
+	return domain.ScriptOutcome{CollectionChanges: []domain.CollectionChange{{Name: "cookies", Value: "a=1; b=2"}}}
+}
+
+type failingCollectionWriter struct{}
+
+func (failingCollectionWriter) ApplyCollectionChanges(_ string, _ string, _ []domain.CollectionChange) error {
+	return errors.New("no settings to write to")
+}
+
+type fakeCollectionWriter struct {
+	requestPath string
+	changes     []domain.CollectionChange
+}
+
+func (writer *fakeCollectionWriter) ApplyCollectionChanges(_ string, requestPath string, changes []domain.CollectionChange) error {
+	writer.requestPath = requestPath
+	writer.changes = changes
+	return nil
+}
+
+func TestSendSavesScriptCollectionChanges(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		_, _ = writer.Write([]byte("ok"))
+	}))
+	defer server.Close()
+
+	request := domain.Request{
+		Method:  domain.MethodGet,
+		URL:     server.URL,
+		Scripts: &domain.Scripts{PostResponse: "awake.collection.setVariable('cookies', 'a=1; b=2')"},
+	}
+
+	service := newTestService(t, fakeSource{request: request})
+	SetScriptRunner(service, &collectionScriptRunner{})
+	writer := &fakeCollectionWriter{}
+	SetCollectionWriter(service, writer)
+
+	response, err := service.Send(t.TempDir(), "collections/users/list.yaml", "")
+	if err != nil {
+		t.Fatalf("send request: %v", err)
+	}
+	service.Close(response.ID)
+
+	if writer.requestPath != "collections/users/list.yaml" || len(writer.changes) != 1 || writer.changes[0].Name != "cookies" {
+		t.Errorf("unexpected saved changes: %+v", writer)
+	}
+	if response.PostResponseOutcome.CollectionError != "" {
+		t.Errorf("unexpected collection error: %s", response.PostResponseOutcome.CollectionError)
+	}
+}
+
+func TestSendReportsCollectionWriteFailure(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		_, _ = writer.Write([]byte("ok"))
+	}))
+	defer server.Close()
+
+	request := domain.Request{
+		Method:  domain.MethodGet,
+		URL:     server.URL,
+		Scripts: &domain.Scripts{PostResponse: "awake.collection.setVariable('cookies', 'a=1')"},
+	}
+
+	service := newTestService(t, fakeSource{request: request})
+	SetScriptRunner(service, &collectionScriptRunner{})
+	SetCollectionWriter(service, failingCollectionWriter{})
+
+	response, err := service.Send(t.TempDir(), "collections/users/list.yaml", "")
+	if err != nil {
+		t.Fatalf("send request: %v", err)
+	}
+	service.Close(response.ID)
+
+	if response.PostResponseOutcome.CollectionError != "no settings to write to" {
+		t.Errorf("unexpected collection error: %s", response.PostResponseOutcome.CollectionError)
+	}
+}
+
 func TestSendSavesScriptEnvironmentChanges(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		_, _ = writer.Write([]byte("ok"))

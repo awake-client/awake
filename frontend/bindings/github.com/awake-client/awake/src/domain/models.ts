@@ -120,6 +120,24 @@ export interface EnvironmentChange {
 }
 
 /**
+ * CollectionChange is a variable a script stores in, or removes from, the
+ * collection of the running request. A shared change goes to the tracked
+ * collection.yaml; a local one to the git ignored collection.local.yaml kept
+ * on this machine.
+ */
+export interface CollectionChange {
+    "Name": string;
+    "Value": string;
+    "Removed": boolean;
+
+    /**
+     * Local is true for a variable stored in the local overrides of the
+     * collection, which stay on this machine.
+     */
+    "Local": boolean;
+}
+
+/**
  * Header is a request header.
  */
 export interface Header {
@@ -283,6 +301,17 @@ export interface ScriptOutcome {
      * EnvironmentError explains why the environment changes were not saved.
      */
     "EnvironmentError": string;
+
+    /**
+     * CollectionChanges lists, in order, the variables the script stored in
+     * the collection of the request.
+     */
+    "CollectionChanges": CollectionChange[] | null;
+
+    /**
+     * CollectionError explains why the collection changes were not saved.
+     */
+    "CollectionError": string;
 }
 
 /**

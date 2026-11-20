@@ -378,6 +378,11 @@ type ScriptOutcome struct {
 	EnvironmentChanges []EnvironmentChange
 	// EnvironmentError explains why the environment changes were not saved.
 	EnvironmentError string
+	// CollectionChanges lists, in order, the variables the script stored in
+	// the collection of the request.
+	CollectionChanges []CollectionChange
+	// CollectionError explains why the collection changes were not saved.
+	CollectionError string
 }
 
 // ScriptRequestExecutor runs another saved request from a pre-request script.

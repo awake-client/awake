@@ -212,6 +212,44 @@ const awakeEntry = (kind: ScriptKind): ApiEntry => ({
         'The selected environment. Values set here apply to this request and are saved for the next ones.',
       members: environmentMembers('the selected environment'),
     },
+    collection: {
+      type: 'namespace',
+      detail: 'Collection',
+      documentation:
+        'The collection of the request. Values set here are saved in its collection.yaml, shared with the team through git, or in collection.local.yaml when written through .local, which git ignores.',
+      members: {
+        setVariable: {
+          type: 'method',
+          detail: '(name: string, value: any): void',
+          documentation:
+            'Saves a variable in the collection of the request, committed to git with the collection. The collection must have been saved once in the interface.',
+        },
+        unset: {
+          type: 'method',
+          detail: '(name: string): void',
+          documentation: 'Removes a variable from the collection of the request.',
+        },
+        local: {
+          type: 'namespace',
+          detail: 'LocalCollection',
+          documentation:
+            'The local overrides of the collection, stored in the git ignored collection.local.yaml and kept on this machine.',
+          members: {
+            setVariable: {
+              type: 'method',
+              detail: '(name: string, value: any): void',
+              documentation:
+                'Saves a variable in collection.local.yaml, which git ignores so the value stays on this machine. Good for session values such as cookies.',
+            },
+            unset: {
+              type: 'method',
+              detail: '(name: string): void',
+              documentation: 'Removes a variable from collection.local.yaml.',
+            },
+          },
+        },
+      },
+    },
     environments: {
       type: 'namespace',
       detail: 'Environments',

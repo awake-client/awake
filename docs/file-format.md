@@ -122,7 +122,8 @@ so they never mix with global ones.
 From lowest to highest precedence:
 
 1. workspace defaults (`awake.yaml`);
-2. collection variables (`collection.yaml`);
+2. collection variables (`collection.yaml`), then the local overrides of the
+   collection (`collection.local.yaml`), which git ignores;
 3. global environment, then its local overrides and secrets;
 4. collection environment of the same name, then its local overrides and
    secrets; the private file of an environment stands for the environment
@@ -255,6 +256,10 @@ The `awake` helper provides:
 | `awake.environment.set(name, value)` | Saves a variable in the selected environment |
 | `awake.environment.unset(name)` | Removes a variable saved in the selected environment |
 | `awake.environments.get(name)` | Opens another environment by file or display name, with its own `get`, `set` and `unset` |
+| `awake.collection.setVariable(name, value)` | Saves a variable in the collection of the request |
+| `awake.collection.unset(name)` | Removes a variable from the collection of the request |
+| `awake.collection.local.setVariable(name, value)` | Saves a variable in the local overrides of the collection, which git ignores |
+| `awake.collection.local.unset(name)` | Removes a variable from the local overrides of the collection |
 | `awake.runRequest(path, options)` | Runs another saved request before this one and returns its response |
 
 `console.log`, `info`, `debug`, `warn` and `error` also write to the script
@@ -289,7 +294,18 @@ secret. Values that are not strings are stored as JSON. Without a selected
 environment, nothing is saved and the response reports it.
 `awake.environments.get(name)` follows the same rules for the environment it
 opens, looking in the request's collection and in the workspace; its changes
-are saved but do not affect the running request. A failing script does not abort the request; its error is
+are saved but do not affect the running request.
+
+`awake.collection.setVariable` saves the value in the variables of the
+request's collection, keeping the rest of `collection.yaml` and its comments.
+Since collections are committed to git, the value is shared with the whole
+team; removing a name uses `awake.collection.unset`. To keep a value on this
+machine only, store it in the local overrides with
+`awake.collection.local.setVariable` and `awake.collection.local.unset`: they
+write to the git ignored `collection.local.yaml`, which wins over the shared
+collection variables when resolving `{{name}}`, like the local overrides of an
+environment. The collection must have been saved once in the interface for the
+shared write. A failing script does not abort the request; its error is
 reported with the response. Post-response scripts see the response preview
 (first 256 KiB), so assertions on a large body only cover that preview.
 

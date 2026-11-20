@@ -344,3 +344,51 @@ func TestResolveAuthenticationReturnsTheDefiningEntry(t *testing.T) {
 		t.Errorf("expected the variables of a collection, got %v, %v", layers, err)
 	}
 }
+
+func TestLoadVariableLayersPrefersLocalCollectionVariables(t *testing.T) {
+	root := t.TempDir()
+	if _, err := workspace.NewService().Create(root, workspace.CreateOptions{Name: "Local", Mode: workspace.ModeTeam}); err != nil {
+		t.Fatalf("create workspace: %v", err)
+	}
+	write := func(path string, content string) {
+		t.Helper()
+		full := filepath.Join(root, filepath.FromSlash(path))
+		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(full, []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write("collections/billing/collection.yaml", "name: Billing\nvariables:\n  baseUrl: https://api.example.com\n  cookies: shared\n")
+	write("collections/billing/collection.local.yaml", "# kept on this machine\nvariables:\n  cookies: local-secret\n")
+
+	source := requestSource{}
+	layers, err := source.LoadVariableLayers(root, "collections/billing/invoices/list.yaml", "")
+	if err != nil {
+		t.Fatalf("load layers: %v", err)
+	}
+
+	merged := map[string]string{}
+	for _, layer := range layers {
+		for name, value := range layer.Values {
+			merged[name] = value
+		}
+	}
+	if merged["baseUrl"] != "https://api.example.com" {
+		t.Errorf("expected the shared baseUrl to remain, got %q", merged["baseUrl"])
+	}
+	if merged["cookies"] != "local-secret" {
+		t.Errorf("expected the local cookies to win, got %q", merged["cookies"])
+	}
+
+	foundLocal := false
+	for _, layer := range layers {
+		if layer.Source == "collections/billing (local)" {
+			foundLocal = true
+		}
+	}
+	if !foundLocal {
+		t.Errorf("expected a collection (local) layer, got %+v", layers)
+	}
+}

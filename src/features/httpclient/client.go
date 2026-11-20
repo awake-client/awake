@@ -90,6 +90,13 @@ type EnvironmentWriter interface {
 	) error
 }
 
+// CollectionWriter saves the variables a script stores in the collection of
+// the request. The application layer supplies the implementation so this
+// feature does not depend on the collections feature.
+type CollectionWriter interface {
+	ApplyCollectionChanges(workspaceRoot string, requestPath string, changes []domain.CollectionChange) error
+}
+
 // Service exposes request execution to the application layer.
 type Service struct {
 	source       Source
@@ -101,6 +108,7 @@ type Service struct {
 	oauth2       OAuth2TokenProvider
 	scripts      ScriptRunner
 	environments EnvironmentWriter
+	collections  CollectionWriter
 }
 
 // NewService returns an HTTP client service backed by source.
@@ -145,6 +153,13 @@ func SetEnvironmentWriter(service *Service, writer EnvironmentWriter) {
 	service.environments = writer
 }
 
+// SetCollectionWriter lets scripts save variables in the collection of the
+// request. It is a package function rather than a service method, so the
+// writer never crosses the Wails bridge.
+func SetCollectionWriter(service *Service, writer CollectionWriter) {
+	service.collections = writer
+}
+
 // Send executes a request and streams its body to the response store.
 func (service *Service) Send(workspaceRoot string, requestPath string, environmentFileName string) (Response, error) {
 	return service.send(workspaceRoot, requestPath, environmentFileName, sendOptions{
@@ -186,6 +201,7 @@ func (service *Service) send(workspaceRoot string, requestPath string, environme
 	environments := service.environmentResolver(workspaceRoot, requestPath)
 	layers, preRequestOutcome := service.runPreRequest(workspaceRoot, requestPath, environmentFileName, &request, layers, environments, options)
 	service.saveEnvironmentChanges(workspaceRoot, requestPath, environmentFileName, &preRequestOutcome)
+	service.saveCollectionChanges(workspaceRoot, requestPath, &preRequestOutcome)
 
 	oauth2Token, err := service.oauth2Token(workspaceRoot, requestPath, environmentFileName, request, layers)
 	if err != nil {
@@ -235,6 +251,7 @@ func (service *Service) send(workspaceRoot string, requestPath string, environme
 	response.PreRequestOutcome = preRequestOutcome
 	response.PostResponseOutcome = service.runPostResponse(request, response, layers, environments)
 	service.saveEnvironmentChanges(workspaceRoot, requestPath, environmentFileName, &response.PostResponseOutcome)
+	service.saveCollectionChanges(workspaceRoot, requestPath, &response.PostResponseOutcome)
 	if options.recordHistory {
 		response.HistoryWarning = service.recordHistory(workspaceRoot, requestPath, environmentFileName, request, sent, response)
 	}
@@ -421,6 +438,21 @@ func (service *Service) saveEnvironmentChanges(workspaceRoot string, requestPath
 		}
 	}
 	outcome.EnvironmentError = strings.Join(failures, "; ")
+}
+
+// saveCollectionChanges writes what a script stored with awake.collection,
+// and reports a failure on the outcome rather than failing the request.
+func (service *Service) saveCollectionChanges(workspaceRoot string, requestPath string, outcome *domain.ScriptOutcome) {
+	if len(outcome.CollectionChanges) == 0 {
+		return
+	}
+	if service.collections == nil {
+		outcome.CollectionError = "collection writer is not configured"
+		return
+	}
+	if err := service.collections.ApplyCollectionChanges(workspaceRoot, requestPath, outcome.CollectionChanges); err != nil {
+		outcome.CollectionError = err.Error()
+	}
 }
 
 // environmentResolver lets scripts open other environments by name.

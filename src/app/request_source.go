@@ -130,17 +130,32 @@ func (source requestSource) LoadVariableLayers(workspaceRoot string, requestPath
 	scopes := environments.ScopesOfRequest(requestPath)
 
 	// Default variables of the collection and of the folder of the request,
-	// weakest first, before the environment layers refine them.
+	// weakest first, before the environment layers refine them. A collection
+	// may also hold local variables on collection.local.yaml, which git
+	// ignores and which override its shared variables on this machine, like
+	// the local overrides of an environment.
+	collectionRepository := collections.NewRepository(workspaceRoot)
+	collectionPath, _ := collectionRepository.CollectionOfRequest(requestPath)
 	for _, scope := range scopes {
 		if scope == "" {
 			continue
 		}
-		collection, err := collections.NewRepository(workspaceRoot).LoadCollection(scope)
+		collection, err := collectionRepository.LoadCollection(scope)
 		if err != nil && !errors.Is(err, collections.ErrEntryNotFound) {
 			return nil, err
 		}
 		if err == nil && len(collection.Variables) > 0 {
 			layers = append(layers, variables.Layer{Source: scope, Values: collection.Variables})
+		}
+		if scope != collectionPath {
+			continue
+		}
+		local, err := collectionRepository.LocalVariables(scope)
+		if err != nil {
+			return nil, err
+		}
+		if len(local) > 0 {
+			layers = append(layers, variables.Layer{Source: scope + " (local)", Values: local})
 		}
 	}
 

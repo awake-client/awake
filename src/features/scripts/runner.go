@@ -188,6 +188,34 @@ func installHelper(runtime *goja.Runtime, variablesObject *goja.Object, environm
 		_ = variablesObject.Set(name, valueToString(value))
 	})
 
+	// The collection of the request saves what the script stores: the shared
+	// variables, committed through git, and the local overrides on
+	// collection.local.yaml, which stay on this machine. The local variables
+	// object follows, like awake.environment.set.
+	collection := runtime.NewObject()
+	_ = collection.Set("setVariable", func(name string, value goja.Value) {
+		text := valueToString(value)
+		_ = variablesObject.Set(name, text)
+		outcome.CollectionChanges = append(outcome.CollectionChanges, domain.CollectionChange{Name: name, Value: text})
+	})
+	_ = collection.Set("unset", func(name string) {
+		_ = variablesObject.Delete(name)
+		outcome.CollectionChanges = append(outcome.CollectionChanges, domain.CollectionChange{Name: name, Removed: true})
+	})
+
+	local := runtime.NewObject()
+	_ = local.Set("setVariable", func(name string, value goja.Value) {
+		text := valueToString(value)
+		_ = variablesObject.Set(name, text)
+		outcome.CollectionChanges = append(outcome.CollectionChanges, domain.CollectionChange{Name: name, Value: text, Local: true})
+	})
+	_ = local.Set("unset", func(name string) {
+		_ = variablesObject.Delete(name)
+		outcome.CollectionChanges = append(outcome.CollectionChanges, domain.CollectionChange{Name: name, Removed: true, Local: true})
+	})
+	_ = collection.Set("local", local)
+	_ = helper.Set("collection", collection)
+
 	environment := runtime.NewObject()
 	_ = environment.Set("get", func(name string) goja.Value {
 		return readVariable(variablesObject, name)

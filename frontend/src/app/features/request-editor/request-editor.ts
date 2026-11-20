@@ -774,6 +774,15 @@ export class RequestEditor {
       this.htmlPreview.set(false);
       this.largeResponseShown.set(false);
 
+      // A script may have stored variables in collection.yaml: reload the tree
+      // and the resolved variables so the change shows immediately.
+      if (
+        (response.PostResponseOutcome?.CollectionChanges?.length ?? 0) > 0 ||
+        (response.PreRequestOutcome?.CollectionChanges?.length ?? 0) > 0
+      ) {
+        notifyCollectionsChanged();
+      }
+
       if (response.Encoding === 'utf-8') {
         this.responseBody.set(response.Preview);
         this.responseNextOffset = new TextEncoder().encode(response.Preview).length;
@@ -1107,6 +1116,8 @@ export class RequestEditor {
         Error: '',
         EnvironmentChanges: null,
         EnvironmentError: '',
+        CollectionChanges: null,
+        CollectionError: '',
       };
       this.response.set({
         ID: '',
@@ -1587,8 +1598,10 @@ function hasScriptContent(outcome: ScriptOutcome | null | undefined): boolean {
     outcome &&
     (outcome.Error ||
       outcome.EnvironmentError ||
+      outcome.CollectionError ||
       (outcome.Logs?.length ?? 0) > 0 ||
       (outcome.Tests?.length ?? 0) > 0 ||
-      (outcome.EnvironmentChanges?.length ?? 0) > 0),
+      (outcome.EnvironmentChanges?.length ?? 0) > 0 ||
+      (outcome.CollectionChanges?.length ?? 0) > 0),
   );
 }

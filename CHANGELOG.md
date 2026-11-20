@@ -14,6 +14,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   create and update requests, without ever seeing secret values. The
   Assistant page shows the command registering it and a switch turning it off
   for a workspace on this computer.
+- Request scripts can store variables in the collection of a request with
+  `awake.collection.setVariable` and remove them with
+  `awake.collection.unset`. Unlike `awake.setVariable`, the value is saved in
+  `collection.yaml` and shared with the team through git.
+  `awake.collection.local.setVariable` keeps the value on this machine in the
+  git ignored `collection.local.yaml`, which wins over the shared collection
+  variables when resolving `{{name}}`.
+
 ### Fixed
 
 - Creating a git repository and talking to a coding agent no longer flash an

@@ -35,6 +35,19 @@ describe('script completions', () => {
     expect(labels).toContain('environment');
   });
 
+  it('completes the collection variable helpers', () => {
+    const labels = complete('awake.collection.|', 'post-response')?.options.map((option) => option.label);
+    expect(labels).toContain('setVariable');
+    expect(labels).toContain('unset');
+    expect(labels).toContain('local');
+  });
+
+  it('completes the local collection helpers', () => {
+    const labels = complete('awake.collection.local.|', 'post-response')?.options.map((option) => option.label);
+    expect(labels).toContain('setVariable');
+    expect(labels).toContain('unset');
+  });
+
   it('completes the request paths of awake.runRequest', () => {
     const result = complete('awake.runRequest("coll|', 'pre-request', REQUESTS);
     expect(result?.from).toBe('awake.runRequest("'.length);
