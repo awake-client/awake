@@ -21,9 +21,16 @@ import {
   syntaxHighlighting,
 } from '@codemirror/language';
 import { openSearchPanel, search, searchKeymap } from '@codemirror/search';
-import { Compartment, EditorState, Extension } from '@codemirror/state';
+import {
+  Annotation,
+  Compartment,
+  EditorSelection,
+  EditorState,
+  Extension,
+} from '@codemirror/state';
 import {
   EditorView,
+  drawSelection,
   highlightActiveLine,
   highlightActiveLineGutter,
   keymap,
@@ -37,6 +44,9 @@ import { ScriptKind, scriptLanguage } from './script-language';
 
 /** Languages the editor highlights. */
 export type CodeLanguage = 'json' | 'xml' | 'text' | 'javascript';
+
+/** Marks a document replaced from outside, which is not an edit to report. */
+const externalChange = Annotation.define<boolean>();
 
 /**
  * Syntax colors, taken from the application tokens so they follow the light
@@ -89,6 +99,12 @@ const theme = EditorView.theme({
   '.cm-lineNumbers .cm-gutterElement': { padding: '0 6px 0 12px', minWidth: '28px' },
   '.cm-foldGutter .cm-gutterElement': { padding: '0 4px', cursor: 'pointer' },
   '.cm-activeLine': { backgroundColor: 'var(--color-hover)' },
+  // The cursor line and its brackets only matter while the editor is in use.
+  '&:not(.cm-focused) .cm-activeLine': { backgroundColor: 'transparent' },
+  '&:not(.cm-focused) .cm-matchingBracket, &:not(.cm-focused) .cm-nonmatchingBracket': {
+    backgroundColor: 'transparent',
+    outline: 'none',
+  },
   '.cm-activeLineGutter': {
     backgroundColor: 'transparent',
     color: 'var(--color-text-muted)',
@@ -278,6 +294,10 @@ export class CodeEditor {
             highlightActiveLineGutter(),
             highlightActiveLine(),
             history(),
+            // CodeMirror draws the cursor and the selection itself: WebKit
+            // paints its native caret at a stale place once the content is
+            // replaced, as when switching between shared and local versions.
+            drawSelection(),
             indentOnInput(),
             bracketMatching(),
             EditorView.lineWrapping,
@@ -297,7 +317,10 @@ export class CodeEditor {
             this.editable.of(editableExtension(this.readOnly())),
             placeholderExtension(this.placeholder()),
             EditorView.updateListener.of((update) => {
-              if (update.docChanged) {
+              const edited = update.transactions.some(
+                (transaction) => transaction.docChanged && !transaction.annotation(externalChange),
+              );
+              if (edited) {
                 this.valueChange.emit(update.state.doc.toString());
               }
             }),
@@ -311,7 +334,17 @@ export class CodeEditor {
       const value = this.value();
       const view = this.view;
       if (view && view.state.doc.toString() !== value) {
-        view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: value } });
+        // Keep the cursor where it was, within the new text, rather than
+        // letting the whole replacement send it back to the start.
+        const { anchor, head } = view.state.selection.main;
+        view.dispatch({
+          changes: { from: 0, to: view.state.doc.length, insert: value },
+          selection: EditorSelection.single(
+            Math.min(anchor, value.length),
+            Math.min(head, value.length),
+          ),
+          annotations: externalChange.of(true),
+        });
       }
     });
     effect(() => {
