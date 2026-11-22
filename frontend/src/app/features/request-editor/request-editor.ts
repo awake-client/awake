@@ -393,7 +393,9 @@ export class RequestEditor {
     const message = this.responseError();
     return message ? describeSendFailure(message) : null;
   });
-  protected readonly isSending = signal(false);
+  /** Requests waiting for a response, so switching tabs keeps each its own state. */
+  private readonly sendingPaths = signal<ReadonlySet<string>>(new Set());
+  protected readonly isSending = computed(() => this.sendingPaths().has(this.requestPath()));
   protected readonly isLoadingChunk = signal(false);
 
   /** Images get a picture instead of the "binary response" note. */
@@ -785,7 +787,8 @@ export class RequestEditor {
       return;
     }
 
-    this.isSending.set(true);
+    const path = this.requestPath();
+    this.setSending(path, true);
     this.responseError.set(null);
     this.lastRunAt.set(null);
     await this.closeResponse();
@@ -793,15 +796,9 @@ export class RequestEditor {
     try {
       const response = await HTTPClientService.Send(
         this.workspaceStore.rootPath() ?? '',
-        this.requestPath(),
+        path,
         this.environmentStore.selected(),
       );
-
-      this.response.set(response);
-      this.responseTab.set('body');
-      this.responseHasMore.set(false);
-      this.htmlPreview.set(false);
-      this.largeResponseShown.set(false);
 
       // A script may have stored variables in collection.yaml: reload the tree
       // and the resolved variables so the change shows immediately.
@@ -812,21 +809,70 @@ export class RequestEditor {
         notifyCollectionsChanged();
       }
 
-      if (response.Encoding === 'utf-8') {
-        this.responseBody.set(response.Preview);
-        this.responseNextOffset = new TextEncoder().encode(response.Preview).length;
-        this.responseHasMore.set(this.responseNextOffset < response.Size);
-      } else {
-        this.responseBody.set('');
-        this.responseNextOffset = 0;
+      const body = initialBody(response);
+      if (this.requestPath() !== path) {
+        this.deliverToStash(path, { response, error: null, ...body });
+        return;
       }
 
+      this.response.set(response);
+      this.responseTab.set('body');
+      this.htmlPreview.set(false);
+      this.largeResponseShown.set(false);
+      this.responseBody.set(body.responseBody);
+      this.responseNextOffset = body.responseNextOffset;
+      this.responseHasMore.set(body.responseHasMore);
       void this.loadImage(response);
     } catch (error) {
-      this.responseError.set(describeError(error));
+      if (this.requestPath() !== path) {
+        this.deliverToStash(path, { response: null, error: describeError(error), ...initialBody(null) });
+      } else {
+        this.responseError.set(describeError(error));
+      }
     } finally {
-      this.isSending.set(false);
+      this.setSending(path, false);
     }
+  }
+
+  private setSending(path: string, sending: boolean): void {
+    this.sendingPaths.update((paths) => {
+      const next = new Set(paths);
+      if (sending) {
+        next.add(path);
+      } else {
+        next.delete(path);
+      }
+      return next;
+    });
+  }
+
+  /**
+   * The user switched to another tab while the request was in flight: the
+   * outcome goes to its stashed state, shown when they come back to it.
+   */
+  private deliverToStash(
+    path: string,
+    outcome: { response: HTTPResponse | null; error: string | null } & ReturnType<typeof initialBody>,
+  ): void {
+    const state = this.tabsStore.takeStash(path);
+    if (!state) {
+      // Its tab was closed: nobody will show the response.
+      if (outcome.response?.ID) {
+        void HTTPClientService.Close(outcome.response.ID).catch(() => undefined);
+      }
+      return;
+    }
+    this.tabsStore.stash(path, {
+      ...state,
+      responseIdentifier: outcome.response?.ID,
+      response: outcome.response,
+      responseBody: outcome.responseBody,
+      responseHasMore: outcome.responseHasMore,
+      responseNextOffset: outcome.responseNextOffset,
+      responseTab: 'body',
+      responseError: outcome.error,
+      lastRunAt: null,
+    });
   }
 
   /**
@@ -1651,6 +1697,19 @@ function normalizeProtocol(protocol: Protocol | undefined): Protocol {
     default:
       return Protocol.ProtocolHTTP;
   }
+}
+
+/** The body shown first: the text preview, with an offset to read the rest. */
+function initialBody(response: HTTPResponse | null) {
+  if (!response || response.Encoding !== 'utf-8') {
+    return { responseBody: '', responseNextOffset: 0, responseHasMore: false };
+  }
+  const responseNextOffset = new TextEncoder().encode(response.Preview).length;
+  return {
+    responseBody: response.Preview,
+    responseNextOffset,
+    responseHasMore: responseNextOffset < response.Size,
+  };
 }
 
 function describeError(error: unknown): string {
