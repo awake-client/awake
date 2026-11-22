@@ -44,19 +44,19 @@ export class GitSync {
   readonly label = computed(() => {
     switch (this.state()) {
       case 'off':
-        return 'Sync off';
+        return 'Off';
       case 'syncing':
-        return 'Syncing…';
+        return 'Syncing';
       case 'conflicts':
-        return 'Conflicts to resolve';
+        return 'Conflicts';
       case 'error':
-        return 'Sync failed';
+        return 'Failed';
       case 'skipped':
         return 'Not synced';
       case 'synced':
-        return `Synced ${relativeTime(this.lastSync(), this.clock())}`;
+        return `${relativeTime(this.lastSync(), this.clock())} ago`;
       default:
-        return 'Waiting...';
+        return 'Waiting';
     }
   });
 
