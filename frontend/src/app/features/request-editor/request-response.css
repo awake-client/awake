@@ -68,15 +68,29 @@
   letter-spacing: 0.05em;
 }
 
-.response-spacer {
-  flex: 1;
+/* Status and metadata wrap inside their own group, so the tabs and the
+   close button always stay together on the right. */
+.response-summary {
+  display: flex;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 14px;
+  min-width: 0;
+}
+
+.response-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
 }
 
 .response-tabs {
   display: flex;
   flex: 0 0 auto;
   gap: 2px;
-  margin-left: auto;
 }
 
 .response-tabs .tab {
@@ -353,6 +367,18 @@
     flex-wrap: wrap;
     gap: 6px 10px;
     padding: 8px 10px 8px 14px;
+  }
+
+  .response-summary {
+    gap: 6px 10px;
+  }
+
+  .last-run-prefix {
+    display: none;
+  }
+
+  .response-tabs .tab {
+    padding: 0 8px;
   }
 
   .response-body-container,

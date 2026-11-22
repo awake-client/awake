@@ -673,81 +673,83 @@
   } @else if (isSending() || response() || responseError()) {
     <section class="response-section" [style.flex-basis.%]="layout.responseRatio() * 100">
       <header class="response-toolbar">
-        @if (isSending()) {
-          <span class="response-meta">Sending request…</span>
-        } @else if (response(); as current) {
-          <span class="status-pill" [attr.data-status]="statusClass(current)">
-            {{ current.Status }}
-          </span>
-          <span class="response-meta">{{ current.DurationMilliseconds }} ms</span>
-          <span class="response-meta">{{ formatSize(current.Size) }}</span>
-          @if (current.Truncated) {
-            <span class="response-warning">truncated</span>
-          }
-          @if (lastRunAt(); as executedAt) {
-            <span class="last-run" title="Last execution, from the history">
-              Last run · {{ lastRunLabel(executedAt) }}
+        <div class="response-summary">
+          @if (isSending()) {
+            <span class="response-meta">Sending request…</span>
+          } @else if (response(); as current) {
+            <span class="status-pill" [attr.data-status]="statusClass(current)">
+              {{ current.Status }}
             </span>
+            <span class="response-meta">{{ current.DurationMilliseconds }} ms</span>
+            <span class="response-meta">{{ formatSize(current.Size) }}</span>
+            @if (current.Truncated) {
+              <span class="response-warning">truncated</span>
+            }
+            @if (lastRunAt(); as executedAt) {
+              <span class="last-run" title="Last execution, from the history">
+                <span class="last-run-prefix">Last run · </span>{{ lastRunLabel(executedAt) }}
+              </span>
+            }
+          } @else if (responseError()) {
+            <span class="status-pill" data-status="server-error">Failed</span>
+            <span class="response-meta">The request could not be sent</span>
           }
-        } @else if (responseError()) {
-          <span class="status-pill" data-status="server-error">Failed</span>
-          <span class="response-meta">The request could not be sent</span>
-        }
+        </div>
 
-        <span class="response-spacer"></span>
-
-        @if (!response() && responseError()) {
-          <button
-            type="button"
-            class="response-close"
-            aria-label="Close"
-            title="Close"
-            (click)="closeResponsePanel()"
-          >
-            <app-icon name="close" [size]="14" />
-          </button>
-        }
-
-        @if (response()) {
-          <div class="response-tabs">
+        <div class="response-actions">
+          @if (!response() && responseError()) {
             <button
               type="button"
-              class="tab"
-              [class.active]="responseTab() === 'body'"
-              (click)="selectResponseTab('body')"
+              class="response-close"
+              aria-label="Close"
+              title="Close"
+              (click)="closeResponsePanel()"
             >
-              Body
+              <app-icon name="close" [size]="14" />
             </button>
-            <button
-              type="button"
-              class="tab"
-              [class.active]="responseTab() === 'headers'"
-              (click)="selectResponseTab('headers')"
-            >
-              Headers
-            </button>
-            @if (hasResponseScripts()) {
+          }
+
+          @if (response()) {
+            <div class="response-tabs">
               <button
                 type="button"
                 class="tab"
-                [class.active]="responseTab() === 'scripts'"
-                (click)="selectResponseTab('scripts')"
+                [class.active]="responseTab() === 'body'"
+                (click)="selectResponseTab('body')"
               >
-                Scripts
+                Body
               </button>
-            }
-          </div>
+              <button
+                type="button"
+                class="tab"
+                [class.active]="responseTab() === 'headers'"
+                (click)="selectResponseTab('headers')"
+              >
+                Headers
+              </button>
+              @if (hasResponseScripts()) {
+                <button
+                  type="button"
+                  class="tab"
+                  [class.active]="responseTab() === 'scripts'"
+                  (click)="selectResponseTab('scripts')"
+                >
+                  Scripts
+                </button>
+              }
+            </div>
 
-          <button
-            type="button"
-            class="response-close"
-            aria-label="Close response"
-            title="Close response"
-            (click)="closeResponsePanel()"
-          >
-            <app-icon name="close" [size]="14" />
-          </button>
-        }
+            <button
+              type="button"
+              class="response-close"
+              aria-label="Close response"
+              title="Close response"
+              (click)="closeResponsePanel()"
+            >
+              <app-icon name="close" [size]="14" />
+            </button>
+          }
+        </div>
       </header>
 
       @if (isSending()) {
