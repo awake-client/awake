@@ -445,3 +445,37 @@
     animation-duration: 2.4s;
   }
 }
+
+/* Send failure: a plain-language hint, with the raw error tucked away. */
+.send-failure {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 20px;
+}
+
+.send-failure-hint {
+  margin: 0;
+  color: var(--color-text);
+  font-size: var(--text-base);
+}
+
+.send-failure-details summary {
+  width: fit-content;
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.send-failure-details code {
+  display: block;
+  margin-top: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-text-muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}

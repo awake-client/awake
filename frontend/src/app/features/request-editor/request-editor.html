@@ -690,9 +690,9 @@
                 <span class="last-run-prefix">Last run · </span>{{ lastRunLabel(executedAt) }}
               </span>
             }
-          } @else if (responseError()) {
+          } @else if (sendFailure(); as failure) {
             <span class="status-pill" data-status="server-error">Failed</span>
-            <span class="response-meta">The request could not be sent</span>
+            <span class="response-meta">{{ failure.title }}</span>
           }
         </div>
 
@@ -759,8 +759,16 @@
         </div>
       }
 
-      @if (responseError(); as message) {
-        <p class="editor-message error">{{ message }}</p>
+      @if (sendFailure(); as failure) {
+        <div class="send-failure" role="alert">
+          <p class="send-failure-hint">{{ failure.hint }}</p>
+          @if (failure.details) {
+            <details class="send-failure-details">
+              <summary>Technical details</summary>
+              <code>{{ failure.details }}</code>
+            </details>
+          }
+        </div>
       }
 
       @if (response(); as current) {

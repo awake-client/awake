@@ -60,6 +60,7 @@ import { AuthEditor, describeAuthentication } from '@shared/auth-editor';
 import { CodeEditor, CodeLanguage, prettyJson } from '@shared/code-editor';
 import { DriftNotice } from './drift-notice';
 import { bodyDrift, parameterDrift } from './override-drift';
+import { describeSendFailure } from './send-failure';
 import { looksLikeMarkup, prettyMarkup } from '@shared/markup-format';
 import { ResizeHandle } from '@shared/resize-handle';
 import { applyEnvironmentAuthentication } from '@shared/environment-authentication';
@@ -388,6 +389,10 @@ export class RequestEditor {
   protected readonly responseHasMore = signal(false);
   protected readonly responseTab = signal<'body' | 'headers' | 'scripts'>('body');
   protected readonly responseError = signal<string | null>(null);
+  protected readonly sendFailure = computed(() => {
+    const message = this.responseError();
+    return message ? describeSendFailure(message) : null;
+  });
   protected readonly isSending = signal(false);
   protected readonly isLoadingChunk = signal(false);
 
