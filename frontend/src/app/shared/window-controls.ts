@@ -38,8 +38,8 @@ const unmaximiseEvent = 'common:WindowUnMaximise';
     >
       @if (maximised()) {
         <svg viewBox="0 0 10 10" aria-hidden="true">
-          <path d="M2 2h6v6" />
-          <path d="M4 4h4v4H4Z" />
+          <path d="M2.5 2.5v-2h7v7h-2" />
+          <path d="M0.5 2.5h7v7h-7Z" />
         </svg>
       } @else {
         <svg viewBox="0 0 10 10" aria-hidden="true"><path d="M0.5 0.5h9v9h-9Z" /></svg>
