@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.3] - 2026-11-23
+
 ### Changed
 
 - A request that could not be sent says why in plain words: host not found,
@@ -265,7 +267,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   showing "No environment". Scripts writing environment variables find the
   collection environment from a request in one of its folders.
 
-[Unreleased]: https://github.com/awake-client/awake/compare/v0.9.2...HEAD
+[Unreleased]: https://github.com/awake-client/awake/compare/v0.9.3...HEAD
+[0.9.3]: https://github.com/awake-client/awake/compare/v0.9.2...v0.9.3
 [0.9.2]: https://github.com/awake-client/awake/compare/v0.9.1...v0.9.2
 [0.9.1]: https://github.com/awake-client/awake/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/awake-client/awake/compare/v0.8.0...v0.9.0
