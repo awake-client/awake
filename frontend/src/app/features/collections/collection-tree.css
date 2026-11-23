@@ -300,13 +300,26 @@
   background: var(--color-accent-soft);
 }
 
-/* A line on the edge of a row shows where the dragged row is placed. */
-.tree-row.drop-before {
-  box-shadow: inset 0 2px 0 var(--color-accent);
+/* A line on the edge of a row shows where the dragged row is placed. It is a
+   separate element: an inset shadow would bend with the rounded corners. */
+.tree-row.drop-before::after,
+.tree-row.drop-after::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--color-accent);
+  pointer-events: none;
 }
 
-.tree-row.drop-after {
-  box-shadow: inset 0 -2px 0 var(--color-accent);
+.tree-row.drop-before::after {
+  top: -1px;
+}
+
+.tree-row.drop-after::after {
+  bottom: -1px;
 }
 
 .folder-icon[data-color] {
