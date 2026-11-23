@@ -54,6 +54,12 @@ interface RowMenu {
 const PRIVATE_ROOT = 'local';
 const PRIVATE_SECTION_PATH = '#private';
 
+/** Where a dragged row lands next to another row, instead of inside it. */
+interface DropPlacement {
+  anchor: string;
+  after: boolean;
+}
+
 /** One visible line of the flattened collection tree. */
 interface TreeRow {
   entry: Entry;
@@ -106,6 +112,8 @@ export class CollectionTree {
   protected readonly showHidden = this.hiddenCollections.showHidden;
   /** Folder that would receive the row being dragged. */
   protected readonly dropTarget = signal<string | null>(null);
+  /** Row the dragged row would be placed before or after. */
+  protected readonly dropPlacement = signal<DropPlacement | null>(null);
   protected readonly dragged = signal<TreeRow | null>(null);
   private readonly viewport = viewChild(CdkVirtualScrollViewport);
   private expandTimer: number | undefined;
@@ -597,9 +605,12 @@ export class CollectionTree {
     notifyCollectionsChanged({ removed });
   }
 
-  /** Requests and folders can be dragged; collections stay at the root. */
+  /**
+   * Every row can be dragged: requests and folders move between folders and
+   * reorder among their siblings, collections reorder among the collections.
+   */
   protected canDrag(row: TreeRow): boolean {
-    return !row.section && row.depth > 0;
+    return !row.section;
   }
 
   protected startDrag(event: DragEvent, row: TreeRow): void {
@@ -616,23 +627,23 @@ export class CollectionTree {
   }
 
   /**
-   * Hovering a folder targets it; hovering a request targets its folder. A
-   * collapsed folder opens after a short pause, so deep moves stay possible.
+   * The upper or lower edge of a row places the dragged row before or after
+   * it; the middle of a folder drops it inside, and hovering a request inside
+   * targets its folder. A collapsed folder opens after a short pause, so deep
+   * moves stay possible.
    */
   protected dragOver(event: DragEvent, row: TreeRow): void {
     const dragged = this.dragged();
     if (!dragged || row.section) {
       return;
     }
-    const target = this.isRequest(row)
-      ? row.entry.Path.slice(0, row.entry.Path.lastIndexOf('/'))
-      : row.entry.Path;
-    const source = dragged.entry.Path;
-    const parent = source.slice(0, source.lastIndexOf('/'));
-    const intoItself =
-      !this.isRequest(dragged) && (target === source || target.startsWith(`${source}/`));
-    if (intoItself || target === parent) {
-      this.dropTarget.set(null);
+
+    const element = event.currentTarget as HTMLElement | null;
+    const bounds = element?.getBoundingClientRect();
+    const ratio = bounds && bounds.height > 0 ? (event.clientY - bounds.top) / bounds.height : 0.5;
+    const drop = this.dropFor(dragged, row, ratio);
+    if (!drop) {
+      this.clearDrop();
       return;
     }
 
@@ -640,8 +651,20 @@ export class CollectionTree {
     if (event.dataTransfer) {
       event.dataTransfer.dropEffect = 'move';
     }
-    if (this.dropTarget() !== target) {
-      this.dropTarget.set(target);
+
+    if (typeof drop !== 'string') {
+      const current = this.dropPlacement();
+      if (current?.anchor !== drop.anchor || current.after !== drop.after) {
+        window.clearTimeout(this.expandTimer);
+        this.dropTarget.set(null);
+        this.dropPlacement.set(drop);
+      }
+      return;
+    }
+
+    this.dropPlacement.set(null);
+    if (this.dropTarget() !== drop) {
+      this.dropTarget.set(drop);
       window.clearTimeout(this.expandTimer);
       if (!this.isRequest(row) && !row.expanded) {
         this.expandTimer = window.setTimeout(() => {
@@ -654,47 +677,178 @@ export class CollectionTree {
     }
   }
 
+  /**
+   * What dropping the dragged row on a row at a vertical ratio would do: the
+   * folder it moves into, a place next to the row, or nothing.
+   */
+  private dropFor(dragged: TreeRow, row: TreeRow, ratio: number): string | DropPlacement | null {
+    const source = dragged.entry.Path;
+    const anchor = row.entry.Path;
+    if (anchor === source) {
+      return null;
+    }
+
+    // A collection only finds a place among the collections of its root.
+    if (dragged.depth === 0) {
+      if (row.depth !== 0 || rootOf(anchor) !== rootOf(source)) {
+        return null;
+      }
+      return { anchor, after: ratio >= 0.5 };
+    }
+
+    const insideDragged = !this.isRequest(dragged) && anchor.startsWith(`${source}/`);
+    if (insideDragged) {
+      return null;
+    }
+
+    if (this.isRequest(row)) {
+      return { anchor, after: ratio >= 0.5 };
+    }
+    // A folder keeps its edges for placing; the lower edge of an open folder
+    // sits above its first child, so it drops inside instead.
+    if (row.depth > 0 && ratio < 0.25) {
+      return { anchor, after: false };
+    }
+    if (row.depth > 0 && ratio > 0.75 && !row.expanded) {
+      return { anchor, after: true };
+    }
+    return anchor === parentOf(source) ? null : anchor;
+  }
+
   protected async drop(event: DragEvent): Promise<void> {
     event.preventDefault();
     const dragged = this.dragged();
     const target = this.dropTarget();
+    const placement = this.dropPlacement();
     this.endDrag();
-    const workspaceRoot = this.workspaceRoot();
-    if (!dragged || !target || !workspaceRoot) {
+    if (!dragged) {
       return;
     }
+    if (placement) {
+      await this.arrange(dragged, placement);
+    } else if (target) {
+      await this.moveInto(dragged, target);
+    }
+  }
 
+  private async moveInto(dragged: TreeRow, target: string): Promise<void> {
+    const workspaceRoot = this.workspaceRoot();
+    if (!workspaceRoot) {
+      return;
+    }
     try {
       const moved = await CollectionsService.Move(workspaceRoot, dragged.entry.Path, target);
-      // The history follows the request; failing to update it must not undo the move.
-      await HistoryService.RenameRequests(workspaceRoot, dragged.entry.Path, moved).catch(
-        () => undefined,
-      );
-      this.errorMessage.set(null);
-      notifyCollectionsChanged({
-        moved: { from: dragged.entry.Path, to: moved },
-        created: moved,
-        kind: this.isRequest(dragged) ? 'request' : 'folder',
-      });
+      await this.followMove(workspaceRoot, dragged, moved);
     } catch (error) {
       this.errorMessage.set(describeMoveError(error));
     }
   }
 
+  /** Places a row before or after another, moving it to that row's folder. */
+  private async arrange(dragged: TreeRow, placement: DropPlacement): Promise<void> {
+    const workspaceRoot = this.workspaceRoot();
+    if (!workspaceRoot) {
+      return;
+    }
+    try {
+      const moved = await CollectionsService.Arrange(
+        workspaceRoot,
+        dragged.entry.Path,
+        placement.anchor,
+        placement.after,
+      );
+      await this.followMove(workspaceRoot, dragged, moved);
+    } catch (error) {
+      this.errorMessage.set(describeMoveError(error));
+    }
+  }
+
+  /** Reloads the tree after a move or a new order, and follows the entry. */
+  private async followMove(workspaceRoot: string, dragged: TreeRow, moved: string): Promise<void> {
+    const kind: CreationKind = this.isRequest(dragged)
+      ? 'request'
+      : dragged.depth === 0
+        ? 'collection'
+        : 'folder';
+    if (moved !== dragged.entry.Path) {
+      // The history follows the request; failing to update it must not undo the move.
+      await HistoryService.RenameRequests(workspaceRoot, dragged.entry.Path, moved).catch(
+        () => undefined,
+      );
+    }
+    this.errorMessage.set(null);
+    notifyCollectionsChanged({
+      moved: moved !== dragged.entry.Path ? { from: dragged.entry.Path, to: moved } : undefined,
+      created: moved,
+      kind,
+    });
+  }
+
+  /** Moves a row above or below its neighbor, from the menu or the keyboard. */
+  protected async moveBy(row: TreeRow, offset: -1 | 1): Promise<void> {
+    const neighbor = this.sibling(row, offset);
+    if (neighbor) {
+      await this.arrange(row, { anchor: neighbor.entry.Path, after: offset > 0 });
+    }
+  }
+
+  protected moveFromRowMenu(offset: -1 | 1): void {
+    const menu = this.rowMenu();
+    this.rowMenu.set(null);
+    if (menu) {
+      void this.moveBy(menu.row, offset);
+    }
+  }
+
+  /** Reports whether a row has a neighbor to swap places with. */
+  protected canMove(row: TreeRow, offset: -1 | 1): boolean {
+    return this.sibling(row, offset) !== null;
+  }
+
+  /** The previous or next visible row of the same folder, or collection root. */
+  private sibling(row: TreeRow, offset: -1 | 1): TreeRow | null {
+    if (row.section) {
+      return null;
+    }
+    const rows = this.rows();
+    const parent = parentOf(row.entry.Path);
+    for (
+      let index = rows.findIndex((candidate) => candidate.entry.Path === row.entry.Path) + offset;
+      index >= 0 && index < rows.length;
+      index += offset
+    ) {
+      const candidate = rows[index];
+      if (candidate.section || candidate.depth < row.depth) {
+        return null;
+      }
+      if (candidate.depth === row.depth) {
+        return parentOf(candidate.entry.Path) === parent ? candidate : null;
+      }
+    }
+    return null;
+  }
+
   /** Requests directly inside the targeted folder are tinted with it. */
   protected isInDropTarget(row: TreeRow): boolean {
     const target = this.dropTarget();
-    return (
-      target !== null &&
-      this.isRequest(row) &&
-      row.entry.Path.slice(0, row.entry.Path.lastIndexOf('/')) === target
-    );
+    return target !== null && this.isRequest(row) && parentOf(row.entry.Path) === target;
+  }
+
+  /** Reports whether the dragged row would land just before or after a row. */
+  protected isPlacedNextTo(row: TreeRow, after: boolean): boolean {
+    const placement = this.dropPlacement();
+    return placement?.anchor === row.entry.Path && placement.after === after;
+  }
+
+  private clearDrop(): void {
+    window.clearTimeout(this.expandTimer);
+    this.dropTarget.set(null);
+    this.dropPlacement.set(null);
   }
 
   protected endDrag(): void {
-    window.clearTimeout(this.expandTimer);
+    this.clearDrop();
     this.dragged.set(null);
-    this.dropTarget.set(null);
   }
 
   /** A double click keeps the request open in its own tab. */
@@ -859,6 +1013,16 @@ export class CollectionTree {
   private toRows(entries: Entry[], depth: number): TreeRow[] {
     return entries.map((entry) => ({ entry, depth, expanded: false }));
   }
+}
+
+/** Directory holding an entry, such as collections/platform for a request in it. */
+function parentOf(path: string): string {
+  return path.slice(0, path.lastIndexOf('/'));
+}
+
+/** Collection root of an entry: collections, or local for private ones. */
+function rootOf(path: string): string {
+  return path.split('/')[0];
 }
 
 function privateSectionRow(): TreeRow {

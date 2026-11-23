@@ -18,4 +18,9 @@ export class Shortcuts {
   key(key: string): string {
     return this.isMac ? `⌘${key}` : `Ctrl+${key}`;
   }
+
+  /** One key with the Alt modifier: ⌥↑ on macOS, Alt+↑ elsewhere. */
+  alt(key: string): string {
+    return this.isMac ? `⌥${key}` : `Alt+${key}`;
+  }
 }

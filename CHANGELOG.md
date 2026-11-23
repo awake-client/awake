@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Requests, folders and collections can be reordered by dragging them onto
+  the upper or lower edge of another row, or with Move up and Move down in
+  their menu (Alt+↑ and Alt+↓). The order is saved in the collection and
+  folder files, so it is shared through git; private collections keep theirs
+  on this computer.
+
 ## [0.9.3] - 2026-11-23
 
 ### Changed

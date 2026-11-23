@@ -300,6 +300,15 @@
   background: var(--color-accent-soft);
 }
 
+/* A line on the edge of a row shows where the dragged row is placed. */
+.tree-row.drop-before {
+  box-shadow: inset 0 2px 0 var(--color-accent);
+}
+
+.tree-row.drop-after {
+  box-shadow: inset 0 -2px 0 var(--color-accent);
+}
+
 .folder-icon[data-color] {
   color: var(--entity-color);
 }
