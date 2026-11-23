@@ -50,6 +50,13 @@ func (tools *tools) registerWrite(server *sdk.Server) {
 	}, tools.updateRequest)
 
 	sdk.AddTool(server, &sdk.Tool{
+		Name: "delete_request",
+		Description: "Delete a request file and its local overrides. Folders and collections cannot be " +
+			"deleted. A shared request can be restored with git; a private one, under local/, cannot.",
+		Annotations: &sdk.ToolAnnotations{Title: "Delete a request", DestructiveHint: boolPointer(true), OpenWorldHint: boolPointer(false)},
+	}, tools.deleteRequest)
+
+	sdk.AddTool(server, &sdk.Tool{
 		Name:        "create_folder",
 		Description: "Create a folder inside an existing collection or folder.",
 		Annotations: &sdk.ToolAnnotations{Title: "Create a folder", DestructiveHint: boolPointer(false), OpenWorldHint: boolPointer(false)},
@@ -98,6 +105,16 @@ func (tools *tools) savedRequest(path string) (*sdk.CallToolResult, requestOutpu
 		return nil, requestOutput{}, err
 	}
 	return nil, requestOutput{Path: path, Request: object}, nil
+}
+
+func (tools *tools) deleteRequest(_ context.Context, _ *sdk.CallToolRequest, input pathInput) (*sdk.CallToolResult, pathOutput, error) {
+	if err := tools.workspace.DeleteRequest(input.Path); err != nil {
+		if errors.Is(err, ErrNotARequest) {
+			return nil, pathOutput{}, fmt.Errorf("%s is not a request; only request files can be deleted", input.Path)
+		}
+		return nil, pathOutput{}, describeEntryError(input.Path, err)
+	}
+	return nil, pathOutput{Path: input.Path}, nil
 }
 
 func (tools *tools) createFolder(_ context.Context, _ *sdk.CallToolRequest, input createFolderInput) (*sdk.CallToolResult, pathOutput, error) {

@@ -17,6 +17,9 @@ var (
 	ErrNotFound = errors.New("mcp: not found")
 	// ErrExists is returned by the ports when an entry already exists.
 	ErrExists = errors.New("mcp: already exists")
+	// ErrNotARequest is returned when a path names a folder or a collection
+	// where a request is expected.
+	ErrNotARequest = errors.New("mcp: not a request")
 )
 
 // Entry is a collection, folder or request of the workspace tree.
@@ -62,6 +65,9 @@ type Workspace interface {
 	InheritedAuthentication(path string) (InheritedAuthentication, error)
 	CreateRequest(path string, request domain.Request) error
 	UpdateRequest(path string, request domain.Request) error
+	// DeleteRequest removes a request file and its local overrides. It
+	// never removes a folder or a collection.
+	DeleteRequest(path string) error
 	CreateFolder(path string, name string) error
 	CreateCollection(path string, collection domain.Collection) error
 	Environments() ([]Environment, error)

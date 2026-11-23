@@ -125,6 +125,23 @@ func TestMCPServerListsSendsAndWritesRequests(t *testing.T) {
 		t.Fatalf("expected to read the created request, got %v", read)
 	}
 
+	failed, deleted := call("delete_request", map[string]any{"path": "collections/billing/invoices/create.yaml"})
+	if failed || deleted["path"] != "collections/billing/invoices/create.yaml" {
+		t.Fatalf("unexpected deletion: %v", deleted)
+	}
+	if _, err := os.Stat(filepath.Join(root, "collections/billing/invoices/create.yaml")); !os.IsNotExist(err) {
+		t.Errorf("expected the request file to be gone, got %v", err)
+	}
+	if failed, _ = call("delete_request", map[string]any{"path": "collections/billing/invoices/create.yaml"}); !failed {
+		t.Error("expected deleting a missing request to fail")
+	}
+	if failed, _ = call("delete_request", map[string]any{"path": "collections/billing/invoices"}); !failed {
+		t.Error("expected deleting a folder to be refused")
+	}
+	if _, err := os.Stat(filepath.Join(root, "collections/billing/invoices/list.yaml")); err != nil {
+		t.Errorf("expected the folder to be kept, got %v", err)
+	}
+
 	failed, collection := call("create_collection", map[string]any{"name": "Équipe Users", "private": true})
 	if failed || collection["path"] != "local/equipe-users" {
 		t.Errorf("unexpected collection: %v", collection)

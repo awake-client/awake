@@ -1,8 +1,8 @@
 # MCP server
 
 Awake includes a [Model Context Protocol](https://modelcontextprotocol.io)
-server, so coding agents such as Claude Code can list, read, send, create and
-update the requests of a workspace.
+server, so coding agents such as Claude Code can list, read, send, create,
+update and delete the requests of a workspace.
 
 The server is local only. The agent starts it as a subprocess and talks to it
 over stdin and stdout; no port is opened. It runs whether or not the Awake
@@ -24,7 +24,7 @@ awake mcp [--workspace <directory>] [--read-only]
 | Flag | Meaning |
 | --- | --- |
 | `--workspace` | Workspace directory. By default, the closest parent of the current directory that holds `awake.yaml`. |
-| `--read-only` | Leaves out `create_request`, `update_request`, `create_folder` and `create_collection`. Requests can still be sent. |
+| `--read-only` | Leaves out `create_request`, `update_request`, `delete_request`, `create_folder` and `create_collection`. Requests can still be sent. |
 
 ## Turn it off
 
@@ -83,11 +83,13 @@ authorization code grant needs a browser: authorize the request in Awake first.
 | --- | --- | --- |
 | `create_request` | `path`, `request` | Fails when the file exists. Missing folders are created. Returns the saved request, defaults included. |
 | `update_request` | `path`, `request` | Replaces the whole request: read it with `get_request`, change it, send it back. Fails when the file does not exist. |
+| `delete_request` | `path` | Deletes a request file and its local overrides. Fails when it does not exist, and refuses folders and collections. Returns the deleted `path`. |
 | `create_folder` | `path`, `name?` | Creates a folder in an existing collection or folder. |
 | `create_collection` | `name`, `private?` | Creates `collections/<slug>`, or `local/<slug>` when private. |
 
-Deleting and moving are not available: git and the Awake interface remain the
-way to undo or reorganize.
+Only requests can be deleted, and moving is not available: the Awake interface
+remains the way to reorganize or remove folders and collections. A deleted
+shared request can be restored with git; a private one, under `local/`, cannot.
 
 ## Resources
 

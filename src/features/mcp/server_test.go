@@ -93,14 +93,14 @@ func toolNames(t *testing.T, session *sdk.ClientSession) []string {
 
 func TestReadOnlyServersLeaveOutTheWriteTools(t *testing.T) {
 	all := strings.Join(toolNames(t, connect(t, &fakeWorkspace{}, &fakeSender{}, Options{})), ",")
-	for _, name := range []string{"list_requests", "get_request", "send_request", "create_request", "update_request", "create_folder", "create_collection"} {
+	for _, name := range []string{"list_requests", "get_request", "send_request", "create_request", "update_request", "delete_request", "create_folder", "create_collection"} {
 		if !strings.Contains(all, name) {
 			t.Errorf("expected the tool %s, got %s", name, all)
 		}
 	}
 
 	readOnly := strings.Join(toolNames(t, connect(t, &fakeWorkspace{}, &fakeSender{}, Options{ReadOnly: true})), ",")
-	if strings.Contains(readOnly, "create_") || strings.Contains(readOnly, "update_") {
+	if strings.Contains(readOnly, "create_") || strings.Contains(readOnly, "update_") || strings.Contains(readOnly, "delete_") {
 		t.Errorf("a read-only server must not offer write tools, got %s", readOnly)
 	}
 	if !strings.Contains(readOnly, "send_request") {

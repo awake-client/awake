@@ -14,6 +14,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   their menu (Alt+↑ and Alt+↓). The order is saved in the collection and
   folder files, so it is shared through git; private collections keep theirs
   on this computer.
+- Coding agents can delete a request through the MCP server with
+  `delete_request`. Folders and collections stay out of their reach.
 
 ## [0.9.3] - 2026-11-23
 

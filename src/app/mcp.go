@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"syscall"
 
 	"github.com/awake-client/awake/src/domain"
@@ -171,6 +172,22 @@ func (adapter mcpWorkspace) CreateRequest(path string, request domain.Request) e
 
 func (adapter mcpWorkspace) UpdateRequest(path string, request domain.Request) error {
 	return mcpError(adapter.collections.UpdateRequest(adapter.root, path, request))
+}
+
+// DeleteRequest only accepts a request file: the collections feature would
+// remove a directory with everything inside it.
+func (adapter mcpWorkspace) DeleteRequest(path string) error {
+	if !strings.HasSuffix(path, ".yaml") {
+		return mcp.ErrNotARequest
+	}
+	info, err := os.Stat(filepath.Join(adapter.root, filepath.FromSlash(path)))
+	if err != nil {
+		return mcpError(err)
+	}
+	if info.IsDir() {
+		return mcp.ErrNotARequest
+	}
+	return mcpError(adapter.collections.Delete(adapter.root, path))
 }
 
 func (adapter mcpWorkspace) CreateFolder(path string, name string) error {
