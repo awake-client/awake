@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- A request that could not be sent says why in plain words: host not found,
+  network unreachable, connection refused, timeout, certificate problem,
+  connection closed or invalid URL. The original error stays under Technical
+  details.
+- The sync status in the sidebar uses shorter labels, such as "Off",
+  "Conflicts" or "5 min ago".
+
+### Fixed
+
+- Switching tabs while a request is on its way no longer leaves the spinner on
+  another request, and the response lands in the tab of the request that sent
+  it.
+- On a narrow window, the response tabs and the close button stay together on
+  the right when the status line wraps.
+
 ## [0.9.2] - 2026-11-20
 
 ### Added
