@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.1] - 2026-11-23
+
 ### Fixed
 
 - The line showing where a dragged request, folder or collection lands in the
@@ -289,7 +291,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   showing "No environment". Scripts writing environment variables find the
   collection environment from a request in one of its folders.
 
-[Unreleased]: https://github.com/awake-client/awake/compare/v0.10.0...HEAD
+[Unreleased]: https://github.com/awake-client/awake/compare/v0.10.1...HEAD
+[0.10.1]: https://github.com/awake-client/awake/compare/v0.10.0...v0.10.1
 [0.10.0]: https://github.com/awake-client/awake/compare/v0.9.3...v0.10.0
 [0.9.3]: https://github.com/awake-client/awake/compare/v0.9.2...v0.9.3
 [0.9.2]: https://github.com/awake-client/awake/compare/v0.9.1...v0.9.2
