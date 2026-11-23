@@ -17,6 +17,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Coding agents can delete a request through the MCP server with
   `delete_request`. Folders and collections stay out of their reach.
 
+### Fixed
+
+- On Windows, the restore button of a maximized window shows two overlapping
+  windows with sharp lines, like the system one.
+
 ## [0.9.3] - 2026-11-23
 
 ### Changed
