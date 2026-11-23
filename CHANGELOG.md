@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- The line showing where a dragged request, folder or collection lands in the
+  tree is straight, instead of bending with the rounded corners of the row.
+
 ## [0.10.0] - 2026-11-23
 
 ### Added
