@@ -13,6 +13,7 @@ environments/
   development.yaml              shared variables, tracked by git
   development.local.yaml        local overrides, git ignored
 collections/
+  order.yaml                    order of the collections, optional
   platform/
     collection.yaml             collection metadata
     environments/
@@ -174,6 +175,26 @@ The directory tree defines nesting. A collection directory without a
 `folder.yaml` with a display name, default variables, default headers and its
 own authentication; the settings of the closest folder, then of the collection,
 apply to the requests below it.
+
+### Order
+
+Without an order, the tree lists folders first, then requests, by name.
+Reordering in the tree writes an `order` list of file and directory names:
+in `collection.yaml` for the entries of a collection, in `folder.yaml` for the
+entries of a folder, and in `order.yaml` at the root of `collections/` or
+`local/` for the collections themselves.
+
+```yaml
+name: Users
+order:
+  - list-users.yaml
+  - admins
+  - create-user.yaml
+```
+
+Entries the list leaves out, such as a request added by another teammate,
+follow the listed ones in the default order, and names that no longer exist are
+ignored. Moving or deleting an entry updates the list of its directory.
 
 ## Requests
 

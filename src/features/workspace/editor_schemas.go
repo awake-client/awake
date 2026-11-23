@@ -124,11 +124,17 @@ func editorSchemas() []editorSchema {
 			globs:    []string{"collections/**/folder.yaml", "local/**/folder.yaml"},
 		},
 		{
+			fileName: "collection-order.schema.json",
+			schema:   collectionOrderSchema(),
+			globs:    []string{"collections/order.yaml", "local/order.yaml"},
+		},
+		{
 			fileName: "request.schema.json",
 			schema:   requestSchema(),
 			globs: []string{
 				"collections/**/*.yaml", "local/**/*.yaml",
 				"!**/collection.yaml", "!**/folder.yaml", "!**/environments/*.yaml", "!**/*.local.yaml",
+				"!collections/order.yaml", "!local/order.yaml",
 			},
 		},
 		{
@@ -292,13 +298,32 @@ func collectionSchema() map[string]any {
 		"authentication": authentication(),
 		"documentation":  text("Free-form notes, in Markdown."),
 		"color":          color(),
+		"order":          order("Requests and folders of the collection, in the order the tree shows them."),
 	}, "name")
 }
 
 func folderSchema() map[string]any {
 	return document("Awake folder", map[string]any{
-		"name": text("Display name."),
+		"name":  text("Display name."),
+		"order": order("Requests and folders of the folder, in the order the tree shows them."),
 	}, "name")
+}
+
+func collectionOrderSchema() map[string]any {
+	return document("Awake collection order", map[string]any{
+		"order": order("Collection directories, in the order the tree shows them."),
+	})
+}
+
+// order lists file and directory names; the entries it leaves out follow, in
+// the default order.
+func order(description string) map[string]any {
+	return map[string]any{
+		"type":        "array",
+		"description": description,
+		"items":       map[string]any{"type": "string"},
+		"uniqueItems": true,
+	}
 }
 
 func environmentSchema(shared bool) map[string]any {

@@ -19,6 +19,15 @@ import * as domain$0 from "../../domain/models.js";
 import * as $models from "./models.js";
 
 /**
+ * Arrange places a request, a folder or a collection just before or after
+ * another entry and returns its new path. A request or folder placed next to
+ * an entry of another directory moves into it.
+ */
+export function Arrange(workspaceRoot: string, relativePath: string, anchorPath: string, after: boolean): $CancellablePromise<string> {
+    return $Call.ByID(1821507289, workspaceRoot, relativePath, anchorPath, after);
+}
+
+/**
  * CreateCollection creates a collection directory with its metadata file.
  */
 export function CreateCollection(workspaceRoot: string, relativePath: string, collection: domain$0.Collection): $CancellablePromise<void> {

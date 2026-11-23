@@ -88,6 +88,13 @@ func (service *Service) Move(workspaceRoot string, relativePath string, targetDi
 	return NewRepository(workspaceRoot).Move(relativePath, targetDirectory)
 }
 
+// Arrange places a request, a folder or a collection just before or after
+// another entry and returns its new path. A request or folder placed next to
+// an entry of another directory moves into it.
+func (service *Service) Arrange(workspaceRoot string, relativePath string, anchorPath string, after bool) (string, error) {
+	return NewRepository(workspaceRoot).Arrange(relativePath, anchorPath, after)
+}
+
 // SearchRequests returns requests matching every word of the query.
 func (service *Service) SearchRequests(workspaceRoot string, query string, limit int) ([]Entry, error) {
 	return NewRepository(workspaceRoot).SearchRequests(query, limit)

@@ -194,7 +194,8 @@ func (repository *Repository) List(relativePath string) ([]Entry, error) {
 			continue
 		}
 
-		if !strings.HasSuffix(entry.Name(), fileExtension) || isMetadataFile(entry.Name()) {
+		if !strings.HasSuffix(entry.Name(), fileExtension) || isMetadataFile(entry.Name()) ||
+			isRootOrderFile(path.Join(orderDirectory(relativePath), entry.Name())) {
 			continue
 		}
 
@@ -214,6 +215,11 @@ func (repository *Repository) List(relativePath string) ([]Entry, error) {
 	sort.Slice(result, func(first int, second int) bool {
 		return entryLess(result[first], result[second])
 	})
+	order, err := readOrder(directory, orderDirectory(relativePath))
+	if err != nil {
+		return nil, fmt.Errorf("read order of %s: %w", relativePath, err)
+	}
+	sortByOrder(result, order)
 
 	return result, nil
 }
@@ -252,6 +258,9 @@ func (repository *Repository) SearchRequests(query string, limit int) ([]Entry, 
 		relativePath, err := filepath.Rel(repository.workspaceRoot, filePath)
 		if err != nil {
 			return err
+		}
+		if isRootOrderFile(filepath.ToSlash(relativePath)) {
+			return nil
 		}
 
 		name, method, err := readRequestSummary(filePath, entry.Name())
@@ -813,7 +822,12 @@ func (repository *Repository) UpdateCollection(relativePath string, collection d
 	if err != nil {
 		return fmt.Errorf("encode collection %s: %w", relativePath, err)
 	}
-	return files.WriteAtomically(filepath.Join(directory, collectionFileName), content)
+	filePath := filepath.Join(directory, collectionFileName)
+	content, err = keepOrder(filePath, content)
+	if err != nil {
+		return fmt.Errorf("keep order of %s: %w", relativePath, err)
+	}
+	return files.WriteAtomically(filePath, content)
 }
 
 // updateFolder replaces the metadata of an existing folder: its display name,
@@ -842,7 +856,12 @@ func (repository *Repository) updateFolder(cleaned string, collection domain.Col
 	if err != nil {
 		return fmt.Errorf("encode folder %s: %w", cleaned, err)
 	}
-	return files.WriteAtomically(filepath.Join(directory, folderFileName), content)
+	filePath := filepath.Join(directory, folderFileName)
+	content, err = keepOrder(filePath, content)
+	if err != nil {
+		return fmt.Errorf("keep order of %s: %w", cleaned, err)
+	}
+	return files.WriteAtomically(filePath, content)
 }
 
 func (repository *Repository) CreateCollection(relativePath string, collection domain.Collection) error {
@@ -947,6 +966,10 @@ func (repository *Repository) Move(relativePath string, targetDirectory string) 
 			return "", fmt.Errorf("move local overrides of %s: %w", relativePath, err)
 		}
 	}
+	// The entry has moved: a stale order only costs it its place in the tree,
+	// so it does not fail the move.
+	_ = repository.forgetInOrder(source)
+	_ = repository.appendToOrder(destination)
 	return destination, nil
 }
 
@@ -981,12 +1004,15 @@ func (repository *Repository) Delete(relativePath string) error {
 		if err := os.Remove(overridePath(target)); err != nil && !errors.Is(err, os.ErrNotExist) {
 			return fmt.Errorf("delete local overrides of %s: %w", relativePath, err)
 		}
+		_ = repository.forgetInOrder(cleaned)
 		return nil
 	}
 
 	if err := os.RemoveAll(target); err != nil {
 		return fmt.Errorf("delete folder %s: %w", relativePath, err)
 	}
+	// The entry is gone either way; a stale name in the order is harmless.
+	_ = repository.forgetInOrder(cleaned)
 	return nil
 }
 
@@ -1189,7 +1215,8 @@ func hasChildren(directory string, isCollection bool) (bool, error) {
 
 func isRequestPath(relativePath string) bool {
 	return strings.HasSuffix(relativePath, fileExtension) &&
-		!isMetadataFile(path.Base(relativePath))
+		!isMetadataFile(path.Base(relativePath)) &&
+		!isRootOrderFile(path.Clean(relativePath))
 }
 
 func matchesQuery(entry Entry, terms []string) bool {
