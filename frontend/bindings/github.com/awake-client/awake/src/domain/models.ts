@@ -183,6 +183,15 @@ export interface HistoryExchange {
 }
 
 /**
+ * MarketplaceReference names a marketplace a workspace installs plugins from.
+ * It is stored in awake.yaml so the whole team browses the same catalog.
+ */
+export interface MarketplaceReference {
+    "name": string;
+    "repository": string;
+}
+
+/**
  * OAuth2GrantType describes how an OAuth 2 client obtains a token.
  */
 export enum OAuth2GrantType {
@@ -224,6 +233,37 @@ export interface Parameter {
 export interface PathParameter {
     "Name": string;
     "Value": string;
+}
+
+/**
+ * PluginDeclaration is a plugin a workspace uses, pinned to one commit of its
+ * repository. It is stored in awake.yaml, so pulling the workspace brings the
+ * same plugin version to every teammate; each of them still approves it
+ * before it runs.
+ */
+export interface PluginDeclaration {
+    "id": string;
+
+    /**
+     * Marketplace names the marketplace the plugin was installed from, used
+     * to look for updates. It is empty for a plugin installed from its
+     * repository URL.
+     */
+    "marketplace"?: string;
+    "repository": string;
+
+    /**
+     * Ref is the tag or branch the commit was resolved from, kept to look for
+     * updates of a plugin installed from its repository URL.
+     */
+    "ref"?: string;
+    "commit": string;
+
+    /**
+     * Settings holds the values shared with the team. Secret settings stay in
+     * the keychain of each user.
+     */
+    "settings"?: { [_ in string]?: string } | null;
 }
 
 /**

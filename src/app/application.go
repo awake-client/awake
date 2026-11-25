@@ -40,6 +40,7 @@ func Run(frontendAssets embed.FS) error {
 			application.NewService(featureServices.Interop),
 			application.NewService(featureServices.OAuth2),
 			application.NewService(featureServices.Platform),
+			application.NewService(featureServices.Plugins),
 			application.NewService(featureServices.Secrets),
 			application.NewService(featureServices.Updates),
 			application.NewService(featureServices.Workspace),
