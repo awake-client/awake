@@ -48,7 +48,8 @@ func Run(frontendAssets embed.FS) error {
 			application.NewService(featureServices.MCPSettings),
 		},
 		Assets: application.AssetOptions{
-			Handler: application.AssetFileServerFS(frontendAssets),
+			Handler:    application.AssetFileServerFS(frontendAssets),
+			Middleware: pluginViewMiddleware(featureServices.PluginHost),
 		},
 		Mac: application.MacOptions{
 			ApplicationShouldTerminateAfterLastWindowClosed: true,

@@ -42,6 +42,14 @@ export function CheckUpdate(workspaceRoot: string, pluginID: string): $Cancellab
 }
 
 /**
+ * Contributions lists what the enabled plugins of the workspace add to the
+ * interface: commands, authentication types, dynamic variables and views.
+ */
+export function Contributions(workspaceRoot: string): $CancellablePromise<$models.UIContributions> {
+    return $Call.ByID(396188651, workspaceRoot);
+}
+
+/**
  * Download fetches the commit the workspace declares for a plugin, typically
  * one a teammate added, so the user can review it before approving it.
  */
@@ -64,6 +72,14 @@ export function DynamicVariables(workspaceRoot: string): $CancellablePromise<$mo
  */
 export function Install(workspaceRoot: string, source: $models.PluginSource, commit: string): $CancellablePromise<$models.PluginView> {
     return $Call.ByID(2108667051, workspaceRoot, source, commit);
+}
+
+/**
+ * InvokeView calls a handler on behalf of the page of a view. payload and the
+ * result are JSON.
+ */
+export function InvokeView(workspaceRoot: string, pluginID: string, viewID: string, handler: string, payload: string): $CancellablePromise<string> {
+    return $Call.ByID(1519081977, workspaceRoot, pluginID, viewID, handler, payload);
 }
 
 /**

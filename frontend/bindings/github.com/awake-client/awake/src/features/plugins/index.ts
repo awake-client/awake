@@ -15,8 +15,10 @@ export {
 
 export type {
     AuthenticationContribution,
+    AuthenticationItem,
     CatalogEntry,
     CommandContribution,
+    CommandItem,
     Contributions,
     DynamicVariableContribution,
     FormatContribution,
@@ -28,5 +30,7 @@ export type {
     RequestTabContribution,
     ResponseViewerContribution,
     SecretSettingState,
-    Setting
+    Setting,
+    UIContributions,
+    ViewItem
 } from "./models.js";

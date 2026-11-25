@@ -16,6 +16,17 @@ export interface AuthenticationContribution {
 }
 
 /**
+ * AuthenticationItem is an authentication type a plugin provides, with the
+ * type a request stores.
+ */
+export interface AuthenticationItem {
+    "pluginId": string;
+    "type": domain$0.AuthenticationType;
+    "label": string;
+    "fields": Setting[] | null;
+}
+
+/**
  * CatalogEntry is a plugin of a marketplace.
  */
 export interface CatalogEntry {
@@ -31,6 +42,16 @@ export interface CatalogEntry {
  * CommandContribution is an entry of the command palette.
  */
 export interface CommandContribution {
+    "id": string;
+    "title": string;
+}
+
+/**
+ * CommandItem is a command of the command palette.
+ */
+export interface CommandItem {
+    "pluginId": string;
+    "pluginName": string;
     "id": string;
     "title": string;
 }
@@ -313,3 +334,31 @@ export enum SettingType {
      */
     SettingSelect = "select",
 };
+
+/**
+ * UIContributions lists what the enabled plugins of a workspace add to the
+ * interface.
+ */
+export interface UIContributions {
+    "commands": CommandItem[] | null;
+    "authentication": AuthenticationItem[] | null;
+    "dynamicVariables": DynamicVariableContribution[] | null;
+    "responseViewers": ViewItem[] | null;
+    "requestTabs": ViewItem[] | null;
+}
+
+/**
+ * ViewItem is a response viewer or a request tab, with the URL of its page.
+ */
+export interface ViewItem {
+    "pluginId": string;
+    "id": string;
+    "title": string;
+
+    /**
+     * ContentTypes lists the media types a response viewer renders, such as
+     * application/x-protobuf or image/*. It is empty for a request tab.
+     */
+    "contentTypes": string[] | null;
+    "url": string;
+}

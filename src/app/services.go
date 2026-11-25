@@ -36,11 +36,13 @@ type services struct {
 	OAuth2       *oauth2.Service
 	Platform     *platform.Service
 	Plugins      *plugins.Service
-	Secrets      *secrets.Service
-	Updates      *updates.Service
-	Workspace    *workspace.Service
-	Assistant    *assistant.Service
-	MCPSettings  *mcp.SettingsService
+	// PluginHost serves the views of plugins; it is not bound to the frontend.
+	PluginHost  *plugins.Host
+	Secrets     *secrets.Service
+	Updates     *updates.Service
+	Workspace   *workspace.Service
+	Assistant   *assistant.Service
+	MCPSettings *mcp.SettingsService
 }
 
 func newServices() (*services, error) {
@@ -79,6 +81,7 @@ func newServices() (*services, error) {
 		OAuth2:       oauth2Service,
 		Platform:     platform.NewService(),
 		Plugins:      pluginService,
+		PluginHost:   pluginHost,
 		Secrets:      secrets.NewServiceWithKeychain(keychain),
 		Updates:      updates.NewService(),
 		Workspace:    workspace.NewService(),
