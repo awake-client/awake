@@ -44,6 +44,30 @@ func TestCacheResolveClonesThenFetches(t *testing.T) {
 	}
 }
 
+func TestCacheResolveCachedNeverFetches(t *testing.T) {
+	git := newFakeGit()
+	git.publish(firstCommit, "v1.0.0", testArchive(t, map[string]string{"one.txt": "1"}))
+	cache := NewCache(t.TempDir(), git)
+	operationContext := context.Background()
+
+	if _, err := cache.ResolveCached(operationContext, testRepositoryURL, "v1.0.0"); !errors.Is(err, ErrNotCached) {
+		t.Fatalf("expected ErrNotCached before the first download, got %v", err)
+	}
+	if _, err := cache.Resolve(operationContext, testRepositoryURL, ""); err != nil {
+		t.Fatalf("resolve: %v", err)
+	}
+
+	git.publish(secondCommit, "v2.0.0", testArchive(t, map[string]string{"two.txt": "2"}))
+	git.offline = true
+	commit, err := cache.ResolveCached(operationContext, testRepositoryURL, "")
+	if err != nil || commit != firstCommit {
+		t.Fatalf("expected the downloaded default branch %s, got %s: %v", firstCommit, commit, err)
+	}
+	if _, err := cache.ResolveCached(operationContext, testRepositoryURL, "v2.0.0"); err == nil {
+		t.Error("expected a tag published after the download to be unknown")
+	}
+}
+
 func TestCacheCheckoutExtractsOnceAndWorksOffline(t *testing.T) {
 	git := newFakeGit()
 	git.publish(firstCommit, "", testArchive(t, map[string]string{
@@ -225,13 +249,12 @@ func TestReadFileRefusesPathsLeavingTheCheckout(t *testing.T) {
 	}
 }
 
-// fakeGit serves a single repository whose commits are tar archives held in
-// memory. Commits become visible to the cache when it clones or fetches.
+// fakeGit serves repositories whose commits are tar archives held in memory.
+// Commits become visible to the cache when it clones or fetches.
 type fakeGit struct {
-	remote       map[string][]byte
-	remoteRefs   map[string]string
-	local        map[string]map[string][]byte
-	localRefs    map[string]map[string]string
+	remotes      map[string]*fakeRepository
+	local        map[string]*fakeRepository
+	urls         map[string]string
 	offline      bool
 	archiveError error
 	clones       int
@@ -239,33 +262,50 @@ type fakeGit struct {
 	archives     int
 }
 
+type fakeRepository struct {
+	commits map[string][]byte
+	refs    map[string]string
+}
+
 func newFakeGit() *fakeGit {
 	return &fakeGit{
-		remote:     map[string][]byte{},
-		remoteRefs: map[string]string{},
-		local:      map[string]map[string][]byte{},
-		localRefs:  map[string]map[string]string{},
+		remotes: map[string]*fakeRepository{},
+		local:   map[string]*fakeRepository{},
+		urls:    map[string]string{},
 	}
 }
 
+// publish adds a commit to the test repository and moves its default branch,
+// and tag when one is given, to it.
 func (git *fakeGit) publish(commit string, tag string, archive []byte) {
-	git.remote[commit] = archive
-	git.remoteRefs[headReferenceForTests] = commit
+	git.publishTo(testRepositoryURL, commit, tag, archive)
+}
+
+func (git *fakeGit) publishTo(url string, commit string, tag string, archive []byte) {
+	remote, found := git.remotes[url]
+	if !found {
+		remote = &fakeRepository{commits: map[string][]byte{}, refs: map[string]string{}}
+		git.remotes[url] = remote
+	}
+	remote.commits[commit] = archive
+	remote.refs[""] = commit
 	if tag != "" {
-		git.remoteRefs[tag] = commit
+		remote.refs[tag] = commit
 	}
 }
 
-const headReferenceForTests = ""
-
-func (git *fakeGit) CloneBare(_ context.Context, _ string, directory string) error {
+func (git *fakeGit) CloneBare(_ context.Context, url string, directory string) error {
 	if git.offline {
 		return errors.New("offline")
+	}
+	if _, found := git.remotes[url]; !found {
+		return fmt.Errorf("repository %s not found", url)
 	}
 	if err := os.MkdirAll(directory, 0o755); err != nil {
 		return err
 	}
 	git.clones++
+	git.urls[filepath.Base(directory)] = url
 	git.sync(filepath.Base(directory))
 	return nil
 }
@@ -282,12 +322,20 @@ func (git *fakeGit) Fetch(_ context.Context, directory string) error {
 // sync copies the remote state under the base name of the repository, which
 // survives the rename from the staging directory.
 func (git *fakeGit) sync(name string) {
-	git.local[name] = maps.Clone(git.remote)
-	git.localRefs[name] = maps.Clone(git.remoteRefs)
+	remote := git.remotes[git.urls[name]]
+	git.local[name] = &fakeRepository{commits: maps.Clone(remote.commits), refs: maps.Clone(remote.refs)}
+}
+
+func (git *fakeGit) localRepository(directory string) *fakeRepository {
+	repository, found := git.local[filepath.Base(directory)]
+	if !found {
+		return &fakeRepository{}
+	}
+	return repository
 }
 
 func (git *fakeGit) ResolveCommit(_ context.Context, directory string, ref string) (string, error) {
-	commit, found := git.localRefs[filepath.Base(directory)][ref]
+	commit, found := git.localRepository(directory).refs[ref]
 	if !found {
 		return "", fmt.Errorf("unknown ref %q", ref)
 	}
@@ -295,7 +343,7 @@ func (git *fakeGit) ResolveCommit(_ context.Context, directory string, ref strin
 }
 
 func (git *fakeGit) HasCommit(_ context.Context, directory string, commit string) (bool, error) {
-	_, found := git.local[filepath.Base(directory)][commit]
+	_, found := git.localRepository(directory).commits[commit]
 	return found, nil
 }
 
@@ -304,7 +352,7 @@ func (git *fakeGit) Archive(_ context.Context, directory string, commit string, 
 	if git.archiveError != nil {
 		return git.archiveError
 	}
-	archive, found := git.local[filepath.Base(directory)][commit]
+	archive, found := git.localRepository(directory).commits[commit]
 	if !found {
 		return fmt.Errorf("unknown commit %s", commit)
 	}

@@ -42,6 +42,9 @@ var (
 	// ErrUnsafePath is returned for a path that leaves the plugin repository.
 	ErrUnsafePath = errors.New("plugins: path leaves the plugin repository")
 
+	// ErrNotCached is returned when a repository was never downloaded.
+	ErrNotCached = errors.New("plugins: repository not downloaded yet")
+
 	errExtractionStopped = errors.New("plugins: extraction stopped")
 )
 
@@ -99,6 +102,27 @@ func (cache *Cache) Resolve(operationContext context.Context, url string, ref st
 	repository, err := cache.updatedRepository(operationContext, url)
 	if err != nil {
 		return "", err
+	}
+	commit, err := cache.git.ResolveCommit(operationContext, repository, ref)
+	if err != nil {
+		return "", fmt.Errorf("plugins: resolve %q in %s: %w", ref, url, err)
+	}
+	return commit, nil
+}
+
+// ResolveCached returns the commit ref points at in the copy of the repository
+// already downloaded, without fetching it, so listing a catalog works offline.
+func (cache *Cache) ResolveCached(operationContext context.Context, url string, ref string) (string, error) {
+	if err := validateRef(ref); err != nil {
+		return "", fmt.Errorf("plugins: ref %w", err)
+	}
+
+	cache.mutex.Lock()
+	defer cache.mutex.Unlock()
+
+	repository := cache.repositoryDirectory(url)
+	if !isDirectory(repository) {
+		return "", fmt.Errorf("%w: %s", ErrNotCached, url)
 	}
 	commit, err := cache.git.ResolveCommit(operationContext, repository, ref)
 	if err != nil {
