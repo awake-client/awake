@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/awake-client/awake/src/domain"
 )
 
 func TestCreateThenOpen(t *testing.T) {
@@ -229,5 +231,50 @@ func TestUpdateColorAcceptsOnlyKnownColors(t *testing.T) {
 	}
 	if cleared, err := service.UpdateColor(rootPath, ""); err != nil || cleared.Color != "" {
 		t.Fatalf("an empty color removes it, got %q, %v", cleared.Color, err)
+	}
+}
+
+func TestSaveKeepsMarketplacesAndPlugins(t *testing.T) {
+	rootPath := t.TempDir()
+	created, err := Create(rootPath, CreateOptions{Name: "Platform API", Mode: ModeTeam})
+	if err != nil {
+		t.Fatalf("create workspace: %v", err)
+	}
+
+	created.Marketplaces = []domain.MarketplaceReference{
+		{Name: "awake-official", Repository: "https://github.com/awake-client/marketplace.git"},
+	}
+	created.Plugins = []domain.PluginDeclaration{{
+		ID:          "aws-sigv4",
+		Marketplace: "awake-official",
+		Repository:  "https://github.com/awake-plugins/aws-sigv4.git",
+		Ref:         "v1.2.0",
+		Commit:      "3f2a9c1e0b7d4a5f6e8c9d0a1b2c3d4e5f6a7b8c",
+		Settings:    map[string]string{"region": "eu-west-3"},
+	}}
+	repository := NewRepository(rootPath)
+	if err := repository.Save(created); err != nil {
+		t.Fatalf("save: %v", err)
+	}
+
+	loaded, err := repository.Load()
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if len(loaded.Marketplaces) != 1 || loaded.Marketplaces[0].Name != "awake-official" {
+		t.Errorf("unexpected marketplaces: %+v", loaded.Marketplaces)
+	}
+	if len(loaded.Plugins) != 1 || loaded.Plugins[0].Commit != created.Plugins[0].Commit || loaded.Plugins[0].Settings["region"] != "eu-west-3" {
+		t.Errorf("unexpected plugins: %+v", loaded.Plugins)
+	}
+
+	content, err := os.ReadFile(repository.ConfigurationPath())
+	if err != nil {
+		t.Fatalf("read awake.yaml: %v", err)
+	}
+	for _, expected := range []string{"marketplaces:\n  - {name: awake-official, ", "plugins:\n  - id: aws-sigv4\n"} {
+		if !strings.Contains(string(content), expected) {
+			t.Errorf("expected %q in awake.yaml:\n%s", expected, content)
+		}
 	}
 }

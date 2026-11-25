@@ -362,5 +362,25 @@ func workspaceSchema() map[string]any {
 			"synchronizationInterval": text("Interval between synchronizations, such as 5m."),
 		}),
 		"color": color(),
+		"marketplaces": map[string]any{
+			"type":        "array",
+			"description": "Marketplaces the plugins of the workspace come from.",
+			"items": object(map[string]any{
+				"name":       text("Marketplace name, as its marketplace.yaml declares it."),
+				"repository": text("Git URL of the marketplace repository."),
+			}, "name", "repository"),
+		},
+		"plugins": map[string]any{
+			"type":        "array",
+			"description": "Plugins of the workspace. Each user approves a plugin before it runs.",
+			"items": object(map[string]any{
+				"id":          text("Plugin identifier."),
+				"marketplace": text("Marketplace the plugin was installed from."),
+				"repository":  text("Git URL of the plugin repository."),
+				"ref":         text("Tag or branch the commit was resolved from."),
+				"commit":      text("Full hash of the commit the workspace runs."),
+				"settings":    variables("Settings shared with the team."),
+			}, "id", "repository", "commit"),
+		},
 	}, "version", "id", "name", "mode")
 }

@@ -30,6 +30,9 @@ type Configuration struct {
 	Git                *GitConfiguration `yaml:"git,omitempty"`
 	// Color names one of the colors listed in domain.Colors.
 	Color string `yaml:"color,omitempty"`
+	// Marketplaces and Plugins are managed by the plugins feature.
+	Marketplaces []domain.MarketplaceReference `yaml:"marketplaces,omitempty"`
+	Plugins      []domain.PluginDeclaration    `yaml:"plugins,omitempty"`
 }
 
 // GitConfiguration describes how the workspace synchronizes with its remote.
