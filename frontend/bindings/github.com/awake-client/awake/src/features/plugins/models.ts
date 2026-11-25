@@ -216,6 +216,11 @@ export enum PluginState {
      * PluginInvalid means the declared commit holds no valid plugin.
      */
     PluginInvalid = "invalid",
+
+    /**
+     * PluginFailed means the plugin is approved but its bundle did not load.
+     */
+    PluginFailed = "failed",
 };
 
 /**
@@ -255,6 +260,14 @@ export interface ResponseViewerContribution {
     "title": string;
     "contentTypes": string[] | null;
     "view": string;
+}
+
+/**
+ * SecretSettingState reports whether a secret setting has a value.
+ */
+export interface SecretSettingState {
+    "key": string;
+    "isSet": boolean;
 }
 
 /**

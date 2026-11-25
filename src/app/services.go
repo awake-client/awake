@@ -1,6 +1,9 @@
 package app
 
 import (
+	"net/http"
+	"time"
+
 	"github.com/awake-client/awake/src/features/assistant"
 	"github.com/awake-client/awake/src/features/collections"
 	"github.com/awake-client/awake/src/features/environments"
@@ -17,6 +20,9 @@ import (
 	"github.com/awake-client/awake/src/features/updates"
 	"github.com/awake-client/awake/src/features/workspace"
 )
+
+// pluginFetchTimeout bounds one request a plugin sends with awake.http.fetch.
+const pluginFetchTimeout = 30 * time.Second
 
 // services holds the feature services exposed to the frontend. Dependencies are
 // wired here so features never construct each other directly.
@@ -55,10 +61,13 @@ func newServices() (*services, error) {
 	httpclient.SetEnvironmentWriter(httpClient, environmentWriter{secrets: secretRepository})
 	httpclient.SetCollectionWriter(httpClient, collectionWriter{})
 
-	pluginService, err := newPluginService()
+	pluginService, pluginHost, err := newPlugins(keychain)
 	if err != nil {
 		return nil, err
 	}
+	httpclient.SetPluginHost(httpClient, pluginHost)
+	interopService := interop.NewService(interopAdapter{}, interopAdapter{})
+	interop.SetPluginFormats(interopService, pluginFormats{host: pluginHost})
 
 	return &services{
 		Collections:  collections.NewService(),
@@ -66,7 +75,7 @@ func newServices() (*services, error) {
 		Git:          git.NewService(),
 		History:      historyService,
 		HTTPClient:   httpClient,
-		Interop:      interop.NewService(interopAdapter{}, interopAdapter{}),
+		Interop:      interopService,
 		OAuth2:       oauth2Service,
 		Platform:     platform.NewService(),
 		Plugins:      pluginService,
@@ -78,17 +87,22 @@ func newServices() (*services, error) {
 	}, nil
 }
 
-// newPluginService keeps plugin repositories in the user cache directory and
-// approvals in the user configuration directory, outside every workspace.
-func newPluginService() (*plugins.Service, error) {
+// newPlugins keeps plugin repositories in the user cache directory and
+// approvals in the user configuration directory, outside every workspace. The
+// host runs the enabled plugins while requests are sent or imported.
+func newPlugins(keychain plugins.Keychain) (*plugins.Service, *plugins.Host, error) {
 	cacheRoot, err := plugins.DefaultCacheRoot()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	trustPath, err := plugins.DefaultTrustPath()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	cache := plugins.NewCache(cacheRoot, git.BareRepositories{})
-	return plugins.NewService(cache, plugins.NewTrustStore(trustPath), pluginWorkspace{}, updates.Version), nil
+	trust := plugins.NewTrustStore(trustPath)
+	host := plugins.NewHost(cache, trust, pluginWorkspace{}, keychain, updates.Version, &http.Client{Timeout: pluginFetchTimeout})
+	service := plugins.NewService(cache, trust, pluginWorkspace{}, updates.Version)
+	plugins.ConnectHost(service, host)
+	return service, host, nil
 }

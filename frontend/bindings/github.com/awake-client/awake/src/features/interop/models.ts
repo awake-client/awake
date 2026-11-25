@@ -55,3 +55,20 @@ export interface ImportResult {
     "Environments": number;
     "Warnings": string[] | null;
 }
+
+/**
+ * PluginFormat is a document format an enabled plugin imports or exports.
+ */
+export interface PluginFormat {
+    "format": Format;
+    "label": string;
+    "extensions": string[] | null;
+}
+
+/**
+ * PluginFormatList lists the formats the enabled plugins of a workspace add.
+ */
+export interface PluginFormatList {
+    "imports": PluginFormat[] | null;
+    "exports": PluginFormat[] | null;
+}

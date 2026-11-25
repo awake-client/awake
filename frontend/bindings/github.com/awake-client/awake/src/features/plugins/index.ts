@@ -27,5 +27,6 @@ export type {
     PluginView,
     RequestTabContribution,
     ResponseViewerContribution,
+    SecretSettingState,
     Setting
 } from "./models.js";

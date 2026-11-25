@@ -50,6 +50,14 @@ export function Download(workspaceRoot: string, pluginID: string): $CancellableP
 }
 
 /**
+ * DynamicVariables lists the {{$name}} placeholders the enabled plugins of the
+ * workspace provide, for autocompletion.
+ */
+export function DynamicVariables(workspaceRoot: string): $CancellablePromise<$models.DynamicVariableContribution[] | null> {
+    return $Call.ByID(2321819654, workspaceRoot);
+}
+
+/**
  * Install adds the reviewed commit of a plugin to the workspace, or moves an
  * installed plugin to it, and approves it on this machine: the user installing
  * it has just reviewed its permissions.
@@ -105,6 +113,30 @@ export function RemoveMarketplace(workspaceRoot: string, name: string): $Cancell
  */
 export function Revoke(workspaceRoot: string, pluginID: string): $CancellablePromise<void> {
     return $Call.ByID(2364025582, workspaceRoot, pluginID);
+}
+
+/**
+ * RunCommand runs a command an enabled plugin adds to the command palette and
+ * returns what it logged.
+ */
+export function RunCommand(workspaceRoot: string, pluginID: string, commandID: string): $CancellablePromise<string[] | null> {
+    return $Call.ByID(1084187562, workspaceRoot, pluginID, commandID);
+}
+
+/**
+ * SecretSettings reports which secret settings of a plugin have a value on
+ * this computer.
+ */
+export function SecretSettings(workspaceRoot: string, pluginID: string): $CancellablePromise<$models.SecretSettingState[] | null> {
+    return $Call.ByID(2201261385, workspaceRoot, pluginID);
+}
+
+/**
+ * SetSecretSetting stores a secret setting in the keychain of this computer,
+ * or removes it when value is empty. It never reaches awake.yaml.
+ */
+export function SetSecretSetting(workspaceRoot: string, pluginID: string, key: string, value: string): $CancellablePromise<void> {
+    return $Call.ByID(2113617120, workspaceRoot, pluginID, key, value);
 }
 
 /**

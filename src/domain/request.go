@@ -130,7 +130,7 @@ type Authentication struct {
 
 	// Fields holds the values of an authentication a plugin provides, by the
 	// keys its manifest declares. They may reference variables.
-	Fields map[string]string `yaml:"fields,omitempty"`
+	Fields map[string]string `yaml:"fields,omitempty" json:"Fields,omitempty"`
 }
 
 // Body holds the request body.

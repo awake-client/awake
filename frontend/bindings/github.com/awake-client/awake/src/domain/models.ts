@@ -26,6 +26,12 @@ export interface Authentication {
     "Scopes": string[] | null;
     "RedirectURL": string;
     "Audience": string;
+
+    /**
+     * Fields holds the values of an authentication a plugin provides, by the
+     * keys its manifest declares. They may reference variables.
+     */
+    "Fields"?: { [_ in string]?: string } | null;
 }
 
 /**
