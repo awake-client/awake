@@ -1,0 +1,12 @@
+# Example marketplace index. A marketplace is a git repository with this file
+# at its root; add it in Plugins → Marketplaces with the repository URL.
+version: 1
+name: example-marketplace
+description: Example plugins for Awake.
+plugins:
+  - id: hmac-signer
+    # Point at the repository holding the plugin, and the tag to install.
+    repository: https://github.com/your-team/awake-hmac-signer.git
+    ref: v1.0.0
+    description: Signs requests with an HMAC-SHA256 of their method, URL and body.
+    tags: [authentication, example]
