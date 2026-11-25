@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+
+	"github.com/awake-client/awake/src/shared/semver"
 )
 
 // installationTarget returns what an update replaces: the .app bundle on
@@ -30,7 +32,7 @@ func installationTarget(executable, platform string) string {
 // installation in Program Files, /usr/local/bin or an /Applications folder
 // owned by another account cannot be updated in place.
 func checkInstallation() error {
-	if !isReleaseVersion(Version) {
+	if !semver.IsRelease(Version) {
 		return fmt.Errorf("this development build cannot update itself")
 	}
 	executable, err := os.Executable()

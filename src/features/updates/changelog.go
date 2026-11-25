@@ -2,8 +2,9 @@ package updates
 
 import (
 	"regexp"
-	"strconv"
 	"strings"
+
+	"github.com/awake-client/awake/src/shared/semver"
 )
 
 // ChangelogVersion lists the changes one version brought.
@@ -28,7 +29,6 @@ var (
 	sectionHeading   = regexp.MustCompile(`^###\s+(.+?)\s*$`)
 	listItem         = regexp.MustCompile(`^\s*[-*+]\s+(.*)$`)
 	linkReference    = regexp.MustCompile(`^\s*\[[^\]]+\]:\s+\S+`)
-	versionNumber    = regexp.MustCompile(`^v?(\d+(?:\.\d+)*)(?:-([0-9A-Za-z.-]+))?(?:\+.*)?$`)
 	markdownComments = regexp.MustCompile(`(?s)<!--.*?-->`)
 )
 
@@ -92,10 +92,10 @@ func parseReleaseNotes(version, notes string) []ChangelogVersion {
 // still lists them there; they are then shown as the changes of latest.
 func changesBetween(versions []ChangelogVersion, current, latest string) []ChangelogVersion {
 	kept := releasedBetween(versions, current, latest)
-	if len(kept) > 0 && compareVersions(kept[0].Version, latest) == 0 {
+	if len(kept) > 0 && semver.Compare(kept[0].Version, latest) == 0 {
 		return kept
 	}
-	if isReleaseVersion(current) && compareVersions(latest, current) <= 0 {
+	if semver.IsRelease(current) && semver.Compare(latest, current) <= 0 {
 		return kept
 	}
 	for _, version := range versions {
@@ -113,77 +113,19 @@ func releasedBetween(versions []ChangelogVersion, current, latest string) []Chan
 		if strings.EqualFold(version.Version, unreleasedVersion) {
 			continue
 		}
-		if compareVersions(version.Version, latest) > 0 {
+		if semver.Compare(version.Version, latest) > 0 {
 			continue
 		}
-		if isReleaseVersion(current) {
-			if compareVersions(version.Version, current) <= 0 {
+		if semver.IsRelease(current) {
+			if semver.Compare(version.Version, current) <= 0 {
 				continue
 			}
-		} else if compareVersions(version.Version, latest) != 0 {
+		} else if semver.Compare(version.Version, latest) != 0 {
 			continue
 		}
 		kept = append(kept, version)
 	}
 	return kept
-}
-
-// isReleaseVersion reports whether version reads as a semantic version rather
-// than a development label such as "dev".
-func isReleaseVersion(version string) bool {
-	return versionNumber.MatchString(strings.TrimSpace(version))
-}
-
-// compareVersions orders two semantic versions, with or without a "v" prefix.
-// A pre-release sorts before its release. Unreadable versions sort first.
-func compareVersions(left, right string) int {
-	leftMatch := versionNumber.FindStringSubmatch(strings.TrimSpace(left))
-	rightMatch := versionNumber.FindStringSubmatch(strings.TrimSpace(right))
-	switch {
-	case leftMatch == nil && rightMatch == nil:
-		return strings.Compare(left, right)
-	case leftMatch == nil:
-		return -1
-	case rightMatch == nil:
-		return 1
-	}
-
-	if order := compareNumbers(leftMatch[1], rightMatch[1]); order != 0 {
-		return order
-	}
-	leftPrerelease, rightPrerelease := leftMatch[2], rightMatch[2]
-	switch {
-	case leftPrerelease == rightPrerelease:
-		return 0
-	case leftPrerelease == "":
-		return 1
-	case rightPrerelease == "":
-		return -1
-	}
-	return strings.Compare(leftPrerelease, rightPrerelease)
-}
-
-func compareNumbers(left, right string) int {
-	leftParts := strings.Split(left, ".")
-	rightParts := strings.Split(right, ".")
-	for position := 0; position < max(len(leftParts), len(rightParts)); position++ {
-		leftPart, rightPart := numberAt(leftParts, position), numberAt(rightParts, position)
-		if leftPart != rightPart {
-			if leftPart < rightPart {
-				return -1
-			}
-			return 1
-		}
-	}
-	return 0
-}
-
-func numberAt(parts []string, position int) int {
-	if position >= len(parts) {
-		return 0
-	}
-	number, _ := strconv.Atoi(parts[position])
-	return number
 }
 
 // sectionBuilder collects bullets, and the lines that wrap them, into
