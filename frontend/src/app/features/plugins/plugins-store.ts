@@ -6,6 +6,7 @@ import {
   PluginView,
 } from '@bindings/github.com/awake-client/awake/src/features/plugins/models';
 import * as PluginsService from '@bindings/github.com/awake-client/awake/src/features/plugins/service';
+import { PluginContributions } from '@core/plugin-contributions';
 import { WorkspaceStore } from '@core/workspace-store';
 import { needsAttention } from './plugin-labels';
 
@@ -22,6 +23,7 @@ export interface PluginReview {
 @Injectable()
 export class PluginsStore {
   private readonly workspaceStore = inject(WorkspaceStore);
+  private readonly pluginContributions = inject(PluginContributions);
 
   readonly plugins = signal<PluginView[]>([]);
   readonly marketplaces = signal<MarketplaceView[]>([]);
@@ -257,6 +259,8 @@ export class PluginsStore {
       if (message) {
         this.statusMessage.set(message);
       }
+      // Commands, authentication types and views follow what changed.
+      void this.pluginContributions.reload();
       return true;
     } catch (error) {
       this.errorMessage.set(describeError(error));
