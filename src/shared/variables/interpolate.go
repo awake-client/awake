@@ -20,9 +20,10 @@ func (missingError *MissingVariablesError) Error() string {
 }
 
 // Interpolate replaces {{variable}} placeholders using the provided layers,
-// and {{$name}} placeholders with a freshly generated dynamic value. Layers are
-// ordered from lowest to highest precedence. It fails instead of leaving an
-// undefined placeholder behind.
+// and {{$name}} placeholders with a freshly generated dynamic value. A {{$name}}
+// that is not built in is looked up in the layers, where the values computed
+// by plugins are added. Layers are ordered from lowest to highest precedence.
+// It fails instead of leaving an undefined placeholder behind.
 func Interpolate(input string, layers ...map[string]string) (string, error) {
 	values := make(map[string]string)
 	for _, layer := range layers {
@@ -39,6 +40,9 @@ func Interpolate(input string, layers ...map[string]string) (string, error) {
 
 		if strings.HasPrefix(name, DynamicPrefix) {
 			if value, found := resolveDynamic(name); found {
+				return value
+			}
+			if value, found := values[name]; found {
 				return value
 			}
 			missing[name] = true
@@ -64,4 +68,26 @@ func Interpolate(input string, layers ...map[string]string) (string, error) {
 	}
 
 	return result, nil
+}
+
+// ExternalDynamicNames lists, sorted and once each, the {{$name}} placeholders
+// of text that are not built in, so the caller can ask plugins for them.
+func ExternalDynamicNames(text string) []string {
+	seen := map[string]bool{}
+	for _, matches := range placeholderPattern.FindAllStringSubmatch(text, -1) {
+		name := matches[1]
+		if !strings.HasPrefix(name, DynamicPrefix) || seen[name] {
+			continue
+		}
+		if _, builtIn := resolveDynamic(name); builtIn {
+			continue
+		}
+		seen[name] = true
+	}
+	names := make([]string, 0, len(seen))
+	for name := range seen {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return names
 }
