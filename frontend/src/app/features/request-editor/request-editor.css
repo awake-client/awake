@@ -562,3 +562,8 @@
   white-space: nowrap;
   user-select: text;
 }
+
+/* Tabs added by plugins carry the plug icon. */
+.plugin-tab app-icon {
+  color: var(--color-text-subtle);
+}

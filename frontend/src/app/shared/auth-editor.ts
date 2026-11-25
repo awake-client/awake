@@ -5,10 +5,16 @@ import {
   AuthenticationType,
   OAuth2GrantType,
 } from '@bindings/github.com/awake-client/awake/src/domain/models';
+import {
+  Setting,
+  SettingType,
+} from '@bindings/github.com/awake-client/awake/src/features/plugins/models';
 import { EnvironmentStore } from '@core/environment-store';
+import { PluginContributions } from '@core/plugin-contributions';
 import { VariableStore } from '@core/variable-store';
 import { applyEnvironmentAuthentication } from './environment-authentication';
 import { Icon, IconName } from './icon';
+import { Select, SelectOption } from './select';
 import { SecretInput } from './secret-input';
 import { VariableInput } from './variable-input';
 
@@ -42,8 +48,24 @@ const TYPES: TypeOption[] = [
   { type: AuthenticationType.AuthenticationOAuth2, label: 'OAuth 2', icon: 'globe' },
 ];
 
+/** Prefix of an authentication type a plugin provides: plugin:<id>/<type>. */
+const PLUGIN_TYPE_PREFIX = 'plugin:';
+
+/** Whether a type names an authentication a plugin provides. */
+export function isPluginAuthentication(type: string | null | undefined): boolean {
+  return !!type && type.startsWith(PLUGIN_TYPE_PREFIX);
+}
+
+/** The plugin identifier of a plugin authentication type. */
+export function pluginOfAuthentication(type: string): string {
+  return type.slice(PLUGIN_TYPE_PREFIX.length).split('/')[0] ?? '';
+}
+
 /** Human readable name of an authentication type. */
 export function describeAuthentication(authentication: Authentication | null | undefined): string {
+  if (isPluginAuthentication(authentication?.Type)) {
+    return `Authentication from the ${pluginOfAuthentication(authentication!.Type)} plugin`;
+  }
   switch (authentication?.Type) {
     case AuthenticationType.AuthenticationBasic:
       return 'Basic authentication';
@@ -74,7 +96,7 @@ export function describeAuthentication(authentication: Authentication | null | u
  */
 @Component({
   selector: 'app-auth-editor',
-  imports: [Icon, SecretInput, VariableInput, RouterLink],
+  imports: [Icon, SecretInput, Select, VariableInput, RouterLink],
   templateUrl: './auth-editor.html',
   styleUrl: './auth-editor.css',
 })
@@ -96,6 +118,7 @@ export class AuthEditor {
   protected readonly value = linkedSignal(() => this.authentication());
 
   private readonly variableStore = inject(VariableStore);
+  private readonly pluginContributions = inject(PluginContributions);
   protected readonly environmentStore = inject(EnvironmentStore);
 
   /**
@@ -143,10 +166,50 @@ export class AuthEditor {
     return ['/workspace/collection', ...this.collectionPath().split('/')];
   }
 
+  /**
+   * Built-in types, then those of the enabled plugins. A plugin type the
+   * authentication uses stays listed when its plugin is not enabled here, so
+   * the choice remains visible.
+   */
   protected types(): TypeOption[] {
-    return this.allowInherit()
+    const builtIn = this.allowInherit()
       ? TYPES
       : TYPES.filter((option) => option.type !== AuthenticationType.AuthenticationInherit);
+    const fromPlugins: TypeOption[] = this.pluginContributions
+      .contributions()
+      .authentication.map((item) => ({ type: item.type, label: item.label, icon: 'plug' }));
+    const current = this.value().Type;
+    if (isPluginAuthentication(current) && !fromPlugins.some((option) => option.type === current)) {
+      fromPlugins.push({ type: current, label: pluginOfAuthentication(current), icon: 'plug' });
+    }
+    return [...builtIn, ...fromPlugins];
+  }
+
+  protected readonly isPluginType = computed(() => isPluginAuthentication(this.value().Type));
+  /** The enabled plugin providing the selected type, or null. */
+  protected readonly pluginAuthentication = computed(() =>
+    this.isPluginType() ? this.pluginContributions.authentication(this.value().Type) : null,
+  );
+  protected readonly SettingType = SettingType;
+
+  protected pluginField(key: string): string {
+    return this.value().Fields?.[key] ?? '';
+  }
+
+  protected updatePluginField(key: string, value: string): void {
+    this.change({ ...this.value(), Fields: { ...(this.value().Fields ?? {}), [key]: value } });
+  }
+
+  protected fieldOptions(field: Setting): SelectOption[] {
+    return (field.options ?? []).map((option) => ({ value: option, label: option }));
+  }
+
+  protected checkedValue(event: Event): string {
+    return (event.target as HTMLInputElement).checked ? 'true' : 'false';
+  }
+
+  protected pluginIdOf(type: string): string {
+    return pluginOfAuthentication(type);
   }
 
   protected selectType(type: AuthenticationType): void {

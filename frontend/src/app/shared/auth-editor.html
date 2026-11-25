@@ -278,6 +278,69 @@
   }
 }
 
+@if (isPluginType()) {
+  @if (pluginAuthentication(); as plugin) {
+    <div class="grid">
+      @for (field of plugin.fields; track field.key) {
+        <label class="field">
+          <span class="field-label">{{ field.label }}</span>
+          @switch (field.type) {
+            @case (SettingType.SettingSecret) {
+              <app-secret-input
+                [value]="pluginField(field.key)"
+                (valueChange)="updatePluginField(field.key, $event)"
+                [placeholder]="'{{' + field.key + '}}'"
+                [ariaLabel]="field.label"
+              />
+            }
+            @case (SettingType.SettingBoolean) {
+              <input
+                type="checkbox"
+                [checked]="pluginField(field.key) === 'true'"
+                (change)="updatePluginField(field.key, checkedValue($event))"
+              />
+            }
+            @case (SettingType.SettingSelect) {
+              <app-select
+                [options]="fieldOptions(field)"
+                [value]="pluginField(field.key)"
+                [ariaLabel]="field.label"
+                (valueChange)="updatePluginField(field.key, $event)"
+              />
+            }
+            @default {
+              <app-variable-input
+                [value]="pluginField(field.key)"
+                (valueChange)="updatePluginField(field.key, $event)"
+                [placeholder]="field.default ?? ''"
+                [ariaLabel]="field.label"
+              />
+            }
+          }
+          @if (field.description) {
+            <span class="hint">{{ field.description }}</span>
+          }
+        </label>
+      } @empty {
+        <p class="hint">The {{ plugin.label }} authentication needs no setting.</p>
+      }
+    </div>
+    <p class="hint">
+      Provided by the {{ plugin.pluginId }} plugin, which signs the request just before it is sent.
+      Reference secrets as <code>{{ '{{variables}}' }}</code>; values written here are saved in the
+      request file.
+    </p>
+  } @else {
+    <div class="usage-banner invalid" role="alert">
+      <app-icon name="alert" [size]="15" />
+      <p>
+        This authentication comes from the <code>{{ pluginIdOf(value().Type) }}</code> plugin, which
+        is not enabled on this computer: requests fail until you enable it in Plugins.
+      </p>
+    </div>
+  }
+}
+
 @if (showsOAuth2Actions()) {
   <ng-content select="[oauth2Actions]" />
 }
