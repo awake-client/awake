@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"slices"
 	"strconv"
+	"strings"
 	"sync"
 
 	"github.com/awake-client/awake/src/domain"
@@ -184,8 +185,13 @@ func (host *Host) Formats(workspaceRoot string) (imports []FormatInfo, exports [
 	return imports, exports
 }
 
-// Import converts a document with the import format of a plugin.
-func (host *Host) Import(workspaceRoot string, pluginID string, format string, fileName string, content []byte) ([]byte, error) {
+// Import converts a document with an import format a plugin provides, named
+// plugin:<plugin id>/<format>.
+func (host *Host) Import(workspaceRoot string, qualifiedFormat string, fileName string, content []byte) ([]byte, error) {
+	pluginID, format, err := splitQualifiedFormat(qualifiedFormat)
+	if err != nil {
+		return nil, err
+	}
 	plugin, err := host.enabledPlugin(workspaceRoot, pluginID)
 	if err != nil {
 		return nil, err
@@ -193,14 +199,18 @@ func (host *Host) Import(workspaceRoot string, pluginID string, format string, f
 	if !slices.ContainsFunc(plugin.runtime.Manifest().Contributes.ImportFormats, func(contribution FormatContribution) bool {
 		return contribution.Format == format
 	}) {
-		return nil, fmt.Errorf("%w: import format %s/%s", ErrUnknownContribution, pluginID, format)
+		return nil, fmt.Errorf("%w: import format %s", ErrUnknownContribution, qualifiedFormat)
 	}
 	collections, _, err := plugin.runtime.Import(format, fileName, string(content))
 	return collections, err
 }
 
-// Export converts collections with the export format of a plugin.
-func (host *Host) Export(workspaceRoot string, pluginID string, format string, collections []byte) (string, error) {
+// Export converts collections with an export format a plugin provides.
+func (host *Host) Export(workspaceRoot string, qualifiedFormat string, collections []byte) (string, error) {
+	pluginID, format, err := splitQualifiedFormat(qualifiedFormat)
+	if err != nil {
+		return "", err
+	}
 	plugin, err := host.enabledPlugin(workspaceRoot, pluginID)
 	if err != nil {
 		return "", err
@@ -208,7 +218,7 @@ func (host *Host) Export(workspaceRoot string, pluginID string, format string, c
 	if !slices.ContainsFunc(plugin.runtime.Manifest().Contributes.ExportFormats, func(contribution FormatContribution) bool {
 		return contribution.Format == format
 	}) {
-		return "", fmt.Errorf("%w: export format %s/%s", ErrUnknownContribution, pluginID, format)
+		return "", fmt.Errorf("%w: export format %s", ErrUnknownContribution, qualifiedFormat)
 	}
 	content, _, err := plugin.runtime.Export(format, collections)
 	return content, err
@@ -449,9 +459,21 @@ func prefixedLogs(pluginID string, log CallLog, err error) []string {
 	return lines
 }
 
+// qualifiedFormatPrefix starts the name of a format a plugin provides.
+const qualifiedFormatPrefix = "plugin:"
+
+func splitQualifiedFormat(qualifiedFormat string) (string, string, error) {
+	rest, found := strings.CutPrefix(qualifiedFormat, qualifiedFormatPrefix)
+	pluginID, format, separated := strings.Cut(rest, "/")
+	if !found || !separated || validateIdentifier(pluginID) != nil || validateIdentifier(format) != nil {
+		return "", "", fmt.Errorf("%w: format %q", ErrUnknownContribution, qualifiedFormat)
+	}
+	return pluginID, format, nil
+}
+
 func formatInfo(pluginID string, format FormatContribution) FormatInfo {
 	return FormatInfo{
-		Format:     "plugin:" + pluginID + "/" + format.Format,
+		Format:     qualifiedFormatPrefix + pluginID + "/" + format.Format,
 		PluginID:   pluginID,
 		Label:      format.Label,
 		Extensions: format.Extensions,

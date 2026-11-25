@@ -177,9 +177,16 @@ func TestHostListsFormatsAndRunsCommands(t *testing.T) {
 	if len(imports) != 1 || imports[0].Format != "plugin:example/lines" || imports[0].Extensions[0] != ".txt" || len(exports) != 0 {
 		t.Fatalf("unexpected formats %+v %+v", imports, exports)
 	}
-	collections, err := fixture.host.Import(testWorkspaceRoot, "example", "lines", "api.txt", []byte("https://a.example"))
+	collections, err := fixture.host.Import(testWorkspaceRoot, "plugin:example/lines", "api.txt", []byte("https://a.example"))
 	if err != nil || !strings.Contains(string(collections), `"name":"api.txt"`) {
 		t.Fatalf("unexpected import %s: %v", collections, err)
+	}
+
+	if _, err := fixture.host.Import(testWorkspaceRoot, "lines", "api.txt", nil); !errors.Is(err, ErrUnknownContribution) {
+		t.Errorf("expected an unqualified format to be refused, got %v", err)
+	}
+	if _, err := fixture.host.Export(testWorkspaceRoot, "plugin:example/lines", []byte("[]")); !errors.Is(err, ErrUnknownContribution) {
+		t.Errorf("expected an import-only format to refuse exports, got %v", err)
 	}
 
 	logs, err := fixture.service.RunCommand(testWorkspaceRoot, "example", "hello")
