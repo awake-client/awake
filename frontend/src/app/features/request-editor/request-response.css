@@ -479,3 +479,11 @@
   overflow-wrap: anywhere;
   white-space: pre-wrap;
 }
+
+/* A response viewer from a plugin takes the room of the body. */
+.response-plugin-view {
+  min-height: 240px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}

@@ -15,7 +15,7 @@
       <div class="field">
         <span class="field-label">Format</span>
         <div class="format-picker" role="radiogroup" aria-label="Import format">
-          @for (format of formats; track format) {
+          @for (format of importFormats(); track format) {
             <button
               type="button"
               role="radio"
@@ -23,7 +23,7 @@
               [attr.aria-checked]="importFormat() === format"
               (click)="selectImportFormat(format)"
             >
-              {{ formatLabels[format] }}
+              {{ formatLabel(format) }}
             </button>
           }
         </div>
@@ -89,7 +89,7 @@
       <div class="field">
         <span class="field-label">Format</span>
         <div class="format-picker" role="radiogroup" aria-label="Export format">
-          @for (format of formats; track format) {
+          @for (format of exportFormats(); track format) {
             <button
               type="button"
               role="radio"
@@ -97,7 +97,7 @@
               [attr.aria-checked]="exportFormat() === format"
               (click)="selectExportFormat(format)"
             >
-              {{ formatLabels[format] }}
+              {{ formatLabel(format) }}
             </button>
           }
         </div>

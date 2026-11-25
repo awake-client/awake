@@ -1,0 +1,433 @@
+<section class="plugins">
+  <header class="plugins-header">
+    <div>
+      <h1>Plugins</h1>
+      <p class="subtitle">
+        Extend Awake with plugins from git repositories. They are pinned in awake.yaml and each
+        teammate enables them on their own computer.
+      </p>
+    </div>
+  </header>
+
+  @if (store.errorMessage(); as message) {
+    <p class="notice error">
+      <app-icon name="alert" [size]="14" />
+      {{ message }}
+    </p>
+  }
+  @if (store.statusMessage(); as message) {
+    <p class="notice success">
+      <app-icon name="check" [size]="14" />
+      {{ message }}
+    </p>
+  }
+
+  <nav class="tabs" role="tablist">
+    <button
+      type="button"
+      role="tab"
+      [class.active]="tab() === 'installed'"
+      [attr.aria-selected]="tab() === 'installed'"
+      (click)="tab.set('installed')"
+    >
+      Installed
+      @if (store.attentionCount() > 0) {
+        <span class="count" title="Plugins waiting for you">{{ store.attentionCount() }}</span>
+      }
+    </button>
+    <button
+      type="button"
+      role="tab"
+      [class.active]="tab() === 'marketplaces'"
+      [attr.aria-selected]="tab() === 'marketplaces'"
+      (click)="tab.set('marketplaces')"
+    >
+      Marketplaces
+    </button>
+  </nav>
+
+  @if (store.isLoading()) {
+    <p class="muted">Reading the plugins of this workspace…</p>
+  } @else if (tab() === 'installed') {
+    @if (store.plugins().length === 0) {
+      <div class="empty">
+        <span class="empty-icon"><app-icon name="plug" [size]="28" /></span>
+        <h2>No plugin yet</h2>
+        <p>Browse a marketplace, or install a plugin straight from its git repository.</p>
+        <button type="button" class="btn btn-primary" (click)="tab.set('marketplaces')">
+          Browse marketplaces
+        </button>
+      </div>
+    } @else {
+      <ul class="plugin-list">
+        @for (plugin of store.plugins(); track plugin.declaration.id) {
+          <li class="card plugin">
+            <div class="plugin-row">
+              <span class="plugin-icon"><app-icon name="plug" [size]="16" /></span>
+              <div class="plugin-text">
+                <p class="plugin-name">
+                  {{ title(plugin) }}
+                  @if (plugin.manifest) {
+                    <span class="version">{{ plugin.manifest.pluginVersion }}</span>
+                  }
+                  <span class="state" [attr.data-tone]="badge(plugin.state).tone">
+                    {{ badge(plugin.state).label }}
+                  </span>
+                </p>
+                <p class="plugin-origin mono">
+                  {{ plugin.declaration.marketplace || plugin.declaration.repository }}
+                  · {{ short(plugin.declaration.commit) }}
+                  @if (plugin.declaration.ref) {
+                    ({{ plugin.declaration.ref }})
+                  }
+                </p>
+                @if (plugin.manifest && plugin.manifest.description) {
+                  <p class="hint">{{ plugin.manifest.description }}</p>
+                }
+                @if (plugin.problem) {
+                  <p class="problem">{{ plugin.problem }}</p>
+                }
+              </div>
+
+              <div class="plugin-actions">
+                @switch (plugin.state) {
+                  @case ('needsApproval') {
+                    <button
+                      type="button"
+                      class="btn btn-primary btn-sm"
+                      [disabled]="store.busy() !== null"
+                      (click)="store.reviewApproval(plugin)"
+                    >
+                      {{ store.isBusy('approve:' + plugin.declaration.id) ? 'Reading…' : 'Review' }}
+                    </button>
+                  }
+                  @case ('notDownloaded') {
+                    <button
+                      type="button"
+                      class="btn btn-primary btn-sm"
+                      [disabled]="store.busy() !== null"
+                      (click)="store.reviewApproval(plugin)"
+                    >
+                      <app-icon name="download" [size]="14" />
+                      {{
+                        store.isBusy('approve:' + plugin.declaration.id)
+                          ? 'Downloading…'
+                          : 'Download'
+                      }}
+                    </button>
+                  }
+                  @case ('failed') {
+                    @if (hasSettings(plugin.manifest)) {
+                      <button
+                        type="button"
+                        class="btn btn-ghost btn-sm"
+                        [class.active]="settingsOpen() === plugin.declaration.id"
+                        (click)="toggleSettings(plugin)"
+                      >
+                        <app-icon name="settings" [size]="14" />
+                        Settings
+                      </button>
+                    }
+                  }
+                  @case ('approved') {
+                    @if (hasSettings(plugin.manifest)) {
+                      <button
+                        type="button"
+                        class="btn btn-ghost btn-sm"
+                        [class.active]="settingsOpen() === plugin.declaration.id"
+                        (click)="toggleSettings(plugin)"
+                      >
+                        <app-icon name="settings" [size]="14" />
+                        Settings
+                      </button>
+                    }
+                    <button
+                      type="button"
+                      class="btn btn-ghost btn-sm"
+                      title="Stop running this plugin on this computer"
+                      [disabled]="store.busy() !== null"
+                      (click)="store.revoke(plugin.declaration.id)"
+                    >
+                      Disable
+                    </button>
+                  }
+                }
+                <button
+                  type="button"
+                  class="btn btn-ghost btn-sm"
+                  title="Look for a newer version"
+                  [disabled]="store.busy() !== null"
+                  (click)="store.checkUpdate(plugin.declaration.id)"
+                >
+                  <app-icon name="refresh" [size]="14" />
+                  {{ store.isBusy('update:' + plugin.declaration.id) ? 'Checking…' : 'Update' }}
+                </button>
+                <button
+                  type="button"
+                  class="btn btn-danger btn-sm"
+                  [disabled]="store.busy() !== null"
+                  [attr.aria-label]="'Uninstall ' + title(plugin)"
+                  (click)="uninstall(plugin)"
+                >
+                  <app-icon name="trash" [size]="14" />
+                </button>
+              </div>
+            </div>
+
+            @if (plugin.manifest; as manifest) {
+              @if (manifest.permissions?.length || contributions(manifest).length) {
+                <ul class="chips">
+                  @for (permission of manifest.permissions ?? []; track permission) {
+                    <li class="chip permission" [title]="describePermission(permission)">
+                      <app-icon name="key" [size]="11" />
+                      {{ permission }}
+                    </li>
+                  }
+                  @for (line of contributions(manifest); track line) {
+                    <li class="chip">{{ line }}</li>
+                  }
+                </ul>
+              }
+
+              @if (settingsOpen() === plugin.declaration.id) {
+                <form class="settings" (submit)="$event.preventDefault(); saveSettings(plugin)">
+                  @for (setting of sharedSettings(manifest); track setting.key) {
+                    <label class="field">
+                      <span class="field-label">{{ setting.label }}</span>
+                      @switch (setting.type) {
+                        @case (settingTypes.SettingBoolean) {
+                          <input
+                            type="checkbox"
+                            [checked]="settingsValues()[setting.key] === 'true'"
+                            (change)="setSetting(setting.key, checkedValue($event))"
+                          />
+                        }
+                        @case (settingTypes.SettingSelect) {
+                          <app-select
+                            [options]="selectOptions(setting)"
+                            [value]="settingsValues()[setting.key]"
+                            [ariaLabel]="setting.label"
+                            (valueChange)="setSetting(setting.key, $event)"
+                          />
+                        }
+                        @default {
+                          <input
+                            class="input"
+                            [value]="settingsValues()[setting.key]"
+                            (input)="setSetting(setting.key, inputValue($event))"
+                          />
+                        }
+                      }
+                      @if (setting.description) {
+                        <span class="field-hint">{{ setting.description }}</span>
+                      }
+                    </label>
+                  }
+                  @for (setting of secretSettings(manifest); track setting.key) {
+                    <div class="field">
+                      <label class="field-label" [attr.for]="'secret-' + setting.key">
+                        {{ setting.label }}
+                        <span class="secret-state">
+                          {{
+                            store.secretStates()[setting.key]
+                              ? 'Stored on this computer'
+                              : 'Not set'
+                          }}
+                        </span>
+                      </label>
+                      <div class="secret-row">
+                        <input
+                          class="input"
+                          type="password"
+                          autocomplete="off"
+                          [id]="'secret-' + setting.key"
+                          [placeholder]="
+                            store.secretStates()[setting.key] ? 'Leave empty to keep it' : ''
+                          "
+                          [value]="secretDrafts()[setting.key] ?? ''"
+                          (input)="setSecret(setting.key, inputValue($event))"
+                        />
+                        @if (store.secretStates()[setting.key]) {
+                          <button
+                            type="button"
+                            class="btn btn-ghost btn-sm"
+                            [disabled]="store.busy() !== null"
+                            (click)="store.clearSecret(plugin.declaration.id, setting.key)"
+                          >
+                            Clear
+                          </button>
+                        }
+                      </div>
+                      @if (setting.description) {
+                        <span class="field-hint">{{ setting.description }}</span>
+                      }
+                    </div>
+                  }
+                  <p class="hint">
+                    Shared settings are saved in awake.yaml for your team. Secret settings stay in
+                    the keychain of this computer.
+                  </p>
+                  <div class="settings-actions">
+                    <button
+                      type="button"
+                      class="btn btn-ghost btn-sm"
+                      (click)="settingsOpen.set(null)"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      class="btn btn-primary btn-sm"
+                      [disabled]="store.busy() !== null"
+                    >
+                      {{ store.isBusy('settings:' + plugin.declaration.id) ? 'Saving…' : 'Save' }}
+                    </button>
+                  </div>
+                </form>
+              }
+            }
+          </li>
+        }
+      </ul>
+    }
+  } @else {
+    <section class="card">
+      <div class="card-header">
+        <app-icon name="plus" [size]="15" />
+        <h2>Add a marketplace</h2>
+      </div>
+      <form class="inline-form" (submit)="$event.preventDefault(); addMarketplace()">
+        <input
+          class="input mono"
+          placeholder="https://github.com/team/awake-marketplace.git"
+          aria-label="Marketplace repository URL"
+          [value]="marketplaceDraft()"
+          (input)="marketplaceDraft.set(inputValue($event))"
+        />
+        <button type="submit" class="btn btn-primary" [disabled]="store.busy() !== null">
+          {{ store.isBusy('add-marketplace') ? 'Adding…' : 'Add' }}
+        </button>
+      </form>
+      <p class="hint">A marketplace is a git repository whose marketplace.yaml lists plugins.</p>
+    </section>
+
+    @if (store.marketplaces().length > 0) {
+      <div class="toolbar">
+        <button
+          type="button"
+          class="btn btn-ghost btn-sm"
+          [disabled]="store.busy() !== null"
+          (click)="store.refreshMarketplaces()"
+        >
+          <app-icon name="refresh" [size]="14" />
+          {{ store.isBusy('refresh') ? 'Refreshing…' : 'Refresh catalogs' }}
+        </button>
+      </div>
+    }
+
+    @for (marketplace of store.marketplaces(); track marketplace.name) {
+      <section class="card">
+        <div class="card-header">
+          <app-icon name="grid" [size]="15" />
+          <h2>{{ marketplace.name }}</h2>
+          <span class="hint mono" [title]="marketplace.repository">{{
+            marketplace.repository
+          }}</span>
+          <button
+            type="button"
+            class="btn btn-ghost btn-sm push-right"
+            [disabled]="store.busy() !== null"
+            [attr.aria-label]="'Remove the ' + marketplace.name + ' marketplace'"
+            (click)="removeMarketplace(marketplace)"
+          >
+            <app-icon name="trash" [size]="14" />
+          </button>
+        </div>
+        @if (marketplace.description) {
+          <p class="hint">{{ marketplace.description }}</p>
+        }
+        @if (marketplace.problem) {
+          <p class="problem">{{ marketplace.problem }}</p>
+        }
+        <ul class="catalog">
+          @for (entry of marketplace.plugins ?? []; track entry.id) {
+            <li class="catalog-entry">
+              <div class="plugin-text">
+                <p class="plugin-name">
+                  {{ entry.id }}
+                  @if (entry.ref) {
+                    <span class="version">{{ entry.ref }}</span>
+                  }
+                </p>
+                @if (entry.description) {
+                  <p class="hint">{{ entry.description }}</p>
+                }
+                @if (entry.tags?.length) {
+                  <ul class="chips">
+                    @for (tag of entry.tags; track tag) {
+                      <li class="chip">{{ tag }}</li>
+                    }
+                  </ul>
+                }
+              </div>
+              @if (entry.installed) {
+                <span class="state" data-tone="success">Installed</span>
+              } @else {
+                <button
+                  type="button"
+                  class="btn btn-primary btn-sm"
+                  [disabled]="store.busy() !== null"
+                  (click)="installFromMarketplace(marketplace, entry)"
+                >
+                  {{
+                    store.isBusy('preview:' + marketplace.name + '/' + entry.id)
+                      ? 'Reading…'
+                      : 'Install'
+                  }}
+                </button>
+              }
+            </li>
+          } @empty {
+            @if (!marketplace.problem) {
+              <li class="muted">This marketplace lists no plugin.</li>
+            }
+          }
+        </ul>
+      </section>
+    }
+
+    <section class="card">
+      <div class="card-header">
+        <app-icon name="git" [size]="15" />
+        <h2>Install from a repository</h2>
+      </div>
+      <form class="inline-form" (submit)="$event.preventDefault(); installFromRepository()">
+        <input
+          class="input mono"
+          placeholder="https://github.com/team/awake-plugin.git"
+          aria-label="Plugin repository URL"
+          [value]="repositoryDraft()"
+          (input)="repositoryDraft.set(inputValue($event))"
+        />
+        <input
+          class="input mono ref-input"
+          placeholder="Tag or branch"
+          aria-label="Tag or branch"
+          [value]="refDraft()"
+          (input)="refDraft.set(inputValue($event))"
+        />
+        <button type="submit" class="btn btn-primary" [disabled]="store.busy() !== null">
+          {{ store.isBusy('preview:repository') ? 'Reading…' : 'Review' }}
+        </button>
+      </form>
+      <p class="hint">Leave the tag empty to install the default branch.</p>
+    </section>
+  }
+</section>
+
+<app-plugin-approval-dialog
+  [review]="store.review()"
+  [busy]="store.isBusy('confirm')"
+  (confirmed)="confirmReview()"
+  (cancelled)="store.cancelReview()"
+/>

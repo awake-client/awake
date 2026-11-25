@@ -3,6 +3,8 @@ import * as InteropService from '@bindings/github.com/awake-client/awake/src/fea
 import {
   ExportOptions,
   Format,
+  PluginFormat,
+  PluginFormatList,
 } from '@bindings/github.com/awake-client/awake/src/features/interop/models';
 import { notifyCollectionsChanged } from '@core/collection-events';
 import { chooseDirectory, chooseFile, chooseSaveFile } from '@core/dialogs';
@@ -16,9 +18,22 @@ const FORMAT_LABELS: Record<Format, string> = {
   [Format.FormatBruno]: 'Bruno',
 };
 
+const BUILT_IN_FORMATS = [Format.FormatOpenAPI, Format.FormatPostman, Format.FormatBruno];
+
+/** Whether a format is provided by a plugin, named plugin:<id>/<format>. */
+export function isPluginFormat(format: string): boolean {
+  return format.startsWith('plugin:');
+}
+
+/** The file chooser pattern of a plugin format, such as *.har;*.json. */
+export function extensionPattern(extensions: string[] | null | undefined): string {
+  const patterns = (extensions ?? []).map((extension) => `*${extension}`);
+  return patterns.length > 0 ? patterns.join(';') : '*.*';
+}
+
 /**
  * Imports external collections into the workspace and exports the workspace
- * collections to an interchange document.
+ * collections to an interchange document. Enabled plugins add formats.
  */
 @Component({
   selector: 'app-interop-panel',
@@ -29,8 +44,28 @@ const FORMAT_LABELS: Record<Format, string> = {
 export class InteropPanel {
   private readonly workspaceStore = inject(WorkspaceStore);
 
-  protected readonly formats = [Format.FormatOpenAPI, Format.FormatPostman, Format.FormatBruno];
-  protected readonly formatLabels = FORMAT_LABELS;
+  private readonly pluginFormats = signal<PluginFormatList>({ imports: [], exports: [] });
+  protected readonly importFormats = computed(() => [
+    ...BUILT_IN_FORMATS,
+    ...(this.pluginFormats().imports ?? []).map((format) => format.format),
+  ]);
+  protected readonly exportFormats = computed(() => [
+    ...BUILT_IN_FORMATS,
+    ...(this.pluginFormats().exports ?? []).map((format) => format.format),
+  ]);
+
+  /** The label of a built-in or plugin format. */
+  protected formatLabel(format: Format): string {
+    return FORMAT_LABELS[format] ?? this.pluginFormat(format)?.label ?? format;
+  }
+
+  private pluginFormat(format: Format): PluginFormat | undefined {
+    const formats = [
+      ...(this.pluginFormats().imports ?? []),
+      ...(this.pluginFormats().exports ?? []),
+    ];
+    return formats.find((candidate) => candidate.format === format);
+  }
 
   protected readonly importFormat = signal<Format>(Format.FormatOpenAPI);
   protected readonly importPath = signal('');
@@ -49,7 +84,11 @@ export class InteropPanel {
   protected readonly exportError = signal<string | null>(null);
 
   protected readonly importHint = computed(() => {
-    switch (this.importFormat()) {
+    const format = this.importFormat();
+    if (isPluginFormat(format)) {
+      return `Path to a ${this.formatLabel(format)} document, read by its plugin.`;
+    }
+    switch (format) {
       case Format.FormatBruno:
         return 'Path to a Bruno collection directory (.bru or OpenCollection YAML).';
       case Format.FormatPostman:
@@ -60,6 +99,9 @@ export class InteropPanel {
   });
 
   protected readonly exportHint = computed(() => {
+    if (isPluginFormat(this.exportFormat())) {
+      return `File that receives the ${this.formatLabel(this.exportFormat())} document, written by its plugin.`;
+    }
     if (this.exportFormat() === Format.FormatBruno) {
       return 'Directory that receives one folder per collection, with their environments.';
     }
@@ -78,13 +120,16 @@ export class InteropPanel {
     const rootPath = this.workspaceStore.rootPath();
     if (rootPath) {
       this.exportPath.set(`${rootPath}/awake-export`);
+      void InteropService.PluginFormats(rootPath)
+        .then((formats) => this.pluginFormats.set(formats))
+        .catch(() => this.pluginFormats.set({ imports: [], exports: [] }));
     }
   }
 
   protected readonly importIsDirectory = computed(() => this.importFormat() === Format.FormatBruno);
   /** OpenAPI and Postman can split by collection; Bruno always does. */
   protected readonly exportSupportsSplit = computed(
-    () => this.exportFormat() !== Format.FormatBruno,
+    () => this.exportFormat() !== Format.FormatBruno && !isPluginFormat(this.exportFormat()),
   );
   protected readonly exportIsDirectory = computed(
     () => this.exportFormat() === Format.FormatBruno || this.exportSplit(),
@@ -103,9 +148,16 @@ export class InteropPanel {
     const path = this.importIsDirectory()
       ? await chooseDirectory({ title: 'Choose a Bruno collection', buttonText: 'Import' })
       : await chooseFile({
-          title: `Choose a ${FORMAT_LABELS[this.importFormat()]} document`,
+          title: `Choose a ${this.formatLabel(this.importFormat())} document`,
           buttonText: 'Choose',
-          types: [{ name: 'API documents', pattern: '*.json;*.yaml;*.yml' }],
+          types: [
+            {
+              name: 'API documents',
+              pattern: isPluginFormat(this.importFormat())
+                ? extensionPattern(this.pluginFormat(this.importFormat())?.extensions)
+                : '*.json;*.yaml;*.yml',
+            },
+          ],
         });
     if (path) {
       this.importPath.set(path);
@@ -125,9 +177,9 @@ export class InteropPanel {
           buttonText: 'Export here',
         })
       : await chooseSaveFile({
-          title: `Save the ${FORMAT_LABELS[format]} export`,
+          title: `Save the ${this.formatLabel(format)} export`,
           buttonText: 'Save',
-          fileName: format === Format.FormatPostman ? 'collection.postman.json' : 'openapi.yaml',
+          fileName: this.exportFileName(format),
         });
     if (path) {
       this.exportPath.set(path);
@@ -135,10 +187,18 @@ export class InteropPanel {
     }
   }
 
+  private exportFileName(format: Format): string {
+    if (isPluginFormat(format)) {
+      return `awake-export${this.pluginFormat(format)?.extensions?.[0] ?? '.txt'}`;
+    }
+    return format === Format.FormatPostman ? 'collection.postman.json' : 'openapi.yaml';
+  }
+
   protected selectExportFormat(format: Format): void {
     this.exportFormat.set(format);
-    if (format === Format.FormatBruno) {
-      // Bruno always writes one directory per collection.
+    if (format === Format.FormatBruno || isPluginFormat(format)) {
+      // Bruno always writes one directory per collection; a plugin writes
+      // one document.
       this.exportSplit.set(false);
     }
   }

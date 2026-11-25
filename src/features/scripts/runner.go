@@ -4,20 +4,20 @@
 package scripts
 
 import (
-	"encoding/json"
 	"errors"
-	"fmt"
-	"net/http"
-	"sort"
 	"strings"
 	"time"
 
 	"github.com/dop251/goja"
 
 	"github.com/awake-client/awake/src/domain"
+	"github.com/awake-client/awake/src/shared/jsruntime"
 )
 
-const scriptTimeout = 5 * time.Second
+const (
+	scriptTimeout       = 5 * time.Second
+	scriptTimeoutReason = "script timed out"
+)
 
 // Runner executes request scripts. The timeout bounds one script so a faulty
 // hook cannot block a request forever.
@@ -41,9 +41,9 @@ func (runner *Runner) BeforeRequest(script string, request *domain.Request, vari
 
 	runtime := goja.New()
 	outcome := domain.ScriptOutcome{}
-	deadline := newScriptDeadline(runtime, runner.timeout)
-	requestObject := requestToObject(runtime, request)
-	variablesObject := variablesToObject(runtime, variables)
+	deadline := jsruntime.NewDeadline(runtime, runner.timeout, scriptTimeoutReason)
+	requestObject := jsruntime.RequestToObject(runtime, request)
+	variablesObject := jsruntime.StringMapToObject(runtime, variables)
 	installHelper(runtime, variablesObject, environments, &outcome, execute, deadline)
 	installConsole(runtime, &outcome)
 
@@ -52,7 +52,7 @@ func (runner *Runner) BeforeRequest(script string, request *domain.Request, vari
 
 	run(runtime, script, deadline, &outcome)
 
-	applyRequestObject(runtime, requestObject, request)
+	jsruntime.ApplyRequestObject(runtime, requestObject, request)
 	readVariables(variablesObject, variables)
 
 	return outcome
@@ -66,13 +66,13 @@ func (runner *Runner) AfterResponse(script string, request domain.Request, respo
 
 	runtime := goja.New()
 	outcome := domain.ScriptOutcome{}
-	deadline := newScriptDeadline(runtime, runner.timeout)
-	variablesObject := variablesToObject(runtime, variables)
+	deadline := jsruntime.NewDeadline(runtime, runner.timeout, scriptTimeoutReason)
+	variablesObject := jsruntime.StringMapToObject(runtime, variables)
 	installHelper(runtime, variablesObject, environments, &outcome, nil, deadline)
 	installConsole(runtime, &outcome)
 
-	runtime.Set("request", requestToObject(runtime, &request))
-	runtime.Set("response", responseToObject(runtime, response))
+	runtime.Set("request", jsruntime.RequestToObject(runtime, &request))
+	runtime.Set("response", jsruntime.ResponseToObject(runtime, response))
 	runtime.Set("variables", variablesObject)
 
 	run(runtime, script, deadline, &outcome)
@@ -81,64 +81,18 @@ func (runner *Runner) AfterResponse(script string, request domain.Request, respo
 	return outcome
 }
 
-func run(runtime *goja.Runtime, script string, deadline *scriptDeadline, outcome *domain.ScriptOutcome) {
-	defer deadline.stop()
+func run(runtime *goja.Runtime, script string, deadline *jsruntime.Deadline, outcome *domain.ScriptOutcome) {
+	defer deadline.Stop()
 
 	if _, err := runtime.RunString(script); err != nil {
 		outcome.Error = err.Error()
 	}
 }
 
-// scriptDeadline bounds how long a script runs. It stops counting while the
-// script waits on a request it runs, whose own timeout applies instead, so a
-// slow login call does not trip the script timeout.
-type scriptDeadline struct {
-	runtime   *goja.Runtime
-	timer     *time.Timer
-	expiresAt time.Time
-	remaining time.Duration
-	paused    bool
-}
-
-func newScriptDeadline(runtime *goja.Runtime, timeout time.Duration) *scriptDeadline {
-	deadline := &scriptDeadline{runtime: runtime, remaining: timeout}
-	deadline.arm()
-	return deadline
-}
-
-func (deadline *scriptDeadline) arm() {
-	deadline.paused = false
-	deadline.expiresAt = time.Now().Add(deadline.remaining)
-	deadline.timer = time.AfterFunc(deadline.remaining, func() {
-		deadline.runtime.Interrupt("script timed out")
-	})
-}
-
-func (deadline *scriptDeadline) pause() {
-	if deadline.paused {
-		return
-	}
-	deadline.paused = true
-	if deadline.timer.Stop() {
-		deadline.remaining = time.Until(deadline.expiresAt)
-	}
-}
-
-func (deadline *scriptDeadline) resume() {
-	if !deadline.paused {
-		return
-	}
-	deadline.arm()
-}
-
-func (deadline *scriptDeadline) stop() {
-	deadline.timer.Stop()
-}
-
-func installHelper(runtime *goja.Runtime, variablesObject *goja.Object, environments domain.EnvironmentResolver, outcome *domain.ScriptOutcome, execute domain.ScriptRequestExecutor, deadline *scriptDeadline) {
+func installHelper(runtime *goja.Runtime, variablesObject *goja.Object, environments domain.EnvironmentResolver, outcome *domain.ScriptOutcome, execute domain.ScriptRequestExecutor, deadline *jsruntime.Deadline) {
 	helper := runtime.NewObject()
 
-	_ = helper.Set("log", logFunction(outcome, ""))
+	_ = helper.Set("log", jsruntime.LogFunction(outcomeLogSink(outcome), ""))
 
 	_ = helper.Set("test", func(call goja.FunctionCall) goja.Value {
 		name := "test"
@@ -185,7 +139,7 @@ func installHelper(runtime *goja.Runtime, variablesObject *goja.Object, environm
 	})
 
 	_ = helper.Set("setVariable", func(name string, value goja.Value) {
-		_ = variablesObject.Set(name, valueToString(value))
+		_ = variablesObject.Set(name, jsruntime.ValueToString(value))
 	})
 
 	// The collection of the request saves what the script stores: the shared
@@ -194,7 +148,7 @@ func installHelper(runtime *goja.Runtime, variablesObject *goja.Object, environm
 	// object follows, like awake.environment.set.
 	collection := runtime.NewObject()
 	_ = collection.Set("setVariable", func(name string, value goja.Value) {
-		text := valueToString(value)
+		text := jsruntime.ValueToString(value)
 		_ = variablesObject.Set(name, text)
 		outcome.CollectionChanges = append(outcome.CollectionChanges, domain.CollectionChange{Name: name, Value: text})
 	})
@@ -205,7 +159,7 @@ func installHelper(runtime *goja.Runtime, variablesObject *goja.Object, environm
 
 	local := runtime.NewObject()
 	_ = local.Set("setVariable", func(name string, value goja.Value) {
-		text := valueToString(value)
+		text := jsruntime.ValueToString(value)
 		_ = variablesObject.Set(name, text)
 		outcome.CollectionChanges = append(outcome.CollectionChanges, domain.CollectionChange{Name: name, Value: text, Local: true})
 	})
@@ -221,7 +175,7 @@ func installHelper(runtime *goja.Runtime, variablesObject *goja.Object, environm
 		return readVariable(variablesObject, name)
 	})
 	_ = environment.Set("set", func(name string, value goja.Value) {
-		text := valueToString(value)
+		text := jsruntime.ValueToString(value)
 		_ = variablesObject.Set(name, text)
 		outcome.EnvironmentChanges = append(outcome.EnvironmentChanges, domain.EnvironmentChange{Name: name, Value: text})
 	})
@@ -257,7 +211,7 @@ var errEnvironmentsUnavailable = errors.New("other environments are not availabl
 
 // runRequestFunction implements awake.runRequest(path, options). The call is
 // synchronous: the script receives the response once the request is over.
-func runRequestFunction(runtime *goja.Runtime, execute domain.ScriptRequestExecutor, deadline *scriptDeadline) func(goja.FunctionCall) goja.Value {
+func runRequestFunction(runtime *goja.Runtime, execute domain.ScriptRequestExecutor, deadline *jsruntime.Deadline) func(goja.FunctionCall) goja.Value {
 	return func(call goja.FunctionCall) goja.Value {
 		pathValue := call.Argument(0)
 		if goja.IsUndefined(pathValue) || goja.IsNull(pathValue) {
@@ -275,14 +229,14 @@ func runRequestFunction(runtime *goja.Runtime, execute domain.ScriptRequestExecu
 
 		// The nested exchange runs under its own timeout; the script waits for
 		// it without spending its own budget.
-		deadline.pause()
+		deadline.Pause()
 		response, err := execute(path, timeout)
-		deadline.resume()
+		deadline.Resume()
 		if err != nil {
 			panic(runtime.NewGoError(err))
 		}
 
-		return responseToObject(runtime, response)
+		return jsruntime.ResponseToObject(runtime, response)
 	}
 }
 
@@ -328,7 +282,7 @@ func namedEnvironment(runtime *goja.Runtime, environment domain.ScriptEnvironmen
 		return runtime.ToValue(value)
 	})
 	_ = handle.Set("set", func(name string, value goja.Value) {
-		text := valueToString(value)
+		text := jsruntime.ValueToString(value)
 		current[name] = text
 		saved := change(name)
 		saved.Value = text
@@ -343,110 +297,12 @@ func namedEnvironment(runtime *goja.Runtime, environment domain.ScriptEnvironmen
 	return handle
 }
 
-// installConsole maps console methods to the script logs, as goja provides
-// no console of its own. Warnings and errors are prefixed to stand out.
-func installConsole(runtime *goja.Runtime, outcome *domain.ScriptOutcome) {
-	console := runtime.NewObject()
-	_ = console.Set("log", logFunction(outcome, ""))
-	_ = console.Set("info", logFunction(outcome, ""))
-	_ = console.Set("debug", logFunction(outcome, ""))
-	_ = console.Set("warn", logFunction(outcome, "warning: "))
-	_ = console.Set("error", logFunction(outcome, "error: "))
-	_ = runtime.Set("console", console)
-}
-
-func logFunction(outcome *domain.ScriptOutcome, prefix string) func(goja.FunctionCall) goja.Value {
-	return func(call goja.FunctionCall) goja.Value {
-		parts := make([]string, 0, len(call.Arguments))
-		for _, argument := range call.Arguments {
-			parts = append(parts, valueToString(argument))
-		}
-		outcome.Logs = append(outcome.Logs, prefix+strings.Join(parts, " "))
-		return goja.Undefined()
-	}
-}
-
-func requestToObject(runtime *goja.Runtime, request *domain.Request) *goja.Object {
-	object := runtime.NewObject()
-	_ = object.Set("method", request.Method)
-	_ = object.Set("url", request.URL)
-
-	headers := runtime.NewObject()
-	for _, header := range request.Headers {
-		if header.Enabled {
-			_ = headers.Set(header.Name, header.Value)
-		}
-	}
-	_ = object.Set("headers", headers)
-
-	query := runtime.NewObject()
-	for _, parameter := range request.Parameters {
-		if parameter.Enabled {
-			_ = query.Set(parameter.Name, parameter.Value)
-		}
-	}
-	_ = object.Set("query", query)
-
-	body := ""
-	if request.Body != nil {
-		body = request.Body.Content
-	}
-	_ = object.Set("body", body)
-
-	return object
-}
-
-func responseToObject(runtime *goja.Runtime, response domain.ScriptResponse) *goja.Object {
-	object := runtime.NewObject()
-	_ = object.Set("status", response.StatusCode)
-	_ = object.Set("statusText", response.Status)
-	_ = object.Set("body", response.Body)
-	_ = object.Set("encoding", response.Encoding)
-	_ = object.Set("duration", response.DurationMilliseconds)
-
-	headers := runtime.NewObject()
-	for name, values := range response.Headers {
-		_ = headers.Set(name, strings.Join(values, ", "))
-	}
-	_ = object.Set("headers", headers)
-
-	cookies := runtime.NewObject()
-	pairs := make([]string, 0)
-	for _, cookie := range (&http.Response{Header: http.Header(response.Headers)}).Cookies() {
-		_ = cookies.Set(cookie.Name, cookie.Value)
-		pairs = append(pairs, cookie.Name+"="+cookie.Value)
-	}
-	_ = object.Set("cookies", cookies)
-	_ = object.Set("cookieHeader", strings.Join(pairs, "; "))
-
-	// json parses the body preview, throwing a JavaScript error when it is not
-	// valid JSON, like JSON.parse.
-	_ = object.Set("json", func(goja.FunctionCall) goja.Value {
-		parse, _ := goja.AssertFunction(runtime.Get("JSON").ToObject(runtime).Get("parse"))
-		value, err := parse(goja.Undefined(), runtime.ToValue(response.Body))
-		if err != nil {
-			panic(err)
-		}
-		return value
-	})
-
-	return object
-}
-
-func variablesToObject(runtime *goja.Runtime, variables map[string]string) *goja.Object {
-	object := runtime.NewObject()
-	for name, value := range variables {
-		_ = object.Set(name, value)
-	}
-	return object
-}
-
 // readVariables copies the variables object back into the map, dropping the
 // names the script deleted.
 func readVariables(object *goja.Object, variables map[string]string) {
 	clear(variables)
 	for _, name := range object.Keys() {
-		variables[name] = valueToString(object.Get(name))
+		variables[name] = jsruntime.ValueToString(object.Get(name))
 	}
 }
 
@@ -458,110 +314,13 @@ func readVariable(object *goja.Object, name string) goja.Value {
 	return value
 }
 
-func applyRequestObject(runtime *goja.Runtime, object *goja.Object, request *domain.Request) {
-	request.Method = strings.TrimSpace(object.Get("method").String())
-	request.URL = object.Get("url").String()
-
-	if body := object.Get("body"); body != nil && !goja.IsUndefined(body) && !goja.IsNull(body) {
-		if request.Body == nil {
-			request.Body = &domain.Body{Type: domain.BodyText}
-		}
-		request.Body.Content = body.String()
-		if request.Body.Type == domain.BodyNone && request.Body.Content != "" {
-			request.Body.Type = domain.BodyText
-		}
-	}
-
-	headers := readStringMap(runtime, object.Get("headers"))
-	request.Headers = mergeHeaders(request.Headers, headers)
-
-	query := readStringMap(runtime, object.Get("query"))
-	request.Parameters = mergeParameters(request.Parameters, query)
+// installConsole sends the console output of a script to its logs.
+func installConsole(runtime *goja.Runtime, outcome *domain.ScriptOutcome) {
+	jsruntime.InstallConsole(runtime, outcomeLogSink(outcome))
 }
 
-func readStringMap(runtime *goja.Runtime, value goja.Value) map[string]string {
-	result := map[string]string{}
-	if value == nil || goja.IsUndefined(value) || goja.IsNull(value) {
-		return result
-	}
-
-	object := value.ToObject(runtime)
-	for _, name := range object.Keys() {
-		result[name] = object.Get(name).String()
-	}
-	return result
-}
-
-func mergeHeaders(existing []domain.Header, updated map[string]string) []domain.Header {
-	result := make([]domain.Header, 0, len(existing)+len(updated))
-	for _, header := range existing {
-		if !header.Enabled {
-			result = append(result, header)
-			continue
-		}
-		value, found := updated[header.Name]
-		if !found {
-			continue
-		}
-		header.Value = value
-		result = append(result, header)
-		delete(updated, header.Name)
-	}
-
-	for _, name := range sortedKeys(updated) {
-		result = append(result, domain.Header{Name: name, Value: updated[name], Enabled: true})
-	}
-
-	return result
-}
-
-func mergeParameters(existing []domain.Parameter, updated map[string]string) []domain.Parameter {
-	result := make([]domain.Parameter, 0, len(existing)+len(updated))
-	for _, parameter := range existing {
-		if !parameter.Enabled {
-			result = append(result, parameter)
-			continue
-		}
-		value, found := updated[parameter.Name]
-		if !found {
-			continue
-		}
-		parameter.Value = value
-		result = append(result, parameter)
-		delete(updated, parameter.Name)
-	}
-
-	for _, name := range sortedKeys(updated) {
-		result = append(result, domain.Parameter{Name: name, Value: updated[name], Enabled: true})
-	}
-
-	return result
-}
-
-func sortedKeys(values map[string]string) []string {
-	keys := make([]string, 0, len(values))
-	for name := range values {
-		keys = append(keys, name)
-	}
-	sort.Strings(keys)
-	return keys
-}
-
-func valueToString(value goja.Value) string {
-	if value == nil || goja.IsUndefined(value) {
-		return ""
-	}
-	exported := value.Export()
-	switch typed := exported.(type) {
-	case string:
-		return typed
-	case nil:
-		return "null"
-	default:
-		encoded, err := json.Marshal(typed)
-		if err != nil {
-			return fmt.Sprint(typed)
-		}
-		return string(encoded)
+func outcomeLogSink(outcome *domain.ScriptOutcome) jsruntime.LogSink {
+	return func(line string) {
+		outcome.Logs = append(outcome.Logs, line)
 	}
 }

@@ -1,0 +1,62 @@
+# Example plugin: everything a plugin can add to Awake, in one small bundle.
+# Copy this directory into a git repository of its own to publish it.
+version: 1
+id: hmac-signer
+name: HMAC Signer
+description: Signs requests with an HMAC-SHA256 of their method, URL and body.
+pluginVersion: 1.0.0
+engine: ">=0.11.0"
+main: dist/plugin.js
+# No permission: the plugin works on the requests it is given, without the
+# network or the secret variables of the user.
+permissions: []
+settings:
+  - key: secret
+    type: secret
+    label: Signing secret
+    description: Kept in the keychain of each computer.
+    required: true
+  - key: header
+    type: string
+    label: Signature header
+    default: Authorization
+  - key: algorithmLabel
+    type: select
+    label: Scheme name
+    options: [HMAC-SHA256, HS256]
+    default: HMAC-SHA256
+contributes:
+  authentication:
+    - type: hmac
+      label: HMAC
+      fields:
+        - key: keyId
+          type: string
+          label: Key id
+          description: Sent with the signature so the server finds the secret.
+  dynamicVariables:
+    - name: $requestId
+      description: Random request identifier
+    - name: $isoDate
+      description: Current time in ISO 8601, UTC
+  hooks: [beforeRequest]
+  commands:
+    - id: show-settings
+      title: "HMAC Signer: show settings"
+  importFormats:
+    - format: urls
+      label: URL list
+      extensions: [.txt]
+  exportFormats:
+    - format: urls
+      label: URL list
+      extensions: [.txt]
+  responseViewers:
+    - id: json-outline
+      title: Outline
+      contentTypes: [application/json]
+      view: ui/json-outline.html
+  requestTabs:
+    - id: signature
+      title: Signature
+      view: ui/signature.html

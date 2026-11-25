@@ -4,6 +4,7 @@ import { COLLECTIONS_CHANGED_EVENT } from './collection-events';
 import { EnvironmentStore } from './environment-store';
 import { TabsStore } from './tabs-store';
 import { WorkspaceStore } from './workspace-store';
+import { PluginContributions } from './plugin-contributions';
 
 /** Where a variable value comes from, by increasing precedence. */
 /**
@@ -57,7 +58,17 @@ export class VariableStore {
     }
     return this.tabsStore.active() ?? '';
   });
-  private readonly dynamicVariables = signal<VariableInfo[]>([]);
+  private readonly builtInDynamicVariables = signal<VariableInfo[]>([]);
+  private readonly pluginContributions = inject(PluginContributions);
+  /** Built-in {{$name}} placeholders, then those of the enabled plugins. */
+  private readonly dynamicVariables = computed<VariableInfo[]>(() => [
+    ...this.builtInDynamicVariables(),
+    ...this.pluginContributions.contributions().dynamicVariables.map((variable) => ({
+      name: variable.name,
+      value: variable.description || 'Computed by a plugin',
+      source: 'dynamic' as const,
+    })),
+  ]);
 
   /** Every variable by name, the highest precedence layer winning. */
   readonly variables = computed(() => {
@@ -86,7 +97,7 @@ export class VariableStore {
   constructor() {
     void HTTPClientService.DynamicVariables()
       .then((variables) =>
-        this.dynamicVariables.set(
+        this.builtInDynamicVariables.set(
           (variables ?? []).map((variable) => ({
             name: variable.Name,
             value: variable.Description,
@@ -94,7 +105,7 @@ export class VariableStore {
           })),
         ),
       )
-      .catch(() => this.dynamicVariables.set([]));
+      .catch(() => this.builtInDynamicVariables.set([]));
 
     // The variables depend on what is on screen: a request, or the settings
     // of a collection. Both may refine the selected environment.

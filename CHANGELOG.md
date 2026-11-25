@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Plugins extend Awake from git repositories: hooks run before and after each
+  request, dynamic variables, authentication types that sign the final
+  request, import and export formats, command palette commands, response
+  viewers and request tabs. Open Plugins in the sidebar to browse marketplaces,
+  which are git repositories listing plugins, or to install a plugin from its
+  repository. See [docs/plugins.md](docs/plugins.md).
+- An installed plugin is pinned to one commit in `awake.yaml`, so the team
+  shares the same version through git. It only runs once each teammate has
+  reviewed and enabled that commit and its permissions on their own computer;
+  an update or a new permission asks again. Secret settings of plugins stay
+  in the keychain.
+- Plugins run isolated, without modules, file system or network unless they
+  ask for it, and their views render in a sandboxed frame that cannot reach
+  the application.
+
 ## [0.10.1] - 2026-11-23
 
 ### Fixed

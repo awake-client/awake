@@ -56,6 +56,7 @@ const SIDEBAR_SECTIONS: SidebarSection[] = [
   { route: '/workspace/history', label: 'History', icon: 'history' },
   { route: '/workspace/git', label: 'Git', icon: 'git' },
   { route: '/workspace/interop', label: 'Import / Export', icon: 'download' },
+  { route: '/workspace/plugins', label: 'Plugins', icon: 'plug' },
 ];
 
 /**

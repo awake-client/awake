@@ -43,6 +43,11 @@ export const routes: Routes = [
         loadComponent: () => import('@features/git/git-panel').then((module) => module.GitPanel),
       },
       {
+        path: 'plugins',
+        loadComponent: () =>
+          import('@features/plugins/plugins-panel').then((module) => module.PluginsPanel),
+      },
+      {
         path: 'interop',
         loadComponent: () =>
           import('@features/interop/interop-panel').then((module) => module.InteropPanel),

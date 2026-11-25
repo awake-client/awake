@@ -1,0 +1,51 @@
+version: 1
+id: aws-sigv4
+name: AWS SigV4
+description: Signs requests with AWS Signature Version 4.
+pluginVersion: 1.2.0
+engine: ">=0.11.0"
+main: dist/plugin.js
+permissions: [network, secrets]
+settings:
+  - key: region
+    type: select
+    label: Region
+    options: [eu-west-3, us-east-1]
+    default: eu-west-3
+contributes:
+  dynamicVariables:
+    - name: $awsDate
+      description: Current date in the AWS format
+  authentication:
+    - type: awsSigV4
+      label: AWS SigV4
+      fields:
+        - key: accessKey
+          type: string
+          label: Access key
+          required: true
+        - key: secretKey
+          type: secret
+          label: Secret key
+          required: true
+  importFormats:
+    - format: insomnia
+      label: Insomnia
+      extensions: [.json, .yaml]
+  exportFormats:
+    - format: har
+      label: HAR
+      extensions: [.har]
+  hooks: [beforeRequest, afterResponse]
+  commands:
+    - id: refresh-token
+      title: "AWS: refresh token"
+  responseViewers:
+    - id: protobuf
+      title: Protobuf
+      contentTypes: [application/x-protobuf]
+      view: ui/viewer.html
+  requestTabs:
+    - id: notes
+      title: Notes
+      view: ui/tab.html

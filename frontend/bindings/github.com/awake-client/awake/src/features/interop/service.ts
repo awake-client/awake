@@ -31,3 +31,11 @@ export function Export(workspaceRoot: string, destinationPath: string, format: $
 export function Import(workspaceRoot: string, sourcePath: string, format: $models.Format): $CancellablePromise<$models.ImportResult> {
     return $Call.ByID(3594296730, workspaceRoot, sourcePath, format);
 }
+
+/**
+ * PluginFormats lists the import and export formats the enabled plugins of
+ * the workspace add, for the import and export panel.
+ */
+export function PluginFormats(workspaceRoot: string): $CancellablePromise<$models.PluginFormatList> {
+    return $Call.ByID(3429835432, workspaceRoot);
+}

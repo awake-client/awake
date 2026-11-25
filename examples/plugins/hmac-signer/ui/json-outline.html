@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Outline</title>
+    <style>
+      :root { color-scheme: light; --text: #1f2328; --muted: #656d76; --key: #0550ae; --background: #ffffff; }
+      :root[data-theme="dark"] { color-scheme: dark; --text: #e6edf3; --muted: #8d96a0; --key: #79c0ff; --background: #1e1e1e; }
+      body { margin: 0; padding: 12px 16px; background: var(--background); color: var(--text); font: 13px/1.6 ui-monospace, SFMono-Regular, Menlo, monospace; }
+      details { margin-left: 14px; }
+      summary { cursor: pointer; }
+      .key { color: var(--key); }
+      .muted { color: var(--muted); }
+    </style>
+  </head>
+  <body>
+    <p class="muted">Waiting for the response…</p>
+    <script>
+      // The page runs in a sandboxed frame: it only talks to Awake through
+      // postMessage. It says when it is ready, then receives its context.
+      const describe = (value) =>
+        Array.isArray(value) ? `array, ${value.length} items` : `object, ${Object.keys(value).length} keys`;
+
+      function render(value, key) {
+        const label = key === undefined ? "" : `<span class="key">${escape(key)}</span>: `;
+        if (value !== null && typeof value === "object") {
+          const details = document.createElement("details");
+          details.open = key === undefined;
+          details.innerHTML = `<summary>${label}<span class="muted">${describe(value)}</span></summary>`;
+          for (const [childKey, child] of Object.entries(value)) {
+            details.appendChild(render(child, childKey));
+          }
+          return details;
+        }
+        const line = document.createElement("div");
+        line.innerHTML = `${label}${escape(JSON.stringify(value))}`;
+        return line;
+      }
+
+      function escape(text) {
+        return String(text).replace(/[&<>"]/g, (character) => `&#${character.charCodeAt(0)};`);
+      }
+
+      window.addEventListener("message", (event) => {
+        const message = event.data;
+        if (!message || message.type !== "awake:context") {
+          return;
+        }
+        document.documentElement.dataset.theme = message.theme;
+        const response = message.data;
+        document.body.replaceChildren();
+        try {
+          document.body.appendChild(render(JSON.parse(response.body)));
+          if (!response.complete) {
+            document.body.insertAdjacentHTML("beforeend", '<p class="muted">Load the rest of the body to see everything.</p>');
+          }
+        } catch (error) {
+          document.body.innerHTML = `<p class="muted">The body is not complete JSON yet: ${escape(error.message)}</p>`;
+        }
+      });
+
+      window.parent.postMessage({ type: "awake:ready" }, "*");
+    </script>
+  </body>
+</html>

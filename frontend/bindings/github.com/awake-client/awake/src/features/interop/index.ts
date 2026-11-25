@@ -13,5 +13,7 @@ export {
 export type {
     ExportOptions,
     ExportResult,
-    ImportResult
+    ImportResult,
+    PluginFormat,
+    PluginFormatList
 } from "./models.js";

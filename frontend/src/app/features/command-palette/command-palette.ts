@@ -3,15 +3,30 @@ import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import * as CollectionsService from '@bindings/github.com/awake-client/awake/src/features/collections/service';
 import { Entry } from '@bindings/github.com/awake-client/awake/src/features/collections/models';
+import { CommandItem } from '@bindings/github.com/awake-client/awake/src/features/plugins/models';
+import * as PluginsService from '@bindings/github.com/awake-client/awake/src/features/plugins/service';
+import { PluginContributions } from '@core/plugin-contributions';
 import { WorkspaceStore } from '@core/workspace-store';
 
 const RESULT_LIMIT = 500;
 const VISIBLE_RESULT_LIMIT = 50;
 const COLLECTIONS_PREFIX = 'collections/';
 
+/** One line of the palette: a request to open or a plugin command to run. */
+export type PaletteItem =
+  | { kind: 'request'; key: string; entry: Entry }
+  | { kind: 'command'; key: string; command: CommandItem };
+
+/** Whether every search term appears in the text. */
+export function matchesTerms(text: string, terms: string[]): boolean {
+  const haystack = text.toLowerCase();
+  return terms.every((term) => haystack.includes(term));
+}
+
 /**
  * Quick switcher for requests. It opens with Ctrl+P or Cmd+P, searches across
- * every collection of the workspace and navigates to the chosen request.
+ * every collection of the workspace and navigates to the chosen request. The
+ * commands of enabled plugins are listed first and run in place.
  */
 @Component({
   selector: 'app-command-palette',
@@ -26,6 +41,7 @@ const COLLECTIONS_PREFIX = 'collections/';
 export class CommandPalette {
   private readonly router = inject(Router);
   private readonly workspaceStore = inject(WorkspaceStore);
+  private readonly pluginContributions = inject(PluginContributions);
   private readonly searchInput = viewChild<ElementRef<HTMLInputElement>>('searchInput');
 
   protected readonly isOpen = signal(false);
@@ -34,23 +50,30 @@ export class CommandPalette {
   protected readonly entries = signal<Entry[]>([]);
   protected readonly activeIndex = signal(0);
   protected readonly errorMessage = signal<string | null>(null);
+  /** What the last plugin command printed. */
+  protected readonly commandOutput = signal<string[] | null>(null);
+  protected readonly runningCommand = signal<string | null>(null);
 
-  protected readonly results = computed(() => {
+  protected readonly results = computed<PaletteItem[]>(() => {
     const terms = this.query()
       .trim()
       .toLowerCase()
       .split(/\s+/)
       .filter((term) => term !== '');
 
-    return this.entries()
-      .filter((entry) => {
-        if (terms.length === 0) {
-          return true;
-        }
-        const haystack = `${entry.Name} ${entry.Path} ${entry.Method}`.toLowerCase();
-        return terms.every((term) => haystack.includes(term));
-      })
-      .slice(0, VISIBLE_RESULT_LIMIT);
+    const commands: PaletteItem[] = this.pluginContributions
+      .contributions()
+      .commands.filter((command) => matchesTerms(`${command.title} ${command.pluginName}`, terms))
+      .map((command) => ({
+        kind: 'command',
+        key: `command:${command.pluginId}/${command.id}`,
+        command,
+      }));
+    const requests: PaletteItem[] = this.entries()
+      .filter((entry) => matchesTerms(`${entry.Name} ${entry.Path} ${entry.Method}`, terms))
+      .map((entry) => ({ kind: 'request', key: entry.Path, entry }));
+
+    return [...commands, ...requests].slice(0, VISIBLE_RESULT_LIMIT);
   });
 
   protected readonly selectedIndex = computed(() => {
@@ -79,6 +102,7 @@ export class CommandPalette {
     this.query.set('');
     this.activeIndex.set(0);
     this.errorMessage.set(null);
+    this.commandOutput.set(null);
 
     const workspaceRoot = this.workspaceStore.rootPath();
     if (!workspaceRoot) {
@@ -108,15 +132,38 @@ export class CommandPalette {
     this.activeIndex.set(0);
   }
 
-  protected async choose(entry: Entry): Promise<void> {
+  protected async choose(item: PaletteItem): Promise<void> {
+    if (item.kind === 'command') {
+      await this.runCommand(item.command);
+      return;
+    }
     this.close();
-    await this.router.navigate(['/workspace/request', ...entry.Path.split('/')]);
+    await this.router.navigate(['/workspace/request', ...item.entry.Path.split('/')]);
+  }
+
+  /** Runs a plugin command and keeps the palette open on what it printed. */
+  private async runCommand(command: CommandItem): Promise<void> {
+    const workspaceRoot = this.workspaceStore.rootPath();
+    if (!workspaceRoot || this.runningCommand()) {
+      return;
+    }
+    this.runningCommand.set(command.title);
+    this.errorMessage.set(null);
+    this.commandOutput.set(null);
+    try {
+      const logs = await PluginsService.RunCommand(workspaceRoot, command.pluginId, command.id);
+      this.commandOutput.set(logs && logs.length > 0 ? logs : [`${command.title}: done.`]);
+    } catch (error) {
+      this.errorMessage.set(describeError(error));
+    } finally {
+      this.runningCommand.set(null);
+    }
   }
 
   protected chooseActive(): void {
-    const entry = this.results()[this.selectedIndex()];
-    if (entry) {
-      void this.choose(entry);
+    const item = this.results()[this.selectedIndex()];
+    if (item) {
+      void this.choose(item);
     }
   }
 

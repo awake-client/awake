@@ -70,10 +70,27 @@ import { VariableInput } from '@shared/variable-input';
 import { RequestHistory } from './request-history/request-history';
 import { StreamPanel } from './stream-panel/stream-panel';
 import { copyText } from '@core/clipboard';
+import { ViewItem } from '@bindings/github.com/awake-client/awake/src/features/plugins/models';
+import { PluginContributions } from '@core/plugin-contributions';
+import { PluginFrame } from '@shared/plugin-frame';
 
 /** Sections of the request editor. */
 type EditorTab =
   'parameters' | 'headers' | 'authentication' | 'body' | 'scripts' | 'documentation' | 'history';
+
+/** A tab a plugin adds, keyed plugin:<plugin id>/<tab id>. */
+type PluginTabKey = `plugin:${string}`;
+
+/** The tab on screen: a built-in section or a plugin tab. */
+type ActiveTab = EditorTab | PluginTabKey;
+
+function viewerKey(viewer: ViewItem): string {
+  return `${viewer.pluginId}/${viewer.id}`;
+}
+
+function isPluginTab(tab: ActiveTab): tab is PluginTabKey {
+  return tab.startsWith('plugin:');
+}
 
 const HTTP_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'] as const;
 
@@ -158,6 +175,7 @@ function valueOf(parameters: PathParameter[] | null, name: string): string | und
     VariableInput,
     DriftNotice,
     DocumentationEditor,
+    PluginFrame,
   ],
   templateUrl: './request-editor.html',
   styleUrls: ['./request-editor.css', './request-layout.css', './request-response.css'],
@@ -184,6 +202,56 @@ export class RequestEditor {
   protected readonly Protocol = Protocol;
   protected readonly httpMethods = HTTP_METHODS;
   protected readonly tabs = Object.keys(TAB_LABELS) as EditorTab[];
+  private readonly pluginContributions = inject(PluginContributions);
+  /** Tabs the enabled plugins add after the built-in sections. */
+  protected readonly pluginTabs = computed(() =>
+    this.pluginContributions.contributions().requestTabs.map((tab) => ({
+      key: `plugin:${tab.pluginId}/${tab.id}` as PluginTabKey,
+      tab,
+    })),
+  );
+  protected readonly isPluginTabActive = computed(() => isPluginTab(this.activeTab()));
+  protected readonly activePluginTab = computed(() => {
+    const active = this.activeTab();
+    return this.pluginTabs().find((entry) => entry.key === active)?.tab ?? null;
+  });
+  /** What a plugin tab shows: the request as edited, variables unresolved. */
+  protected readonly pluginTabData = computed(() => ({
+    path: this.requestPath(),
+    request: this.draft(),
+  }));
+  /** Viewers of the enabled plugins for the content type of the response. */
+  protected readonly responseViewers = computed(() =>
+    this.pluginContributions.viewersFor(this.response()?.ContentType ?? ''),
+  );
+  /** Viewer chosen for the response body, null for the built-in view. */
+  protected readonly selectedViewer = signal<string | null>(null);
+  protected readonly activeViewer = computed(() => {
+    const selected = this.selectedViewer();
+    return this.responseViewers().find((viewer) => viewerKey(viewer) === selected) ?? null;
+  });
+  protected readonly viewerKey = viewerKey;
+  /**
+   * What a response viewer receives. A binary body arrives as the base64
+   * preview the backend keeps; text bodies as loaded so far.
+   */
+  protected readonly viewerData = computed(() => {
+    const response = this.response();
+    if (!response) {
+      return null;
+    }
+    const binary = response.Encoding === 'base64';
+    return {
+      status: response.StatusCode,
+      statusText: response.Status,
+      headers: response.Headers ?? {},
+      contentType: response.ContentType,
+      encoding: response.Encoding,
+      size: response.Size,
+      body: binary ? response.Preview : this.responseBody(),
+      complete: binary ? !response.Truncated : !this.responseHasMore(),
+    };
+  });
   protected readonly tabLabels = TAB_LABELS;
   /** Labels used when the request pane is narrow, side by side. */
   protected readonly shortTabLabels: Record<EditorTab, string> = {
@@ -379,7 +447,7 @@ export class RequestEditor {
   protected readonly postResponseScript = signal('');
   /** Request paths the pre-request script can pass to awake.runRequest. */
   protected readonly scriptRequests = signal<readonly string[]>([]);
-  protected readonly activeTab = signal<EditorTab>('parameters');
+  protected readonly activeTab = signal<ActiveTab>('parameters');
   /** Bumped when the request is loaded or saved, so OAuth 2 status reloads. */
   protected readonly savedRevision = signal(0);
   /** Saves pending edits before an OAuth 2 flow reads the request file. */
@@ -690,7 +758,7 @@ export class RequestEditor {
     this.layout.setResponseRatio(ratio);
   }
 
-  protected selectTab(tab: EditorTab): void {
+  protected selectTab(tab: ActiveTab): void {
     this.activeTab.set(tab);
     if (tab === 'scripts') {
       void this.loadScriptRequests();
@@ -1505,7 +1573,7 @@ export class RequestEditor {
     this.responseNextOffset = (state['responseNextOffset'] as number) ?? 0;
     this.responseTab.set((state['responseTab'] as 'body' | 'headers' | 'scripts') ?? 'body');
     this.responseError.set((state['responseError'] as string | null) ?? null);
-    this.activeTab.set((state['activeTab'] as EditorTab) ?? 'parameters');
+    this.activeTab.set((state['activeTab'] as ActiveTab) ?? 'parameters');
     this.lastRunAt.set((state['lastRunAt'] as string | null) ?? null);
     this.htmlPreview.set(false);
     this.largeResponseShown.set(false);

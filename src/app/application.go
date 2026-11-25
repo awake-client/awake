@@ -40,6 +40,7 @@ func Run(frontendAssets embed.FS) error {
 			application.NewService(featureServices.Interop),
 			application.NewService(featureServices.OAuth2),
 			application.NewService(featureServices.Platform),
+			application.NewService(featureServices.Plugins),
 			application.NewService(featureServices.Secrets),
 			application.NewService(featureServices.Updates),
 			application.NewService(featureServices.Workspace),
@@ -47,7 +48,8 @@ func Run(frontendAssets embed.FS) error {
 			application.NewService(featureServices.MCPSettings),
 		},
 		Assets: application.AssetOptions{
-			Handler: application.AssetFileServerFS(frontendAssets),
+			Handler:    application.AssetFileServerFS(frontendAssets),
+			Middleware: pluginViewMiddleware(featureServices.PluginHost),
 		},
 		Mac: application.MacOptions{
 			ApplicationShouldTerminateAfterLastWindowClosed: true,

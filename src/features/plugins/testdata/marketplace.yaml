@@ -1,0 +1,11 @@
+version: 1
+name: awake-official
+description: Plugins maintained by the Awake team.
+plugins:
+  - id: aws-sigv4
+    repository: https://github.com/awake-plugins/aws-sigv4.git
+    ref: v1.2.0
+    description: AWS Signature Version 4
+    tags: [auth]
+  - id: insomnia
+    repository: git@github.com:awake-plugins/insomnia.git

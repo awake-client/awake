@@ -81,3 +81,39 @@ func TestInterpolateWithoutPlaceholders(t *testing.T) {
 		t.Errorf("unexpected result %q", result)
 	}
 }
+
+func TestInterpolateReadsDynamicVariablesComputedByPlugins(t *testing.T) {
+	result, err := Interpolate("{{$awsDate}}/{{name}}", map[string]string{"name": "ada"}, map[string]string{"$awsDate": "20261125"})
+	if err != nil {
+		t.Fatalf("interpolate: %v", err)
+	}
+	if result != "20261125/ada" {
+		t.Errorf("unexpected result %q", result)
+	}
+
+	var missing *MissingVariablesError
+	if _, err := Interpolate("{{$unknown}}"); !errors.As(err, &missing) || missing.Names[0] != "$unknown" {
+		t.Errorf("expected $unknown to be missing, got %v", err)
+	}
+}
+
+func TestInterpolateKeepsBuiltInDynamicVariablesFirst(t *testing.T) {
+	result, err := Interpolate("{{$timestamp}}", map[string]string{"$timestamp": "overridden"})
+	if err != nil {
+		t.Fatalf("interpolate: %v", err)
+	}
+	if result == "overridden" {
+		t.Error("a layer must not override a built-in dynamic variable")
+	}
+}
+
+func TestExternalDynamicNames(t *testing.T) {
+	names := ExternalDynamicNames(`{{$awsDate}} {{ $uuid }} {{name}} {{$awsDate}} {{$region}}`)
+
+	if !reflect.DeepEqual(names, []string{"$awsDate", "$region"}) {
+		t.Errorf("unexpected names %v", names)
+	}
+	if names := ExternalDynamicNames("no placeholder"); len(names) != 0 {
+		t.Errorf("expected no name, got %v", names)
+	}
+}

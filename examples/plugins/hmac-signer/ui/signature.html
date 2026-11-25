@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Signature</title>
+    <style>
+      :root { color-scheme: light; --text: #1f2328; --muted: #656d76; --panel: #f6f8fa; --background: #ffffff; }
+      :root[data-theme="dark"] { color-scheme: dark; --text: #e6edf3; --muted: #8d96a0; --panel: #2a2a2a; --background: #1e1e1e; }
+      body { margin: 0; padding: 16px 20px; background: var(--background); color: var(--text); font: 13px/1.55 system-ui, sans-serif; }
+      pre { padding: 10px 12px; border-radius: 6px; background: var(--panel); font: 12px/1.5 ui-monospace, Menlo, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
+      .muted { color: var(--muted); }
+    </style>
+  </head>
+  <body>
+    <p class="muted">
+      The HMAC authentication signs the text below with the secret of this computer and sends it in
+      the <strong id="header">Authorization</strong> header. Variables are resolved when the request is
+      sent, so the text shown here keeps them as written.
+    </p>
+    <pre id="canonical">…</pre>
+    <script>
+      // Calls into the plugin carry an id; the answer comes back with it.
+      let nextId = 1;
+      const pending = new Map();
+
+      function invoke(handler, payload) {
+        const id = nextId++;
+        window.parent.postMessage({ type: "awake:invoke", id, handler, payload }, "*");
+        return new Promise((resolve, reject) => pending.set(id, { resolve, reject }));
+      }
+
+      window.addEventListener("message", async (event) => {
+        const message = event.data;
+        if (!message) {
+          return;
+        }
+        if (message.type === "awake:result" || message.type === "awake:error") {
+          const call = pending.get(message.id);
+          pending.delete(message.id);
+          if (call) {
+            message.type === "awake:result" ? call.resolve(message.result) : call.reject(new Error(message.message));
+          }
+          return;
+        }
+        if (message.type !== "awake:context") {
+          return;
+        }
+        document.documentElement.dataset.theme = message.theme;
+        try {
+          const result = await invoke("canonical", { request: message.data.request });
+          document.getElementById("header").textContent = result.header;
+          document.getElementById("canonical").textContent = result.text;
+        } catch (error) {
+          document.getElementById("canonical").textContent = error.message;
+        }
+      });
+
+      window.parent.postMessage({ type: "awake:ready" }, "*");
+    </script>
+  </body>
+</html>

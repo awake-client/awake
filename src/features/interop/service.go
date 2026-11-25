@@ -54,8 +54,9 @@ type Source interface {
 
 // Service imports and exports workspace collections.
 type Service struct {
-	writer Writer
-	source Source
+	writer  Writer
+	source  Source
+	plugins PluginFormats
 }
 
 // NewService returns an interop service backed by writer and source.
@@ -66,7 +67,13 @@ func NewService(writer Writer, source Source) *Service {
 // Import reads an OpenAPI, Postman or Bruno document and writes it into the
 // collections of a workspace. An empty format is detected from the file.
 func (service *Service) Import(workspaceRoot string, sourcePath string, format Format) (ImportResult, error) {
-	collections, err := readCollections(sourcePath, format)
+	var collections []Collection
+	var err error
+	if IsPluginFormat(format) {
+		collections, err = service.importWithPlugin(workspaceRoot, sourcePath, format)
+	} else {
+		collections, err = readCollections(sourcePath, format)
+	}
 	if err != nil {
 		return ImportResult{}, err
 	}
@@ -131,6 +138,10 @@ func (service *Service) Export(workspaceRoot string, destinationPath string, for
 	collections := make([]Collection, 0, len(snapshots))
 	for _, snapshot := range snapshots {
 		collections = append(collections, snapshotCollection(snapshot))
+	}
+
+	if IsPluginFormat(format) {
+		return service.exportWithPlugin(workspaceRoot, destinationPath, format, collections)
 	}
 
 	switch format {

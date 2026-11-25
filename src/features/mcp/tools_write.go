@@ -12,7 +12,7 @@ import (
 )
 
 const requestFields = "Fields: name, method, url (may use {{variables}}), parameters and headers " +
-	"(lists of {name, value, enabled}), authentication ({type: inherit|none|basic|bearer|apiKey|oauth2, ...}), " +
+	"(lists of {name, value, enabled}), authentication ({type: inherit|none|basic|bearer|apiKey|oauth2|plugin:<id>/<type>, ...}), " +
 	"body ({type: none|json|text|xml|form-urlencoded|multipart|binary, ...}), scripts " +
 	"({preRequest, postResponse}) and documentation. Read the awake://guide resource for every field."
 

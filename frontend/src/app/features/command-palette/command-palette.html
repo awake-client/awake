@@ -14,7 +14,7 @@
         name="paletteQuery"
         [ngModel]="query()"
         (ngModelChange)="updateQuery($event)"
-        placeholder="Search requests by name, path or method…"
+        placeholder="Search requests and plugin commands…"
         autocomplete="off"
         spellcheck="false"
         aria-label="Search requests"
@@ -23,6 +23,12 @@
       @if (errorMessage(); as message) {
         <p class="palette-message error">{{ message }}</p>
       }
+      @if (runningCommand(); as title) {
+        <p class="palette-message">Running {{ title }}…</p>
+      }
+      @if (commandOutput(); as lines) {
+        <pre class="palette-output" aria-live="polite">{{ lines.join('\n') }}</pre>
+      }
 
       @if (isLoading()) {
         <p class="palette-message">Loading requests…</p>
@@ -30,20 +36,26 @@
         <p class="palette-message">No request matches this search.</p>
       } @else {
         <ul class="palette-results" role="listbox">
-          @for (entry of results(); track entry.Path; let index = $index) {
+          @for (item of results(); track item.key; let index = $index) {
             <li
               class="palette-result"
               role="option"
               [class.active]="index === selectedIndex()"
               [attr.aria-selected]="index === selectedIndex()"
               (mouseenter)="activeIndex.set(index)"
-              (click)="choose(entry)"
+              (click)="choose(item)"
             >
-              <span class="method-chip" [attr.data-method]="entry.Method || 'GET'">
-                {{ entry.Method || 'GET' }}
-              </span>
-              <span class="result-name">{{ entry.Name }}</span>
-              <span class="result-path">{{ displayPath(entry) }}</span>
+              @if (item.kind === 'command') {
+                <span class="method-chip command-chip">RUN</span>
+                <span class="result-name">{{ item.command.title }}</span>
+                <span class="result-path">{{ item.command.pluginName }}</span>
+              } @else {
+                <span class="method-chip" [attr.data-method]="item.entry.Method || 'GET'">
+                  {{ item.entry.Method || 'GET' }}
+                </span>
+                <span class="result-name">{{ item.entry.Name }}</span>
+                <span class="result-path">{{ displayPath(item.entry) }}</span>
+              }
             </li>
           }
         </ul>
