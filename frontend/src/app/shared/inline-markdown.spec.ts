@@ -21,6 +21,19 @@ describe('parseInlineMarkdown', () => {
     ]);
   });
 
+  it('reads italic text without splitting snake case words', () => {
+    expect(parseInlineMarkdown('*once* per _user_ in user_id')).toEqual([
+      { kind: 'emphasis', text: 'once' },
+      { kind: 'text', text: ' per ' },
+      { kind: 'emphasis', text: 'user' },
+      { kind: 'text', text: ' in user_id' },
+    ]);
+  });
+
+  it('keeps lone asterisks as text', () => {
+    expect(parseInlineMarkdown('2 * 3 * 4')).toEqual([{ kind: 'text', text: '2 * 3 * 4' }]);
+  });
+
   it('links bare URLs without their trailing punctuation', () => {
     expect(parseInlineMarkdown('in https://example.test/pull/1.')).toEqual([
       { kind: 'text', text: 'in ' },

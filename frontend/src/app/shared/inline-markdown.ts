@@ -1,16 +1,17 @@
-/** A run of text inside a changelog line, with the formatting it carries. */
+/** A run of text inside a line of Markdown, with the formatting it carries. */
 export type InlineSegment =
   | { kind: 'text'; text: string }
   | { kind: 'code'; text: string }
   | { kind: 'strong'; text: string }
+  | { kind: 'emphasis'; text: string }
   | { kind: 'link'; text: string; href: string };
 
 const INLINE_PATTERN =
-  /`([^`]+)`|\*\*([^*]+)\*\*|__([^_]+)__|\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)|(https?:\/\/[^\s)<>]+[^\s)<>.,;:!?'"])/g;
+  /`([^`]+)`|\*\*([^*]+)\*\*|__([^_]+)__|\*([^*\s](?:[^*]*[^*\s])?)\*|(?<![\w])_([^_\s](?:[^_]*[^_\s])?)_(?![\w])|\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)|(https?:\/\/[^\s)<>]+[^\s)<>.,;:!?'"])/g;
 
 /**
- * Splits a line of Markdown into the inline formats a changelog uses: code
- * spans, bold text and links. Everything else stays plain text, so the result
+ * Splits a line of Markdown into its inline formats: code spans, bold and
+ * italic text, and links. Everything else stays plain text, so the result
  * renders through bindings, never as HTML. Only http and https links are kept.
  */
 export function parseInlineMarkdown(source: string): InlineSegment[] {
@@ -25,11 +26,13 @@ export function parseInlineMarkdown(source: string): InlineSegment[] {
   for (const match of source.matchAll(INLINE_PATTERN)) {
     const start = match.index ?? 0;
     pushText(source.slice(cursor, start));
-    const [whole, code, strong, underlined, label, href, bareUrl] = match;
+    const [whole, code, strong, underlined, starred, underscored, label, href, bareUrl] = match;
     if (code !== undefined) {
       segments.push({ kind: 'code', text: code });
     } else if (strong !== undefined || underlined !== undefined) {
       segments.push({ kind: 'strong', text: strong ?? underlined });
+    } else if (starred !== undefined || underscored !== undefined) {
+      segments.push({ kind: 'emphasis', text: starred ?? underscored });
     } else if (label !== undefined) {
       segments.push({ kind: 'link', text: label, href });
     } else {

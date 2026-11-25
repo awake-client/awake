@@ -131,6 +131,9 @@
                       @case ('strong') {
                         <strong>{{ segment.text }}</strong>
                       }
+                      @case ('emphasis') {
+                        <em>{{ segment.text }}</em>
+                      }
                       @case ('link') {
                         <a
                           [href]="segment.kind === 'link' ? segment.href : ''"
