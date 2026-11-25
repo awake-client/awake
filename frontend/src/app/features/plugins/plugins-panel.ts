@@ -13,7 +13,9 @@ import { PluginApprovalDialog } from './plugin-approval-dialog';
 import {
   contributionSummary,
   describePermission,
+  hasSettings,
   pluginTitle,
+  secretSettings,
   settingsDraft,
   sharedSettings,
   shortCommit,
@@ -47,6 +49,8 @@ export class PluginsPanel {
   /** Plugin whose settings are open, and the values being edited. */
   protected readonly settingsOpen = signal<string | null>(null);
   protected readonly settingsValues = signal<Record<string, string>>({});
+  /** Secret values typed in the open settings, sent to the keychain on save. */
+  protected readonly secretDrafts = signal<Record<string, string>>({});
 
   protected readonly badge = stateBadge;
   protected readonly title = pluginTitle;
@@ -54,6 +58,8 @@ export class PluginsPanel {
   protected readonly describePermission = describePermission;
   protected readonly contributions = contributionSummary;
   protected readonly sharedSettings = sharedSettings;
+  protected readonly secretSettings = secretSettings;
+  protected readonly hasSettings = hasSettings;
   protected readonly settingTypes = SettingType;
 
   constructor() {
@@ -125,7 +131,16 @@ export class PluginsPanel {
       return;
     }
     this.settingsValues.set(settingsDraft(view.manifest, view.declaration.settings));
+    this.secretDrafts.set({});
+    this.store.secretStates.set({});
     this.settingsOpen.set(view.declaration.id);
+    if (secretSettings(view.manifest).length > 0) {
+      void this.store.loadSecretStates(view.declaration.id);
+    }
+  }
+
+  protected setSecret(key: string, value: string): void {
+    this.secretDrafts.update((drafts) => ({ ...drafts, [key]: value }));
   }
 
   protected setSetting(key: string, value: string): void {
@@ -137,7 +152,7 @@ export class PluginsPanel {
       return;
     }
     const stored = storedSettings(view.manifest, this.settingsValues());
-    if (await this.store.saveSettings(view.declaration.id, stored)) {
+    if (await this.store.saveSettings(view.declaration.id, stored, this.secretDrafts())) {
       this.settingsOpen.set(null);
     }
   }

@@ -31,6 +31,8 @@ export class PluginsStore {
   readonly errorMessage = signal<string | null>(null);
   readonly statusMessage = signal<string | null>(null);
   readonly review = signal<PluginReview | null>(null);
+  /** Secret settings of the plugin whose settings are open, by key: whether each is set. */
+  readonly secretStates = signal<Record<string, boolean>>({});
 
   readonly attentionCount = computed(() => this.plugins().filter(needsAttention).length);
 
@@ -167,10 +169,43 @@ export class PluginsStore {
     });
   }
 
-  saveSettings(pluginID: string, settings: Record<string, string>): Promise<boolean> {
+  /** Whether each secret setting of a plugin has a value on this computer. */
+  async loadSecretStates(pluginID: string): Promise<void> {
+    try {
+      const states = (await PluginsService.SecretSettings(this.rootPath, pluginID)) ?? [];
+      this.secretStates.set(Object.fromEntries(states.map((state) => [state.key, state.isSet])));
+    } catch (error) {
+      this.secretStates.set({});
+      this.errorMessage.set(describeError(error));
+    }
+  }
+
+  /**
+   * Saves the shared settings in awake.yaml and the secret ones typed in the
+   * keychain. A secret left empty keeps its stored value.
+   */
+  saveSettings(
+    pluginID: string,
+    settings: Record<string, string>,
+    secrets: Record<string, string>,
+  ): Promise<boolean> {
     return this.run(`settings:${pluginID}`, async () => {
       this.replacePlugin(await PluginsService.UpdateSettings(this.rootPath, pluginID, settings));
-      return 'Settings saved in awake.yaml.';
+      for (const [key, value] of Object.entries(secrets)) {
+        if (value) {
+          await PluginsService.SetSecretSetting(this.rootPath, pluginID, key, value);
+        }
+      }
+      await this.reloadPlugins();
+      return 'Settings saved. Secret values stay on this computer.';
+    });
+  }
+
+  clearSecret(pluginID: string, key: string): Promise<boolean> {
+    return this.run(`secret:${pluginID}:${key}`, async () => {
+      await PluginsService.SetSecretSetting(this.rootPath, pluginID, key, '');
+      this.secretStates.update((states) => ({ ...states, [key]: false }));
+      await this.reloadPlugins();
     });
   }
 

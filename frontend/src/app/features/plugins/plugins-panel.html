@@ -116,8 +116,21 @@
                       }}
                     </button>
                   }
+                  @case ('failed') {
+                    @if (hasSettings(plugin.manifest)) {
+                      <button
+                        type="button"
+                        class="btn btn-ghost btn-sm"
+                        [class.active]="settingsOpen() === plugin.declaration.id"
+                        (click)="toggleSettings(plugin)"
+                      >
+                        <app-icon name="settings" [size]="14" />
+                        Settings
+                      </button>
+                    }
+                  }
                   @case ('approved') {
-                    @if (sharedSettings(plugin.manifest!).length > 0) {
+                    @if (hasSettings(plugin.manifest)) {
                       <button
                         type="button"
                         class="btn btn-ghost btn-sm"
@@ -210,8 +223,49 @@
                       }
                     </label>
                   }
+                  @for (setting of secretSettings(manifest); track setting.key) {
+                    <div class="field">
+                      <label class="field-label" [attr.for]="'secret-' + setting.key">
+                        {{ setting.label }}
+                        <span class="secret-state">
+                          {{
+                            store.secretStates()[setting.key]
+                              ? 'Stored on this computer'
+                              : 'Not set'
+                          }}
+                        </span>
+                      </label>
+                      <div class="secret-row">
+                        <input
+                          class="input"
+                          type="password"
+                          autocomplete="off"
+                          [id]="'secret-' + setting.key"
+                          [placeholder]="
+                            store.secretStates()[setting.key] ? 'Leave empty to keep it' : ''
+                          "
+                          [value]="secretDrafts()[setting.key] ?? ''"
+                          (input)="setSecret(setting.key, inputValue($event))"
+                        />
+                        @if (store.secretStates()[setting.key]) {
+                          <button
+                            type="button"
+                            class="btn btn-ghost btn-sm"
+                            [disabled]="store.busy() !== null"
+                            (click)="store.clearSecret(plugin.declaration.id, setting.key)"
+                          >
+                            Clear
+                          </button>
+                        }
+                      </div>
+                      @if (setting.description) {
+                        <span class="field-hint">{{ setting.description }}</span>
+                      }
+                    </div>
+                  }
                   <p class="hint">
-                    Shared with your team in awake.yaml. Secret settings are asked on each computer.
+                    Shared settings are saved in awake.yaml for your team. Secret settings stay in
+                    the keychain of this computer.
                   </p>
                   <div class="settings-actions">
                     <button

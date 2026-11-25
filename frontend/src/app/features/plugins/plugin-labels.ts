@@ -34,6 +34,7 @@ const STATE_BADGES: Partial<Record<PluginState, StateBadge>> = {
   [PluginState.PluginNotDownloaded]: { label: 'Not downloaded', tone: 'muted' },
   [PluginState.PluginIncompatible]: { label: 'Needs a newer Awake', tone: 'danger' },
   [PluginState.PluginInvalid]: { label: 'Invalid', tone: 'danger' },
+  [PluginState.PluginFailed]: { label: 'Failed to load', tone: 'danger' },
 };
 
 export function stateBadge(state: PluginState): StateBadge {
@@ -88,6 +89,16 @@ export function contributionSummary(manifest: Manifest): string[] {
 /** Settings the team shares through awake.yaml; secrets stay out of it. */
 export function sharedSettings(manifest: Manifest) {
   return (manifest.settings ?? []).filter((setting) => setting.type !== SettingType.SettingSecret);
+}
+
+/** Settings kept in the keychain of each computer, never in awake.yaml. */
+export function secretSettings(manifest: Manifest) {
+  return (manifest.settings ?? []).filter((setting) => setting.type === SettingType.SettingSecret);
+}
+
+/** Whether a plugin has settings to show. */
+export function hasSettings(manifest: Manifest | null | undefined): boolean {
+  return (manifest?.settings ?? []).length > 0;
 }
 
 /** The value each shared setting has today: the stored one, or its default. */

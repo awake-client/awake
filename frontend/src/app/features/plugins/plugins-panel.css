@@ -341,6 +341,21 @@ h1 {
   border-top: 1px solid var(--color-border);
 }
 
+.secret-state {
+  margin-left: 6px;
+  font-weight: 400;
+  color: var(--color-text-subtle);
+}
+
+.secret-row {
+  display: flex;
+  gap: 8px;
+}
+
+.secret-row .input {
+  flex: 1;
+}
+
 .settings-actions {
   display: flex;
   justify-content: flex-end;
