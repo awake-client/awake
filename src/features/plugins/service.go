@@ -72,6 +72,8 @@ const (
 	PluginIncompatible PluginState = "incompatible"
 	// PluginInvalid means the declared commit holds no valid plugin.
 	PluginInvalid PluginState = "invalid"
+	// PluginFailed means the plugin is approved but its bundle did not load.
+	PluginFailed PluginState = "failed"
 )
 
 // PluginView is a declared plugin as the interface lists it.
@@ -134,6 +136,18 @@ type Service struct {
 	trust        *TrustStore
 	workspace    WorkspaceConfiguration
 	awakeVersion string
+	host         *Host
+}
+
+// ErrHostUnavailable is returned by the operations that need the plugin host
+// when none is connected.
+var ErrHostUnavailable = errors.New("plugins: plugins cannot run in this build")
+
+// ConnectHost lets the service report load problems and manage what only the
+// running plugins know. It is a package function rather than a method, so the
+// host never crosses the Wails bridge.
+func ConnectHost(service *Service, host *Host) {
+	service.host = host
 }
 
 // NewService returns a plugin service. awakeVersion is checked against the
@@ -235,7 +249,7 @@ func (service *Service) ListPlugins(workspaceRoot string) ([]PluginView, error) 
 	}
 	views := make([]PluginView, 0, len(declared.Plugins))
 	for _, declaration := range declared.Plugins {
-		view, err := service.pluginView(declared.WorkspaceID, declaration)
+		view, err := service.pluginView(workspaceRoot, declared.WorkspaceID, declaration)
 		if err != nil {
 			return nil, err
 		}
@@ -300,7 +314,7 @@ func (service *Service) Install(workspaceRoot string, source PluginSource, commi
 	if err := service.approve(declared.WorkspaceID, declaration, manifest); err != nil {
 		return PluginView{}, err
 	}
-	return service.pluginView(declared.WorkspaceID, declaration)
+	return service.pluginView(workspaceRoot, declared.WorkspaceID, declaration)
 }
 
 // CheckUpdate looks for a newer commit of an installed plugin, at the ref its
@@ -355,7 +369,7 @@ func (service *Service) Download(workspaceRoot string, pluginID string) (PluginV
 	if _, err := service.cache.Checkout(operationContext, declaration.Repository, declaration.Commit); err != nil {
 		return PluginView{}, err
 	}
-	return service.pluginView(declared.WorkspaceID, declaration)
+	return service.pluginView(workspaceRoot, declared.WorkspaceID, declaration)
 }
 
 // Approve lets the declared commit of a plugin run on this machine. commit is
@@ -383,7 +397,7 @@ func (service *Service) Approve(workspaceRoot string, pluginID string, commit st
 	if err := service.approve(declared.WorkspaceID, declaration, manifest); err != nil {
 		return PluginView{}, err
 	}
-	return service.pluginView(declared.WorkspaceID, declaration)
+	return service.pluginView(workspaceRoot, declared.WorkspaceID, declaration)
 }
 
 // Revoke stops a plugin from running on this machine. It stays declared for
@@ -447,7 +461,7 @@ func (service *Service) UpdateSettings(workspaceRoot string, pluginID string, se
 	if err := service.workspace.SavePlugins(workspaceRoot, declared.Marketplaces, plugins); err != nil {
 		return PluginView{}, err
 	}
-	return service.pluginView(declared.WorkspaceID, declaration)
+	return service.pluginView(workspaceRoot, declared.WorkspaceID, declaration)
 }
 
 func (service *Service) preview(operationContext context.Context, declared WorkspacePlugins, source PluginSource) (PluginPreview, error) {
@@ -532,7 +546,7 @@ func (service *Service) approve(workspaceID string, declaration domain.PluginDec
 	})
 }
 
-func (service *Service) pluginView(workspaceID string, declaration domain.PluginDeclaration) (PluginView, error) {
+func (service *Service) pluginView(workspaceRoot string, workspaceID string, declaration domain.PluginDeclaration) (PluginView, error) {
 	view := PluginView{Declaration: declaration, State: PluginNotDownloaded}
 	checkout, found := service.cache.CachedCheckout(declaration.Repository, declaration.Commit)
 	if !found {
@@ -563,6 +577,11 @@ func (service *Service) pluginView(workspaceID string, declaration domain.Plugin
 	view.State = PluginNeedsApproval
 	if trusted {
 		view.State = PluginApproved
+		if service.host != nil {
+			if problem := service.host.LoadProblem(workspaceRoot, declaration.ID); problem != "" {
+				view.State, view.Problem = PluginFailed, problem
+			}
+		}
 	}
 	return view, nil
 }
@@ -687,4 +706,65 @@ func findMarketplace(marketplaces []domain.MarketplaceReference, name string) (d
 		return domain.MarketplaceReference{}, false
 	}
 	return marketplaces[position], true
+}
+
+// SecretSettings reports which secret settings of a plugin have a value on
+// this computer.
+func (service *Service) SecretSettings(workspaceRoot string, pluginID string) ([]SecretSettingState, error) {
+	workspaceID, manifest, err := service.declaredManifest(workspaceRoot, pluginID)
+	if err != nil {
+		return nil, err
+	}
+	return service.host.SecretSettingStates(workspaceID, manifest)
+}
+
+// SetSecretSetting stores a secret setting in the keychain of this computer,
+// or removes it when value is empty. It never reaches awake.yaml.
+func (service *Service) SetSecretSetting(workspaceRoot string, pluginID string, key string, value string) error {
+	workspaceID, manifest, err := service.declaredManifest(workspaceRoot, pluginID)
+	if err != nil {
+		return err
+	}
+	return service.host.SetSecretSetting(workspaceID, manifest, key, value)
+}
+
+// RunCommand runs a command an enabled plugin adds to the command palette and
+// returns what it logged.
+func (service *Service) RunCommand(workspaceRoot string, pluginID string, commandID string) ([]string, error) {
+	if service.host == nil {
+		return nil, ErrHostUnavailable
+	}
+	return service.host.RunCommand(workspaceRoot, pluginID, commandID)
+}
+
+// DynamicVariables lists the {{$name}} placeholders the enabled plugins of the
+// workspace provide, for autocompletion.
+func (service *Service) DynamicVariables(workspaceRoot string) ([]DynamicVariableContribution, error) {
+	if service.host == nil {
+		return []DynamicVariableContribution{}, nil
+	}
+	return service.host.DynamicVariables(workspaceRoot), nil
+}
+
+func (service *Service) declaredManifest(workspaceRoot string, pluginID string) (string, Manifest, error) {
+	if service.host == nil {
+		return "", Manifest{}, ErrHostUnavailable
+	}
+	declared, err := service.workspace.LoadPlugins(workspaceRoot)
+	if err != nil {
+		return "", Manifest{}, err
+	}
+	declaration, err := findDeclaration(declared.Plugins, pluginID)
+	if err != nil {
+		return "", Manifest{}, err
+	}
+	checkout, found := service.cache.CachedCheckout(declaration.Repository, declaration.Commit)
+	if !found {
+		return "", Manifest{}, fmt.Errorf("%w: %s", ErrNotCached, declaration.Repository)
+	}
+	manifest, err := ReadManifest(checkout)
+	if err != nil {
+		return "", Manifest{}, err
+	}
+	return declared.WorkspaceID, manifest, nil
 }

@@ -383,9 +383,14 @@ func newServiceFixture(t *testing.T) *serviceFixture {
 
 func (fixture *serviceFixture) publishPlugin(commit string, tag string, manifest string) {
 	fixture.t.Helper()
+	fixture.publishPluginWithBundle(commit, tag, manifest, "awake.register({})\n")
+}
+
+func (fixture *serviceFixture) publishPluginWithBundle(commit string, tag string, manifest string, bundle string) {
+	fixture.t.Helper()
 	fixture.git.publishTo(testRepositoryURL, commit, tag, testArchive(fixture.t, map[string]string{
 		ManifestFileName: manifest,
-		"dist/plugin.js": "awake.register({})\n",
+		"dist/plugin.js": bundle,
 	}))
 }
 
