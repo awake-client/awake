@@ -638,15 +638,12 @@
 
           @case ('documentation') {
             <div class="form-panel">
-              <label class="field field-grow">
-                <span class="field-label">Documentation</span>
-                <textarea
-                  class="input documentation"
-                  [ngModel]="documentation()"
-                  (ngModelChange)="documentation.set($event)"
-                  placeholder="Describe what this request does, its parameters and expected responses."
-                ></textarea>
-              </label>
+              <app-documentation-editor
+                class="field-grow"
+                [value]="documentation()"
+                (valueChange)="documentation.set($event)"
+                placeholder="Describe what this request does, its parameters and expected responses."
+              />
             </div>
           }
         }

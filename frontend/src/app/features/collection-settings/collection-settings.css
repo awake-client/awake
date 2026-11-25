@@ -121,11 +121,6 @@ h1 {
   gap: 14px;
 }
 
-.documentation {
-  min-height: 200px;
-  font-family: var(--font-sans);
-}
-
 .hint {
   margin: 0;
   font-size: var(--text-sm);

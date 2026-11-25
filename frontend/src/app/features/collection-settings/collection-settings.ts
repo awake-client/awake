@@ -16,6 +16,7 @@ import { WorkspaceStore } from '@core/workspace-store';
 import { AuthEditor, describeAuthentication } from '@shared/auth-editor';
 import { OAuth2Actions } from '../oauth2/oauth2-actions';
 import { ColorPicker } from '@shared/color-picker';
+import { DocumentationEditor } from '@shared/documentation-editor';
 import { applyEnvironmentAuthentication } from '@shared/environment-authentication';
 import { Icon } from '@shared/icon';
 import { VariableInput } from '@shared/variable-input';
@@ -34,7 +35,15 @@ interface VariableRow {
  */
 @Component({
   selector: 'app-collection-settings',
-  imports: [AuthEditor, ColorPicker, Icon, OAuth2Actions, RouterLink, VariableInput],
+  imports: [
+    AuthEditor,
+    ColorPicker,
+    DocumentationEditor,
+    Icon,
+    OAuth2Actions,
+    RouterLink,
+    VariableInput,
+  ],
   host: {
     '(document:keydown)': 'handleShortcut($event)',
   },

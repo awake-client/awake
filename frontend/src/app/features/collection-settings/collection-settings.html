@@ -101,16 +101,11 @@
               <app-color-picker [value]="color()" (valueChange)="color.set($event)" />
             </div>
           }
-          <label class="field grow">
-            <span class="field-label">Documentation</span>
-            <textarea
-              class="input documentation"
-              rows="10"
-              [value]="documentation()"
-              (input)="documentation.set(inputValue($event))"
-              placeholder="What this API does, how to get credentials, conventions to follow…"
-            ></textarea>
-          </label>
+          <app-documentation-editor
+            [value]="documentation()"
+            (valueChange)="documentation.set($event)"
+            placeholder="What this API does, how to get credentials, conventions to follow…"
+          />
           <a
             class="link"
             routerLink="/workspace/environments"

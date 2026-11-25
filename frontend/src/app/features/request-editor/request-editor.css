@@ -323,17 +323,12 @@
   min-height: 0;
 }
 
-.body-content,
-.documentation {
+.body-content {
   flex: 1;
   min-height: 180px;
   resize: none;
   font-family: var(--font-mono);
   line-height: 1.55;
-}
-
-.documentation {
-  font-family: var(--font-sans);
 }
 
 /* Scripts scroll as a whole, so each editor keeps a usable height however

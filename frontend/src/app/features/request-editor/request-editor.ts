@@ -58,6 +58,7 @@ import { VariableStore } from '@core/variable-store';
 import { WorkspaceStore } from '@core/workspace-store';
 import { AuthEditor, describeAuthentication } from '@shared/auth-editor';
 import { CodeEditor, CodeLanguage, prettyJson } from '@shared/code-editor';
+import { DocumentationEditor } from '@shared/documentation-editor';
 import { DriftNotice } from './drift-notice';
 import { bodyDrift, parameterDrift } from './override-drift';
 import { describeSendFailure } from './send-failure';
@@ -156,6 +157,7 @@ function valueOf(parameters: PathParameter[] | null, name: string): string | und
     ResizeHandle,
     VariableInput,
     DriftNotice,
+    DocumentationEditor,
   ],
   templateUrl: './request-editor.html',
   styleUrls: ['./request-editor.css', './request-layout.css', './request-response.css'],
@@ -825,7 +827,11 @@ export class RequestEditor {
       void this.loadImage(response);
     } catch (error) {
       if (this.requestPath() !== path) {
-        this.deliverToStash(path, { response: null, error: describeError(error), ...initialBody(null) });
+        this.deliverToStash(path, {
+          response: null,
+          error: describeError(error),
+          ...initialBody(null),
+        });
       } else {
         this.responseError.set(describeError(error));
       }
@@ -852,7 +858,9 @@ export class RequestEditor {
    */
   private deliverToStash(
     path: string,
-    outcome: { response: HTTPResponse | null; error: string | null } & ReturnType<typeof initialBody>,
+    outcome: { response: HTTPResponse | null; error: string | null } & ReturnType<
+      typeof initialBody
+    >,
   ): void {
     const state = this.tabsStore.takeStash(path);
     if (!state) {
