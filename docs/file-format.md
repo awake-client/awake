@@ -73,6 +73,8 @@ git:
 - `mode` is `team` or `personal`. A personal workspace may omit the `git`
   section and stay local.
 - `variables` are workspace defaults available to every request.
+- `marketplaces` and `plugins` declare the plugins of the workspace, each pinned
+  to a commit. See [plugins.md](plugins.md).
 
 ## Environments
 
@@ -145,6 +147,10 @@ each occurrence receives its own value:
 | `{{$date}}` | current date, `YYYY-MM-DD` |
 | `{{$randomInt}}` | integer between 0 and 1000 |
 | `{{$randomHex}}` | 16 hexadecimal characters |
+
+Enabled [plugins](plugins.md) add their own, such as `{{$requestId}}`. A
+plugin placeholder is computed once per request, so its occurrences share the
+value.
 
 Secret values are resolved lazily when a request is sent. Referencing an
 undefined variable is an error, not an empty string.
@@ -404,7 +410,16 @@ configured inline limit are never embedded in YAML.
 
 ### Authentication types
 
-`inherit`, `none`, `basic`, `bearer`, `apiKey`, `oauth2`.
+`inherit`, `none`, `basic`, `bearer`, `apiKey`, `oauth2`, and
+`plugin:<plugin id>/<type>` for an authentication a [plugin](plugins.md)
+provides. Its values go in `fields`, under the keys its manifest declares:
+
+```yaml
+authentication:
+  type: plugin:hmac-signer/hmac
+  fields:
+    keyId: "{{keyId}}"
+```
 
 A request with no `authentication` section, or with the `inherit` type, uses
 the authentication of its closest folder that defines one, then of its

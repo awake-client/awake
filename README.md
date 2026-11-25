@@ -22,6 +22,10 @@ through git instead of a cloud account.
   extract base URLs or change anything else in the workspace, or let agents
   list, send and write requests through the local [MCP server](docs/mcp.md).
 - **Import and export** — Bruno, OpenCollection, OpenAPI and Postman.
+- **Plugins** — hooks, dynamic variables, authentication types, formats,
+  commands and response views from git repositories, pinned in `awake.yaml`
+  and enabled by each teammate after reviewing their permissions. See
+  [docs/plugins.md](docs/plugins.md).
 - **Built to stay fast** — virtualized tree, SQLite index, search, command
   palette, request history, light and dark themes.
 
