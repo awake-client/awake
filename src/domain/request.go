@@ -127,6 +127,10 @@ type Authentication struct {
 	Scopes           []string        `yaml:"scopes,omitempty"`
 	RedirectURL      string          `yaml:"redirectUrl,omitempty"`
 	Audience         string          `yaml:"audience,omitempty"`
+
+	// Fields holds the values of an authentication a plugin provides, by the
+	// keys its manifest declares. They may reference variables.
+	Fields map[string]string `yaml:"fields,omitempty"`
 }
 
 // Body holds the request body.
@@ -484,8 +488,30 @@ func isSupportedAuthentication(authenticationType AuthenticationType) bool {
 		AuthenticationBearer, AuthenticationAPIKey, AuthenticationOAuth2:
 		return true
 	default:
-		return false
+		_, _, isPlugin := authenticationType.PluginContribution()
+		return isPlugin
 	}
+}
+
+// AuthenticationPluginPrefix starts the type of an authentication a plugin
+// provides, written plugin:<plugin id>/<type>.
+const AuthenticationPluginPrefix = "plugin:"
+
+var pluginAuthenticationPattern = regexp.MustCompile(`^plugin:([a-z0-9][a-z0-9-]*)/([A-Za-z][A-Za-z0-9_]*)$`)
+
+// PluginAuthenticationType names the authentication type a plugin provides.
+func PluginAuthenticationType(pluginID string, typeName string) AuthenticationType {
+	return AuthenticationType(AuthenticationPluginPrefix + pluginID + "/" + typeName)
+}
+
+// PluginContribution returns the plugin and the type name of an
+// authentication a plugin provides, and false for a built-in type.
+func (authenticationType AuthenticationType) PluginContribution() (pluginID string, typeName string, isPlugin bool) {
+	matches := pluginAuthenticationPattern.FindStringSubmatch(string(authenticationType))
+	if matches == nil {
+		return "", "", false
+	}
+	return matches[1], matches[2], true
 }
 
 func validateAuthentication(authentication Authentication) error {

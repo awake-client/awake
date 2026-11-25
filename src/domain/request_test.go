@@ -151,3 +151,28 @@ func TestValidateRejectsIncompleteOAuth2(t *testing.T) {
 		}
 	}
 }
+
+func TestPluginAuthenticationTypes(t *testing.T) {
+	pluginID, typeName, isPlugin := PluginAuthenticationType("aws-sigv4", "awsSigV4").PluginContribution()
+	if !isPlugin || pluginID != "aws-sigv4" || typeName != "awsSigV4" {
+		t.Fatalf("unexpected contribution %q %q %v", pluginID, typeName, isPlugin)
+	}
+
+	for _, authenticationType := range []AuthenticationType{"plugin:aws-sigv4/awsSigV4", AuthenticationBearer} {
+		request := Request{Name: "Signed", Method: MethodGet, URL: "https://example.com", Authentication: &Authentication{Type: authenticationType}}
+		request.ApplyDefaults()
+		if err := request.Validate(); err != nil {
+			t.Errorf("expected %q to be valid: %v", authenticationType, err)
+		}
+	}
+	for _, authenticationType := range []AuthenticationType{"plugin:", "plugin:AWS/sign", "plugin:aws/", "plugin:aws/sign/extra", "signature"} {
+		if _, _, isPlugin := authenticationType.PluginContribution(); isPlugin {
+			t.Errorf("expected %q not to name a plugin", authenticationType)
+		}
+		request := Request{Name: "Signed", Method: MethodGet, URL: "https://example.com", Authentication: &Authentication{Type: authenticationType}}
+		request.ApplyDefaults()
+		if err := request.Validate(); err == nil {
+			t.Errorf("expected %q to be refused", authenticationType)
+		}
+	}
+}

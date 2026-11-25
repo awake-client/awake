@@ -223,11 +223,21 @@ func pathParameters() map[string]any {
 	}
 }
 
+// pluginAuthenticationRegex matches plugin:<plugin id>/<type>.
+const pluginAuthenticationRegex = `^plugin:[a-z0-9][a-z0-9-]*/[A-Za-z][A-Za-z0-9_]*$`
+
 func authentication() map[string]any {
 	return object(map[string]any{
-		"type": enumeration("How the request authenticates; inherit uses the collection's authentication.",
-			string(domain.AuthenticationInherit), string(domain.AuthenticationNone), string(domain.AuthenticationBasic),
-			string(domain.AuthenticationBearer), string(domain.AuthenticationAPIKey), string(domain.AuthenticationOAuth2)),
+		"type": map[string]any{
+			"description": "How the request authenticates; inherit uses the collection's authentication, plugin:<id>/<type> a plugin.",
+			"anyOf": []any{
+				enumeration("Built-in authentication.",
+					string(domain.AuthenticationInherit), string(domain.AuthenticationNone), string(domain.AuthenticationBasic),
+					string(domain.AuthenticationBearer), string(domain.AuthenticationAPIKey), string(domain.AuthenticationOAuth2)),
+				map[string]any{"type": "string", "pattern": pluginAuthenticationRegex, "description": "Authentication a plugin provides."},
+			},
+		},
+		"fields": variables("Values of an authentication a plugin provides."),
 		"username":         text("Basic authentication user name."),
 		"password":         text("Basic authentication password."),
 		"token":            text("Bearer token, or a static OAuth 2 token."),
