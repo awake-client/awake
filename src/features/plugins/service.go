@@ -407,6 +407,7 @@ func (service *Service) Revoke(workspaceRoot string, pluginID string) error {
 	if err != nil {
 		return err
 	}
+	defer service.invalidateHost()
 	return service.trust.Revoke(declared.WorkspaceID, pluginID)
 }
 
@@ -425,6 +426,7 @@ func (service *Service) Uninstall(workspaceRoot string, pluginID string) error {
 	if err := service.workspace.SavePlugins(workspaceRoot, declared.Marketplaces, plugins); err != nil {
 		return err
 	}
+	defer service.invalidateHost()
 	return service.trust.Revoke(declared.WorkspaceID, pluginID)
 }
 
@@ -536,7 +538,16 @@ func (service *Service) downloadCommit(operationContext context.Context, reposit
 	return manifest, nil
 }
 
+// invalidateHost drops the plugins the host keeps loaded, so a plugin the
+// user disabled stops serving its views at once.
+func (service *Service) invalidateHost() {
+	if service.host != nil {
+		service.host.Invalidate()
+	}
+}
+
 func (service *Service) approve(workspaceID string, declaration domain.PluginDeclaration, manifest Manifest) error {
+	defer service.invalidateHost()
 	return service.trust.Approve(Approval{
 		WorkspaceID: workspaceID,
 		PluginID:    declaration.ID,
@@ -767,4 +778,22 @@ func (service *Service) declaredManifest(workspaceRoot string, pluginID string) 
 		return "", Manifest{}, err
 	}
 	return declared.WorkspaceID, manifest, nil
+}
+
+// Contributions lists what the enabled plugins of the workspace add to the
+// interface: commands, authentication types, dynamic variables and views.
+func (service *Service) Contributions(workspaceRoot string) (UIContributions, error) {
+	if service.host == nil {
+		return UIContributions{}, ErrHostUnavailable
+	}
+	return service.host.Contributions(workspaceRoot), nil
+}
+
+// InvokeView calls a handler on behalf of the page of a view. payload and the
+// result are JSON.
+func (service *Service) InvokeView(workspaceRoot string, pluginID string, viewID string, handler string, payload string) (string, error) {
+	if service.host == nil {
+		return "", ErrHostUnavailable
+	}
+	return service.host.InvokeView(workspaceRoot, pluginID, viewID, handler, payload)
 }

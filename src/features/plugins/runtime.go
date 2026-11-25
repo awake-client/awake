@@ -91,6 +91,11 @@ type Runtime struct {
 // contribution name.
 var handlerGroups = []string{"dynamicVariables", "authentication", "importFormats", "exportFormats", "commands"}
 
+// viewHandlersGroup holds, for each view, the handlers its page may call.
+// Unlike the other groups a view needs no handler, but a handler needs a
+// declared view.
+const viewHandlersGroup = "views"
+
 // LoadRuntime evaluates the bundle of a plugin in a fresh, isolated runtime.
 // It has no module loader, file system or network of its own: everything goes
 // through the awake object, filtered by the permissions of the manifest.
@@ -254,6 +259,42 @@ func (runtime *Runtime) RunCommand(commandID string) (CallLog, error) {
 	})
 }
 
+// InvokeView calls a handler a view of the plugin registered, for the page of
+// that view. The payload and the result travel as JSON, since the page runs
+// in a sandboxed frame of the interface.
+func (runtime *Runtime) InvokeView(viewID string, handler string, payload string) (string, CallLog, error) {
+	var result string
+	log, err := runtime.call(func(machine *goja.Runtime) error {
+		views := runtime.handlers.Get(viewHandlersGroup)
+		if jsruntime.IsAbsent(views) {
+			return fmt.Errorf("%w: no view handler", ErrUndeclaredHandler)
+		}
+		handlers := views.ToObject(machine).Get(viewID)
+		if jsruntime.IsAbsent(handlers) {
+			return fmt.Errorf("%w: view %s has no handler", ErrUndeclaredHandler, viewID)
+		}
+		parsed := goja.Undefined()
+		if payload != "" {
+			value, err := parseJSON(machine, payload)
+			if err != nil {
+				return fmt.Errorf("plugins: the payload is not JSON: %w", err)
+			}
+			parsed = value
+		}
+		value, err := runtime.callHandler(handlers.ToObject(machine).Get(handler), viewHandlersGroup+"."+viewID+"."+handler, runtime.context(map[string]any{"payload": parsed}))
+		if err != nil {
+			return err
+		}
+		encoded, err := json.Marshal(value.Export())
+		if err != nil {
+			return fmt.Errorf("plugins: encode the result of %s: %w", handler, err)
+		}
+		result = string(encoded)
+		return nil
+	})
+	return result, log, err
+}
+
 // call runs one operation under the call timeout, collecting the logs it
 // prints.
 func (runtime *Runtime) call(operation func(machine *goja.Runtime) error) (CallLog, error) {
@@ -380,7 +421,7 @@ func (runtime *Runtime) checkHandlers() error {
 	}
 
 	problems := []string{}
-	known := append(slices.Clone(handlerGroups), string(HookBeforeRequest), string(HookAfterResponse))
+	known := append(slices.Clone(handlerGroups), string(HookBeforeRequest), string(HookAfterResponse), viewHandlersGroup)
 	for _, key := range runtime.handlers.Keys() {
 		if !slices.Contains(known, key) {
 			problems = append(problems, fmt.Sprintf("unknown handler group %q", key))
@@ -409,6 +450,18 @@ func (runtime *Runtime) checkHandlers() error {
 		for _, name := range registered {
 			if !slices.Contains(expected[group], name) {
 				problems = append(problems, fmt.Sprintf("%s %q is registered but not declared", group, name))
+			}
+		}
+	}
+
+	declaredViews := append(
+		namesOf(contributions.ResponseViewers, func(item ResponseViewerContribution) string { return item.ID }),
+		namesOf(contributions.RequestTabs, func(item RequestTabContribution) string { return item.ID })...,
+	)
+	if value := runtime.handlers.Get(viewHandlersGroup); !jsruntime.IsAbsent(value) {
+		for _, name := range value.ToObject(runtime.machine).Keys() {
+			if !slices.Contains(declaredViews, name) {
+				problems = append(problems, fmt.Sprintf("views %q is registered but not declared", name))
 			}
 		}
 	}
