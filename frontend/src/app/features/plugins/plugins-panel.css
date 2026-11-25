@@ -170,13 +170,17 @@ h1 {
 }
 
 .card-header h2 {
+  flex-shrink: 0;
   margin: 0;
   font-size: var(--text-md);
   font-weight: 600;
+  white-space: nowrap;
   color: var(--color-text-strong);
 }
 
+/* The repository URL takes what the title leaves and ends with an ellipsis. */
 .card-header .hint {
+  flex: 1;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;

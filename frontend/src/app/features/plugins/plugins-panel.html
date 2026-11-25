@@ -330,7 +330,9 @@
         <div class="card-header">
           <app-icon name="grid" [size]="15" />
           <h2>{{ marketplace.name }}</h2>
-          <span class="hint mono">{{ marketplace.repository }}</span>
+          <span class="hint mono" [title]="marketplace.repository">{{
+            marketplace.repository
+          }}</span>
           <button
             type="button"
             class="btn btn-ghost btn-sm push-right"
