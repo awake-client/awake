@@ -41,7 +41,13 @@ func (service *Service) CopyAsCurl(workspaceRoot string, requestPath string, env
 		return "", err
 	}
 
-	httpRequest, err := buildHTTPRequestWithContext(context.Background(), request, layers, oauth2Token)
+	// Plugins compute their placeholders and sign the request, so the command
+	// reproduces what Send would put on the wire.
+	layers, _, err = service.addPluginDynamicValues(workspaceRoot, request, layers)
+	if err != nil {
+		return "", err
+	}
+	httpRequest, _, err := service.buildRequest(context.Background(), workspaceRoot, request, layers, oauth2Token)
 	if err != nil {
 		return "", err
 	}

@@ -109,6 +109,7 @@ type Service struct {
 	scripts      ScriptRunner
 	environments EnvironmentWriter
 	collections  CollectionWriter
+	plugins      PluginHost
 }
 
 // NewService returns an HTTP client service backed by source.
@@ -198,10 +199,15 @@ func (service *Service) send(workspaceRoot string, requestPath string, environme
 		return Response{}, err
 	}
 
+	layers, hookLogs := service.runPluginsBeforeRequest(workspaceRoot, &request, labeledLayers, layers)
 	environments := service.environmentResolver(workspaceRoot, requestPath)
 	layers, preRequestOutcome := service.runPreRequest(workspaceRoot, requestPath, environmentFileName, &request, layers, environments, options)
 	service.saveEnvironmentChanges(workspaceRoot, requestPath, environmentFileName, &preRequestOutcome)
 	service.saveCollectionChanges(workspaceRoot, requestPath, &preRequestOutcome)
+	layers, dynamicLogs, err := service.addPluginDynamicValues(workspaceRoot, request, layers)
+	if err != nil {
+		return Response{}, err
+	}
 
 	oauth2Token, err := service.oauth2Token(workspaceRoot, requestPath, environmentFileName, request, layers)
 	if err != nil {
@@ -211,10 +217,11 @@ func (service *Service) send(workspaceRoot string, requestPath string, environme
 	ctx, cancel := service.exchangeContext(options.timeout)
 	defer cancel()
 
-	httpRequest, err := buildHTTPRequestWithContext(ctx, request, layers, oauth2Token)
+	httpRequest, authenticationLogs, err := service.buildRequest(ctx, workspaceRoot, request, layers, oauth2Token)
 	if err != nil {
 		return Response{}, err
 	}
+	preRequestOutcome = withPluginLogs(preRequestOutcome, hookLogs, dynamicLogs, authenticationLogs)
 	sent := captureSentRequest(httpRequest, resolvedAuthentication(request.Authentication))
 
 	startedAt := time.Now()
@@ -249,7 +256,8 @@ func (service *Service) send(workspaceRoot string, requestPath string, environme
 	}
 
 	response.PreRequestOutcome = preRequestOutcome
-	response.PostResponseOutcome = service.runPostResponse(request, response, layers, environments)
+	layers, afterLogs := service.runPluginsAfterResponse(workspaceRoot, request, response, labeledLayers, layers)
+	response.PostResponseOutcome = withPluginLogs(service.runPostResponse(request, response, layers, environments), afterLogs)
 	service.saveEnvironmentChanges(workspaceRoot, requestPath, environmentFileName, &response.PostResponseOutcome)
 	service.saveCollectionChanges(workspaceRoot, requestPath, &response.PostResponseOutcome)
 	if options.recordHistory {
