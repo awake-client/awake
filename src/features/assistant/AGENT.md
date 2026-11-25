@@ -34,6 +34,10 @@ headers:
 
 - `name` is the display name shown in the collection tree.
 - `url` is a template where `{{variableName}}` is replaced at send time.
+- `authentication` has a `type`: `inherit`, `none`, `basic`, `bearer`,
+  `apiKey`, `oauth2`, or `plugin:<plugin id>/<type>` for one a plugin of the
+  workspace provides, with its values under `fields`. Reference secrets as
+  `{{variables}}`, never as values.
 - `parameters`, `headers` and `variables` use compact flow style, one entry
   per line.
 - Request identity is the file path, so renaming a request file is a move.
